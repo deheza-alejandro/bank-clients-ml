@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+
 def print_df_personalizado(nombre_df, df):
     """
     print personalizado
@@ -11,11 +12,11 @@ def print_df_personalizado(nombre_df, df):
     print("Columnas con nulos:", len(nulos))
     print(nulos)
     print("")
-    c_x = [x for x in df.columns if x.endswith('_x')]
+    c_x = [x for x in df.columns if x.endswith("_x")]
     print("Columnas terminadas con _x:", len(c_x))
     print(c_x)
     print("")
-    c_y = [x for x in df.columns if x.endswith('_y')]
+    c_y = [x for x in df.columns if x.endswith("_y")]
     print("Columnas terminadas con _y:", len(c_y))
     print(c_y)
     print("")
@@ -27,7 +28,10 @@ def print_df_personalizado(nombre_df, df):
     print("Columnas con inf:", len(inf))
     print(inf)
 
-def print_threshold_violations(df: pd.DataFrame, column_name: str, threshold: int, condition: str = "lt") -> None:
+
+def print_threshold_violations(
+    df: pd.DataFrame, column_name: str, threshold: int, condition: str = "lt"
+) -> None:
     """Cuenta y muestra la cantidad de registros en una columna que superan o están por debajo de un umbral determinado.
 
     Parámetros:
@@ -48,6 +52,4 @@ def print_threshold_violations(df: pd.DataFrame, column_name: str, threshold: in
     total_count = getattr(df[column_name], condition)(threshold).sum()
 
     # Imprimir el resultado con el formato requerido
-    print(
-        f"Cantidad de registros {symbol} {threshold} en {column_name}: {total_count}"
-    )
+    print(f"Cantidad de registros {symbol} {threshold} en {column_name}: {total_count}")
