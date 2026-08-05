@@ -1,0 +1,5 @@
+# Force line breaks (LF) in the repository
+* text=auto eol=lf
+
+# Mark images as explicit binary files
+*.png binary
