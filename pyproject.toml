@@ -39,3 +39,34 @@ project-includes = [
     "**/*.py*",
     "**/*.ipynb",
 ]
+
+[tool.ruff.lint]
+extend-select = [
+    "C901",    # mccabe: cyclomatic complexity
+    "PLR0911", # pylint: too-many-return-statements
+    "PLR0913", # pylint: too-many-arguments
+    "PLR0915", # pylint: too-many-statements
+    "E", "W",  # pycodestyle
+    "F",       # Pyflakes
+    "I",       # isort
+    "UP",      # pyupgrade
+    "B",       # flake8-bugbear
+    "SIM",     # flake8-simplify
+    "PTH",     # flake8-use-pathlib
+    "S",       # flake8-bandit
+    "RUF",     # Ruff-specific rules
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-statements = 30
+max-args = 5
+max-returns = 5
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 100
+
+# [tool.ruff.lint.extend-per-file-ignores]
+# "tests/*" = ["S101", "C901", "PLR0911", "PLR0915"]
