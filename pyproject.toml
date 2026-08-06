@@ -27,8 +27,15 @@ build-backend = "uv_build"
 dev = [
     "ipykernel>=7.3.0",
     "jupytext>=1.19.5",
+    "pyrefly>=1.2.0",
     "ruff>=0.16.1",
 ]
 
 [tool.jupytext]
 formats = "ipynb,md"
+
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]
