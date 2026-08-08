@@ -53,3 +53,23 @@ def print_threshold_violations(
 
     # Imprimir el resultado con el formato requerido
     print(f"Cantidad de registros {symbol} {threshold} en {column_name}: {total_count}")
+
+
+def describe_full(df):
+    """
+    Muestra la descripción completa del DataFrame sin truncar filas.
+    Para que la consola no corte el output.
+    """
+    pd.set_option('display.max_rows', None)
+    result = df.describe(include='all').T
+    pd.reset_option('display.max_rows')
+    return result
+
+
+def print_value_counts(df, col):
+    """
+    Imprime el value_counts de una columna seguido de una línea en blanco.
+    """
+    print(df[col].value_counts())
+    print("")
+

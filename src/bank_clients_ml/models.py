@@ -106,3 +106,19 @@ def process_model_results(
         combined_df["decil"] = pd.qcut(combined_df["Prob1"], q=10, labels=decile_labels)
 
     return combined_df
+
+
+def train_and_get_feature_importances(X_train, columns, n_iter=5, target="Target"):
+    """
+    Entrena un modelo LightGBM usando RandomizedSearchCV y devuelve el clasificador, el buscador y las importancias de variables.
+    """
+    model, searcher = generar_modelo_y_buscador(n_iter=n_iter)
+    searcher.fit(X_train[columns], X_train[target])
+    importances = pd.Series(
+        searcher.best_estimator_.feature_importances_,
+        index=columns
+    )
+    print("Best score: ", searcher.best_score_)
+    print(searcher)
+    return model, searcher, importances
+

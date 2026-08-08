@@ -36,3 +36,35 @@ def safe_denominator(data, search=0, replace_with=1):
     # usar .to_numpy() es mas rapido, pero se pierden los nombres de las filas y columnas
     values = data.to_numpy()
     return np.where(values == search, replace_with, values)
+
+
+def compute_percentage(num, den):
+    """
+    Calcula el porcentaje entre dos series o columnas evitando división por cero.
+    """
+    return 100 * num / safe_denominator(den)
+
+
+def replace_null_with_value(df, col, value):
+    """
+    Reemplaza los valores nulos de una columna con un valor específico.
+    """
+    return np.where(df[col].isnull(), value, df[col])
+
+
+def calculate_target_percentage_by_category(df, col, target="Target"):
+    """
+    Calcula porcentajes respecto al target por columna categorica.
+    """
+    tabla = df.groupby([col, target]).size().unstack(fill_value=0)
+    denominador_por_categoria = tabla[0.0] + tabla[1.0]
+
+    if (denominador_por_categoria == 0).any():
+        categorias_con_problema = denominador_por_categoria[denominador_por_categoria == 0].index.tolist()
+        # el denominador_por_categoria nunca deberia ser 0. si da 0 es porque estoy haciendo algo mal
+        raise ValueError(
+            f"Error: La columna '{col}' tiene categorías con denominador 0: {categorias_con_problema}"
+        )
+
+    return (100 * tabla[1.0] / denominador_por_categoria).round(3)
+
