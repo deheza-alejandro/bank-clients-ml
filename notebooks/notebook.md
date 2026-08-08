@@ -28,7 +28,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-from bank_clients_ml.utils import print_df_personalizado, print_threshold_violations
+from bank_clients_ml.utils import print_df_personalizado, print_threshold_violations, describe_full, print_value_counts
+from bank_clients_ml.features import compute_percentage, replace_null_with_value, calculate_target_percentage_by_category
+from bank_clients_ml.models import train_and_get_feature_importances
+
 ```
 
 ```python
@@ -38,12 +41,7 @@ print_df_personalizado("data", data)
 ```
 
 ```python
-pd.set_option('display.max_rows', None) # para que la consola no corte el output
-data.describe(include='all').T
-```
-
-```python
-pd.reset_option('display.max_rows')
+describe_full(data)
 ```
 
 ```python
@@ -75,8 +73,7 @@ for column in greater_than_thirty_one_columns:
 
 ```python
 for x in data.columns:
-    print(data[x].value_counts())
-    print("")
+    print_value_counts(data, x)
 ```
 
 ## Obtener meses relevantes
@@ -251,10 +248,11 @@ Saco el promedio entre "SavingAccount_Balance_FirstDate" y "SavingAccount_Balanc
 Este no es el calculo correcto para "SavingAccount_Balance_Average", pero no va a afectar tanto al modelo porque son solo 4 registros con nulos ademas de que no hay una forma sencilla de calcular el "SavingAccount_Balance_Average" con los datos que tenemos
 
 ```python
-data_entrenamiento['SavingAccount_Balance_Average'] = \
-np.where(data_entrenamiento.SavingAccount_Balance_Average.isnull(), 
-         (data_entrenamiento.SavingAccount_Balance_FirstDate + data_entrenamiento.SavingAccount_Balance_LastDate)/2, 
-         data_entrenamiento.SavingAccount_Balance_Average)
+data_entrenamiento['SavingAccount_Balance_Average'] = replace_null_with_value(
+    data_entrenamiento, 
+    'SavingAccount_Balance_Average', 
+    (data_entrenamiento.SavingAccount_Balance_FirstDate + data_entrenamiento.SavingAccount_Balance_LastDate)/2
+)
 ```
 
 ## Completando 'Region'
@@ -264,10 +262,7 @@ regiones_x_cliente = data[data['Month'] == primer_mes_prediccion] [['client_id',
 print("columnas con nulos en regiones_x_cliente:", regiones_x_cliente.columns[regiones_x_cliente.isnull().any()].tolist())
 print("cantidad de nulos en Region:", regiones_x_cliente.Region.isnull().sum())
 
-regiones_x_cliente['Region'] = \
-np.where(regiones_x_cliente.Region.isnull(), 
-         'BUENOS AIRES', # pongo la mas comun
-         regiones_x_cliente.Region)
+regiones_x_cliente['Region'] = replace_null_with_value(regiones_x_cliente, 'Region', 'BUENOS AIRES') # pongo la Region mas comun
 print("columnas con nulos en regiones_x_cliente:", regiones_x_cliente.columns[regiones_x_cliente.isnull().any()].tolist())
 
 data_entrenamiento = data_entrenamiento.drop(columns=['Region'])
@@ -350,23 +345,11 @@ data_if = data_entrenamiento[data_entrenamiento['Month'] == ultimo_mes_entrenami
 ```python
 data_if = data_if.merge(universo_con_target, how='inner', on='client_id')
 
-# Porcentajes respecto al target por columna categorica
 for col in ['Client_Age_grp', 'Region', 'CreditCard_Product']:
-    print(data_if[[col]].value_counts())
-    tabla = data_if.groupby([col, 'Target']).size().unstack(fill_value=0)
-    denominador_por_categoria = tabla[0.0] + tabla[1.0]
-
-    if (denominador_por_categoria == 0).any(): 
-        categorias_con_problema = denominador_por_categoria[denominador_por_categoria == 0].index.tolist()
-        # el denominador_por_categoria nunca deberia ser 0. si da 0 es porque estoy haciendo algo mal
-        raise ValueError(
-            f"Error: La columna '{col}' tiene categorías con denominador 0: {categorias_con_problema}"
-        )
-
-    porcentajes = (100 * tabla[1.0] / denominador_por_categoria).round(3)
+    print_value_counts(data_if, col)
+    porcentajes = calculate_target_percentage_by_category(data_if, col)
     data_if[col] = data_if[col].map(porcentajes.to_dict())
-    print(data_if[[col]].value_counts())
-    print("")
+    print_value_counts(data_if, col)
 ```
 
 # Fechas
@@ -387,15 +370,7 @@ print("data_if:", data_if.shape)
 ```
 
 ```python
-pd.set_option('display.max_rows', None)
-```
-
-```python
-data_if.describe(include='all').T
-```
-
-```python
-pd.reset_option('display.max_rows')
+describe_full(data_if)
 ```
 
 # Transform features
@@ -479,55 +454,55 @@ transformadas_2 = {
 # SAVING ACCOUNT
 'SavingAccount_Balance_last_minus_first_date': data_entrenamiento['SavingAccount_Balance_LastDate'] - data_entrenamiento['SavingAccount_Balance_FirstDate'],
 
-'SavingAccount_Balance_last_minus_first_date_porc': 100 * data_entrenamiento['SavingAccount_Balance_LastDate'] / safe_denominator(data_entrenamiento['SavingAccount_Balance_FirstDate']),
+'SavingAccount_Balance_last_minus_first_date_porc': compute_percentage(data_entrenamiento['SavingAccount_Balance_LastDate'], data_entrenamiento['SavingAccount_Balance_FirstDate']),
 
-'SavingAccount_Days_with_Debits_porc': 100 * data_entrenamiento['SavingAccount_Days_with_Debits'] / safe_denominator(data_entrenamiento['SavingAccount_Days_with_use']),
-'SavingAccount_Days_with_Credits_porc': 100 * data_entrenamiento['SavingAccount_Days_with_Credits'] / safe_denominator(data_entrenamiento['SavingAccount_Days_with_use']),
+'SavingAccount_Days_with_Debits_porc': compute_percentage(data_entrenamiento['SavingAccount_Days_with_Debits'], data_entrenamiento['SavingAccount_Days_with_use']),
+'SavingAccount_Days_with_Credits_porc': compute_percentage(data_entrenamiento['SavingAccount_Days_with_Credits'], data_entrenamiento['SavingAccount_Days_with_use']),
 
-'SavingAccount_Credits_Transactions_porc': 100 * data_entrenamiento['SavingAccount_Credits_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Transactions_Transactions']), 
-'SavingAccount_Debits_Transactions_porc': 100 * data_entrenamiento['SavingAccount_Debits_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Transactions_Transactions']), 
+'SavingAccount_Credits_Transactions_porc': compute_percentage(data_entrenamiento['SavingAccount_Credits_Transactions'], data_entrenamiento['SavingAccount_Transactions_Transactions']), 
+'SavingAccount_Debits_Transactions_porc': compute_percentage(data_entrenamiento['SavingAccount_Debits_Transactions'], data_entrenamiento['SavingAccount_Transactions_Transactions']), 
 
 'SavingAccount_Transactions_Transactions_DAYS_prom': data_entrenamiento['SavingAccount_Credits_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Days_with_use']),
 'SavingAccount_Credits_Transactions_DAYS_prom': data_entrenamiento['SavingAccount_Credits_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Days_with_Credits']),
 'SavingAccount_Debits_Transactions_DAYS_prom': data_entrenamiento['SavingAccount_Debits_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Days_with_Debits']),
 
 
-'SavingAccount_Salary_Payment_Transactions_porc': 100 * data_entrenamiento['SavingAccount_Salary_Payment_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Transactions_Transactions']),
-'SavingAccount_Transfer_In_Transactions_porc': 100 * data_entrenamiento['SavingAccount_Transfer_In_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Transactions_Transactions']),
-'SavingAccount_ATM_Extraction_Transactions_porc': 100 * data_entrenamiento['SavingAccount_ATM_Extraction_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Transactions_Transactions']), 
-'SavingAccount_Service_Payment_Transactions_porc': 100 * data_entrenamiento['SavingAccount_Service_Payment_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Transactions_Transactions']),
-'SavingAccount_CreditCard_Payment_Transactions_porc': 100 * data_entrenamiento['SavingAccount_CreditCard_Payment_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Transactions_Transactions']),
-'SavingAccount_Transfer_Out_Transactions_porc': 100 * data_entrenamiento['SavingAccount_Transfer_Out_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Transactions_Transactions']),
-'SavingAccount_DebitCard_Spend_Transactions_porc': 100 * data_entrenamiento['SavingAccount_DebitCard_Spend_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Transactions_Transactions']),
+'SavingAccount_Salary_Payment_Transactions_porc': compute_percentage(data_entrenamiento['SavingAccount_Salary_Payment_Transactions'], data_entrenamiento['SavingAccount_Transactions_Transactions']),
+'SavingAccount_Transfer_In_Transactions_porc': compute_percentage(data_entrenamiento['SavingAccount_Transfer_In_Transactions'], data_entrenamiento['SavingAccount_Transactions_Transactions']),
+'SavingAccount_ATM_Extraction_Transactions_porc': compute_percentage(data_entrenamiento['SavingAccount_ATM_Extraction_Transactions'], data_entrenamiento['SavingAccount_Transactions_Transactions']), 
+'SavingAccount_Service_Payment_Transactions_porc': compute_percentage(data_entrenamiento['SavingAccount_Service_Payment_Transactions'], data_entrenamiento['SavingAccount_Transactions_Transactions']),
+'SavingAccount_CreditCard_Payment_Transactions_porc': compute_percentage(data_entrenamiento['SavingAccount_CreditCard_Payment_Transactions'], data_entrenamiento['SavingAccount_Transactions_Transactions']),
+'SavingAccount_Transfer_Out_Transactions_porc': compute_percentage(data_entrenamiento['SavingAccount_Transfer_Out_Transactions'], data_entrenamiento['SavingAccount_Transactions_Transactions']),
+'SavingAccount_DebitCard_Spend_Transactions_porc': compute_percentage(data_entrenamiento['SavingAccount_DebitCard_Spend_Transactions'], data_entrenamiento['SavingAccount_Transactions_Transactions']),
 
-'SavingAccount_Salary_Payment_Transactions_CR_porc': 100 * data_entrenamiento['SavingAccount_Salary_Payment_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Credits_Transactions']),
-'SavingAccount_Transfer_In_Transactions_CR_porc': 100 * data_entrenamiento['SavingAccount_Transfer_In_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Credits_Transactions']),
-'SavingAccount_ATM_Extraction_Transactions_DE_porc': 100 * data_entrenamiento['SavingAccount_ATM_Extraction_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Debits_Transactions']),
-'SavingAccount_Service_Payment_Transactions_DE_porc': 100 * data_entrenamiento['SavingAccount_Service_Payment_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Debits_Transactions']),
-'SavingAccount_CreditCard_Payment_Transactions_DE_porc': 100 * data_entrenamiento['SavingAccount_CreditCard_Payment_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Debits_Transactions']),
-'SavingAccount_Transfer_Out_Transactions_DE_porc': 100 * data_entrenamiento['SavingAccount_Transfer_Out_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Debits_Transactions']),
-'SavingAccount_DebitCard_Spend_Transactions_DE_porc': 100 * data_entrenamiento['SavingAccount_DebitCard_Spend_Transactions'] / safe_denominator(data_entrenamiento['SavingAccount_Debits_Transactions']),
+'SavingAccount_Salary_Payment_Transactions_CR_porc': compute_percentage(data_entrenamiento['SavingAccount_Salary_Payment_Transactions'], data_entrenamiento['SavingAccount_Credits_Transactions']),
+'SavingAccount_Transfer_In_Transactions_CR_porc': compute_percentage(data_entrenamiento['SavingAccount_Transfer_In_Transactions'], data_entrenamiento['SavingAccount_Credits_Transactions']),
+'SavingAccount_ATM_Extraction_Transactions_DE_porc': compute_percentage(data_entrenamiento['SavingAccount_ATM_Extraction_Transactions'], data_entrenamiento['SavingAccount_Debits_Transactions']),
+'SavingAccount_Service_Payment_Transactions_DE_porc': compute_percentage(data_entrenamiento['SavingAccount_Service_Payment_Transactions'], data_entrenamiento['SavingAccount_Debits_Transactions']),
+'SavingAccount_CreditCard_Payment_Transactions_DE_porc': compute_percentage(data_entrenamiento['SavingAccount_CreditCard_Payment_Transactions'], data_entrenamiento['SavingAccount_Debits_Transactions']),
+'SavingAccount_Transfer_Out_Transactions_DE_porc': compute_percentage(data_entrenamiento['SavingAccount_Transfer_Out_Transactions'], data_entrenamiento['SavingAccount_Debits_Transactions']),
+'SavingAccount_DebitCard_Spend_Transactions_DE_porc': compute_percentage(data_entrenamiento['SavingAccount_DebitCard_Spend_Transactions'], data_entrenamiento['SavingAccount_Debits_Transactions']),
 
     
-'SavingAccount_Credits_Amounts_porc': 100 * data_entrenamiento['SavingAccount_Credits_Amounts'] / safe_denominator(data_entrenamiento['SavingAccount_Total_Amount']),
-'SavingAccount_Debits_Amounts_porc': 100 * data_entrenamiento['SavingAccount_Debits_Amounts'] / safe_denominator(data_entrenamiento['SavingAccount_Total_Amount']),
+'SavingAccount_Credits_Amounts_porc': compute_percentage(data_entrenamiento['SavingAccount_Credits_Amounts'], data_entrenamiento['SavingAccount_Total_Amount']),
+'SavingAccount_Debits_Amounts_porc': compute_percentage(data_entrenamiento['SavingAccount_Debits_Amounts'], data_entrenamiento['SavingAccount_Total_Amount']),
 
 
-'SavingAccount_Salary_Payment_Amount_porc': 100 * data_entrenamiento['SavingAccount_Salary_Payment_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Total_Amount']),
-'SavingAccount_Transfer_In_Amount_porc': 100 * data_entrenamiento['SavingAccount_Transfer_In_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Total_Amount']),
-'SavingAccount_ATM_Extraction_Amount_porc': 100 * data_entrenamiento['SavingAccount_ATM_Extraction_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Total_Amount']),
-'SavingAccount_Service_Payment_Amount_porc': 100 * data_entrenamiento['SavingAccount_Service_Payment_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Total_Amount']),
-'SavingAccount_CreditCard_Payment_Amount_porc': 100 * data_entrenamiento['SavingAccount_CreditCard_Payment_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Total_Amount']),
-'SavingAccount_Transfer_Out_Amount_porc': 100 * data_entrenamiento['SavingAccount_Transfer_Out_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Total_Amount']), 
-'SavingAccount_DebitCard_Spend_Amount_porc': 100 * data_entrenamiento['SavingAccount_DebitCard_Spend_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Total_Amount']), 
+'SavingAccount_Salary_Payment_Amount_porc': compute_percentage(data_entrenamiento['SavingAccount_Salary_Payment_Amount'], data_entrenamiento['SavingAccount_Total_Amount']),
+'SavingAccount_Transfer_In_Amount_porc': compute_percentage(data_entrenamiento['SavingAccount_Transfer_In_Amount'], data_entrenamiento['SavingAccount_Total_Amount']),
+'SavingAccount_ATM_Extraction_Amount_porc': compute_percentage(data_entrenamiento['SavingAccount_ATM_Extraction_Amount'], data_entrenamiento['SavingAccount_Total_Amount']),
+'SavingAccount_Service_Payment_Amount_porc': compute_percentage(data_entrenamiento['SavingAccount_Service_Payment_Amount'], data_entrenamiento['SavingAccount_Total_Amount']),
+'SavingAccount_CreditCard_Payment_Amount_porc': compute_percentage(data_entrenamiento['SavingAccount_CreditCard_Payment_Amount'], data_entrenamiento['SavingAccount_Total_Amount']),
+'SavingAccount_Transfer_Out_Amount_porc': compute_percentage(data_entrenamiento['SavingAccount_Transfer_Out_Amount'], data_entrenamiento['SavingAccount_Total_Amount']), 
+'SavingAccount_DebitCard_Spend_Amount_porc': compute_percentage(data_entrenamiento['SavingAccount_DebitCard_Spend_Amount'], data_entrenamiento['SavingAccount_Total_Amount']), 
 
-'SavingAccount_Salary_Payment_Amount_CR_porc': 100 * data_entrenamiento['SavingAccount_Salary_Payment_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Credits_Amounts']), 
-'SavingAccount_Transfer_In_Amount_CR_porc': 100 * data_entrenamiento['SavingAccount_Transfer_In_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Credits_Amounts']), 
-'SavingAccount_ATM_Extraction_Amount_DE_porc': 100 * data_entrenamiento['SavingAccount_ATM_Extraction_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Debits_Amounts']), 
-'SavingAccount_Service_Payment_Amount_DE_porc': 100 * data_entrenamiento['SavingAccount_Service_Payment_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Debits_Amounts']), 
-'SavingAccount_CreditCard_Payment_Amount_DE_porc': 100 * data_entrenamiento['SavingAccount_CreditCard_Payment_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Debits_Amounts']), 
-'SavingAccount_Transfer_Out_Amount_DE_porc': 100 * data_entrenamiento['SavingAccount_Transfer_Out_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Debits_Amounts']), 
-'SavingAccount_DebitCard_Spend_Amount_DE_porc': 100 * data_entrenamiento['SavingAccount_DebitCard_Spend_Amount'] / safe_denominator(data_entrenamiento['SavingAccount_Debits_Amounts']), 
+'SavingAccount_Salary_Payment_Amount_CR_porc': compute_percentage(data_entrenamiento['SavingAccount_Salary_Payment_Amount'], data_entrenamiento['SavingAccount_Credits_Amounts']), 
+'SavingAccount_Transfer_In_Amount_CR_porc': compute_percentage(data_entrenamiento['SavingAccount_Transfer_In_Amount'], data_entrenamiento['SavingAccount_Credits_Amounts']), 
+'SavingAccount_ATM_Extraction_Amount_DE_porc': compute_percentage(data_entrenamiento['SavingAccount_ATM_Extraction_Amount'], data_entrenamiento['SavingAccount_Debits_Amounts']), 
+'SavingAccount_Service_Payment_Amount_DE_porc': compute_percentage(data_entrenamiento['SavingAccount_Service_Payment_Amount'], data_entrenamiento['SavingAccount_Debits_Amounts']), 
+'SavingAccount_CreditCard_Payment_Amount_DE_porc': compute_percentage(data_entrenamiento['SavingAccount_CreditCard_Payment_Amount'], data_entrenamiento['SavingAccount_Debits_Amounts']), 
+'SavingAccount_Transfer_Out_Amount_DE_porc': compute_percentage(data_entrenamiento['SavingAccount_Transfer_Out_Amount'], data_entrenamiento['SavingAccount_Debits_Amounts']), 
+'SavingAccount_DebitCard_Spend_Amount_DE_porc': compute_percentage(data_entrenamiento['SavingAccount_DebitCard_Spend_Amount'], data_entrenamiento['SavingAccount_Debits_Amounts']), 
 
 
 
@@ -539,25 +514,25 @@ transformadas_2 = {
 
 
 # OPERATION
-'Operations_digitales_porc': 100 * data_entrenamiento['Operations_digitales'] / safe_denominator(data_entrenamiento['Operations_total']), 
-'Operations_presenciales_porc': 100 * data_entrenamiento['Operations_presenciales'] / safe_denominator(data_entrenamiento['Operations_total']), 
+'Operations_digitales_porc': compute_percentage(data_entrenamiento['Operations_digitales'], data_entrenamiento['Operations_total']), 
+'Operations_presenciales_porc': compute_percentage(data_entrenamiento['Operations_presenciales'], data_entrenamiento['Operations_total']), 
 
-'Operations_Bank_porc': 100 * data_entrenamiento['Operations_Bank'] / safe_denominator(data_entrenamiento['Operations_total']), 
-'Operations_Terminal_porc': 100 * data_entrenamiento['Operations_Terminal'] / safe_denominator(data_entrenamiento['Operations_total']), 
-'Operations_HomeBanking_porc': 100 * data_entrenamiento['Operations_HomeBanking'] / safe_denominator(data_entrenamiento['Operations_total']), 
-'Operations_Mobile_porc': 100 * data_entrenamiento['Operations_Mobile'] / safe_denominator(data_entrenamiento['Operations_total']), 
-'Operations_Ivr_porc': 100 * data_entrenamiento['Operations_Ivr'] / safe_denominator(data_entrenamiento['Operations_total']), 
-'Operations_Telemarketer_porc': 100 * data_entrenamiento['Operations_Telemarketer'] / safe_denominator(data_entrenamiento['Operations_total']), 
-'Operations_ATM_porc': 100 * data_entrenamiento['Operations_ATM'] / safe_denominator(data_entrenamiento['Operations_total']), 
+'Operations_Bank_porc': compute_percentage(data_entrenamiento['Operations_Bank'], data_entrenamiento['Operations_total']), 
+'Operations_Terminal_porc': compute_percentage(data_entrenamiento['Operations_Terminal'], data_entrenamiento['Operations_total']), 
+'Operations_HomeBanking_porc': compute_percentage(data_entrenamiento['Operations_HomeBanking'], data_entrenamiento['Operations_total']), 
+'Operations_Mobile_porc': compute_percentage(data_entrenamiento['Operations_Mobile'], data_entrenamiento['Operations_total']), 
+'Operations_Ivr_porc': compute_percentage(data_entrenamiento['Operations_Ivr'], data_entrenamiento['Operations_total']), 
+'Operations_Telemarketer_porc': compute_percentage(data_entrenamiento['Operations_Telemarketer'], data_entrenamiento['Operations_total']), 
+'Operations_ATM_porc': compute_percentage(data_entrenamiento['Operations_ATM'], data_entrenamiento['Operations_total']), 
 
 
-'Operations_Bank_P_porc': 100 * data_entrenamiento['Operations_Bank'] / safe_denominator(data_entrenamiento['Operations_presenciales']), 
-'Operations_Terminal_P_porc': 100 * data_entrenamiento['Operations_Terminal'] / safe_denominator(data_entrenamiento['Operations_presenciales']), 
-'Operations_HomeBanking_D_porc': 100 * data_entrenamiento['Operations_HomeBanking'] / safe_denominator(data_entrenamiento['Operations_digitales']), 
-'Operations_Mobile_D_porc': 100 * data_entrenamiento['Operations_Mobile'] / safe_denominator(data_entrenamiento['Operations_digitales']), 
-'Operations_Ivr_D_porc': 100 * data_entrenamiento['Operations_Ivr'] / safe_denominator(data_entrenamiento['Operations_digitales']), 
-'Operations_Telemarketer_D_porc': 100 * data_entrenamiento['Operations_Telemarketer'] / safe_denominator(data_entrenamiento['Operations_digitales']), 
-'Operations_ATM_P_porc': 100 * data_entrenamiento['Operations_ATM'] / safe_denominator(data_entrenamiento['Operations_presenciales']), 
+'Operations_Bank_P_porc': compute_percentage(data_entrenamiento['Operations_Bank'], data_entrenamiento['Operations_presenciales']), 
+'Operations_Terminal_P_porc': compute_percentage(data_entrenamiento['Operations_Terminal'], data_entrenamiento['Operations_presenciales']), 
+'Operations_HomeBanking_D_porc': compute_percentage(data_entrenamiento['Operations_HomeBanking'], data_entrenamiento['Operations_digitales']), 
+'Operations_Mobile_D_porc': compute_percentage(data_entrenamiento['Operations_Mobile'], data_entrenamiento['Operations_digitales']), 
+'Operations_Ivr_D_porc': compute_percentage(data_entrenamiento['Operations_Ivr'], data_entrenamiento['Operations_digitales']), 
+'Operations_Telemarketer_D_porc': compute_percentage(data_entrenamiento['Operations_Telemarketer'], data_entrenamiento['Operations_digitales']), 
+'Operations_ATM_P_porc': compute_percentage(data_entrenamiento['Operations_ATM'], data_entrenamiento['Operations_presenciales']), 
 
 
 
@@ -567,41 +542,41 @@ transformadas_2 = {
 
 
 # CREDIT CARD
-'CreditCard_Payment_digitales_porc': 100 * data_entrenamiento['CreditCard_Payment_digitales'] / safe_denominator(data_entrenamiento['CreditCard_Payment_total']), 
-'CreditCard_Payment_presenciales_porc': 100 * data_entrenamiento['CreditCard_Payment_presenciales'] / safe_denominator(data_entrenamiento['CreditCard_Payment_total']), 
+'CreditCard_Payment_digitales_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_digitales'], data_entrenamiento['CreditCard_Payment_total']), 
+'CreditCard_Payment_presenciales_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_presenciales'], data_entrenamiento['CreditCard_Payment_total']), 
 
 
-'CreditCard_Payment_Aut_Debit_porc': 100 * data_entrenamiento['CreditCard_Payment_Aut_Debit'] / safe_denominator(data_entrenamiento['CreditCard_Payment_total']), 
-'CreditCard_Payment_External_porc': 100 * data_entrenamiento['CreditCard_Payment_External'] / safe_denominator(data_entrenamiento['CreditCard_Payment_total']), 
-'CreditCard_Payment_Cash_porc': 100 * data_entrenamiento['CreditCard_Payment_Cash'] / safe_denominator(data_entrenamiento['CreditCard_Payment_total']), 
-'CreditCard_Payment_Web_porc': 100 * data_entrenamiento['CreditCard_Payment_Web'] / safe_denominator(data_entrenamiento['CreditCard_Payment_total']), 
-'CreditCard_Payment_ATM_porc': 100 * data_entrenamiento['CreditCard_Payment_ATM'] / safe_denominator(data_entrenamiento['CreditCard_Payment_total']), 
-'CreditCard_Payment_TAS_porc': 100 * data_entrenamiento['CreditCard_Payment_TAS'] / safe_denominator(data_entrenamiento['CreditCard_Payment_total']), 
+'CreditCard_Payment_Aut_Debit_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Aut_Debit'], data_entrenamiento['CreditCard_Payment_total']), 
+'CreditCard_Payment_External_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_External'], data_entrenamiento['CreditCard_Payment_total']), 
+'CreditCard_Payment_Cash_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Cash'], data_entrenamiento['CreditCard_Payment_total']), 
+'CreditCard_Payment_Web_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Web'], data_entrenamiento['CreditCard_Payment_total']), 
+'CreditCard_Payment_ATM_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_ATM'], data_entrenamiento['CreditCard_Payment_total']), 
+'CreditCard_Payment_TAS_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_TAS'], data_entrenamiento['CreditCard_Payment_total']), 
 
-'CreditCard_Payment_Aut_Debit_D_porc': 100 * data_entrenamiento['CreditCard_Payment_Aut_Debit'] / safe_denominator(data_entrenamiento['CreditCard_Payment_digitales']), 
-'CreditCard_Payment_External_P_porc': 100 * data_entrenamiento['CreditCard_Payment_External'] / safe_denominator(data_entrenamiento['CreditCard_Payment_presenciales']), 
-'CreditCard_Payment_Cash_P_porc': 100 * data_entrenamiento['CreditCard_Payment_Cash'] / safe_denominator(data_entrenamiento['CreditCard_Payment_presenciales']), 
-'CreditCard_Payment_Web_D_porc': 100 * data_entrenamiento['CreditCard_Payment_Web'] / safe_denominator(data_entrenamiento['CreditCard_Payment_digitales']), 
-'CreditCard_Payment_ATM_P_porc': 100 * data_entrenamiento['CreditCard_Payment_ATM'] / safe_denominator(data_entrenamiento['CreditCard_Payment_presenciales']), 
-'CreditCard_Payment_TAS_P_porc': 100 * data_entrenamiento['CreditCard_Payment_TAS'] / safe_denominator(data_entrenamiento['CreditCard_Payment_presenciales']), 
+'CreditCard_Payment_Aut_Debit_D_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Aut_Debit'], data_entrenamiento['CreditCard_Payment_digitales']), 
+'CreditCard_Payment_External_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_External'], data_entrenamiento['CreditCard_Payment_presenciales']), 
+'CreditCard_Payment_Cash_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Cash'], data_entrenamiento['CreditCard_Payment_presenciales']), 
+'CreditCard_Payment_Web_D_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Web'], data_entrenamiento['CreditCard_Payment_digitales']), 
+'CreditCard_Payment_ATM_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_ATM'], data_entrenamiento['CreditCard_Payment_presenciales']), 
+'CreditCard_Payment_TAS_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_TAS'], data_entrenamiento['CreditCard_Payment_presenciales']), 
 
 
-'CreditCard_Balance_ARG_limit_porc': 100 * data_entrenamiento['CreditCard_Balance_ARG'] / safe_denominator(data_entrenamiento['CreditCard_Total_Limit']), 
-'CreditCard_Balance_DOLLAR_limit_porc': 100 * data_entrenamiento['CreditCard_Balance_DOLLAR'] / safe_denominator(data_entrenamiento['CreditCard_Total_Limit']), 
-'CreditCard_Total_Spending_limit_porc': 100 * data_entrenamiento['CreditCard_Total_Spending'] / safe_denominator(data_entrenamiento['CreditCard_Total_Limit']), 
-'CreditCard_Spending_1_Installment_limit_porc': 100 * data_entrenamiento['CreditCard_Spending_1_Installment'] / safe_denominator(data_entrenamiento['CreditCard_Total_Limit']), 
-'CreditCard_Spending_Installments_limit_porc': 100 * data_entrenamiento['CreditCard_Spending_Installments'] / safe_denominator(data_entrenamiento['CreditCard_Total_Limit']), 
-'CreditCard_Spending_CrossBoarder_limit_porc': 100 * data_entrenamiento['CreditCard_Spending_CrossBoarder'] / safe_denominator(data_entrenamiento['CreditCard_Total_Limit']), 
-'CreditCard_Spending_Aut_Debits_limit_porc': 100 * data_entrenamiento['CreditCard_Spending_Aut_Debits'] / safe_denominator(data_entrenamiento['CreditCard_Total_Limit']), 
-'CreditCard_Revolving_limit_porc': 100 * data_entrenamiento['CreditCard_Revolving'] / safe_denominator(data_entrenamiento['CreditCard_Total_Limit']), 
+'CreditCard_Balance_ARG_limit_porc': compute_percentage(data_entrenamiento['CreditCard_Balance_ARG'], data_entrenamiento['CreditCard_Total_Limit']), 
+'CreditCard_Balance_DOLLAR_limit_porc': compute_percentage(data_entrenamiento['CreditCard_Balance_DOLLAR'], data_entrenamiento['CreditCard_Total_Limit']), 
+'CreditCard_Total_Spending_limit_porc': compute_percentage(data_entrenamiento['CreditCard_Total_Spending'], data_entrenamiento['CreditCard_Total_Limit']), 
+'CreditCard_Spending_1_Installment_limit_porc': compute_percentage(data_entrenamiento['CreditCard_Spending_1_Installment'], data_entrenamiento['CreditCard_Total_Limit']), 
+'CreditCard_Spending_Installments_limit_porc': compute_percentage(data_entrenamiento['CreditCard_Spending_Installments'], data_entrenamiento['CreditCard_Total_Limit']), 
+'CreditCard_Spending_CrossBoarder_limit_porc': compute_percentage(data_entrenamiento['CreditCard_Spending_CrossBoarder'], data_entrenamiento['CreditCard_Total_Limit']), 
+'CreditCard_Spending_Aut_Debits_limit_porc': compute_percentage(data_entrenamiento['CreditCard_Spending_Aut_Debits'], data_entrenamiento['CreditCard_Total_Limit']), 
+'CreditCard_Revolving_limit_porc': compute_percentage(data_entrenamiento['CreditCard_Revolving'], data_entrenamiento['CreditCard_Total_Limit']), 
 
-'CreditCard_Balance_ARG_SP_porc': 100 * data_entrenamiento['CreditCard_Balance_ARG'] / safe_denominator(data_entrenamiento['CreditCard_Total_Spending']), 
-'CreditCard_Balance_DOLLAR_SP_porc': 100 * data_entrenamiento['CreditCard_Balance_DOLLAR'] / safe_denominator(data_entrenamiento['CreditCard_Total_Spending']), 
-'CreditCard_Spending_1_Installment_SP_porc': 100 * data_entrenamiento['CreditCard_Spending_1_Installment'] / safe_denominator(data_entrenamiento['CreditCard_Total_Spending']), 
-'CreditCard_Spending_Installments_SP_porc': 100 * data_entrenamiento['CreditCard_Spending_Installments'] / safe_denominator(data_entrenamiento['CreditCard_Total_Spending']), 
-'CreditCard_Spending_CrossBoarder_SP_porc': 100 * data_entrenamiento['CreditCard_Spending_CrossBoarder'] / safe_denominator(data_entrenamiento['CreditCard_Total_Spending']), 
-'CreditCard_Spending_Aut_Debits_SP_porc': 100 * data_entrenamiento['CreditCard_Spending_Aut_Debits'] / safe_denominator(data_entrenamiento['CreditCard_Total_Spending']), 
-'CreditCard_Revolving_SP_porc': 100 * data_entrenamiento['CreditCard_Revolving'] / safe_denominator(data_entrenamiento['CreditCard_Total_Spending']), 
+'CreditCard_Balance_ARG_SP_porc': compute_percentage(data_entrenamiento['CreditCard_Balance_ARG'], data_entrenamiento['CreditCard_Total_Spending']), 
+'CreditCard_Balance_DOLLAR_SP_porc': compute_percentage(data_entrenamiento['CreditCard_Balance_DOLLAR'], data_entrenamiento['CreditCard_Total_Spending']), 
+'CreditCard_Spending_1_Installment_SP_porc': compute_percentage(data_entrenamiento['CreditCard_Spending_1_Installment'], data_entrenamiento['CreditCard_Total_Spending']), 
+'CreditCard_Spending_Installments_SP_porc': compute_percentage(data_entrenamiento['CreditCard_Spending_Installments'], data_entrenamiento['CreditCard_Total_Spending']), 
+'CreditCard_Spending_CrossBoarder_SP_porc': compute_percentage(data_entrenamiento['CreditCard_Spending_CrossBoarder'], data_entrenamiento['CreditCard_Total_Spending']), 
+'CreditCard_Spending_Aut_Debits_SP_porc': compute_percentage(data_entrenamiento['CreditCard_Spending_Aut_Debits'], data_entrenamiento['CreditCard_Total_Spending']), 
+'CreditCard_Revolving_SP_porc': compute_percentage(data_entrenamiento['CreditCard_Revolving'], data_entrenamiento['CreditCard_Total_Spending']), 
 
 
 
@@ -655,15 +630,7 @@ print(data_entrenamiento.shape)
 ```
 
 ```python
-pd.set_option('display.max_rows', None)
-```
-
-```python
-data_entrenamiento.describe(include='all').T
-```
-
-```python
-pd.reset_option('display.max_rows')
+describe_full(data_entrenamiento)
 ```
 
 ```python
@@ -782,7 +749,7 @@ df_ptp = df_max - df_min
 df_diff = df_last - df_first
 
 # Diferencia relativa: (último / primero)
-df_diff_rel = 100 * df_last / safe_denominator(df_first)
+df_diff_rel = compute_percentage(df_last, df_first)
 # Variación porcentual: 1 - diferencia relativa
 df_variacion = df_diff_rel - 100
 
