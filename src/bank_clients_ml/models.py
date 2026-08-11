@@ -63,6 +63,9 @@ def generar_modelo_y_buscador(n_iter=100):
     return modelo_LightGBM_clasificador, buscador_mejores_hiperparametros
 
 
+DECILE_LABELS = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
+
+
 def process_model_results(
     df: pd.DataFrame, probabilities: np.ndarray, bins: list[int] = []
 ) -> pd.DataFrame:
@@ -77,7 +80,8 @@ def process_model_results(
     probabilities : np.ndarray
         Array bidimensional con las probabilidades predichas por el modelo.
     bins : list[int], opcional
-        Si no esta vacia, usa los bins y calcula la columna de porcentaje 'porc' para tests (por defecto esta vacia).
+        Si no esta vacia, usa los bins y calcula la columna de porcentaje 'porc' para tests
+        (por defecto esta vacia).
 
     Retorna:
     --------
@@ -93,7 +97,7 @@ def process_model_results(
     # Concatenar las características con las probabilidades
     combined_df = pd.concat([selected_features, probabilities_df], axis="columns")
 
-    decile_labels = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
+    decile_labels = DECILE_LABELS
 
     if bins:
         # Si tiene bins, calcular el rango porcentual y usar los bins
@@ -109,8 +113,21 @@ def process_model_results(
 
 
 def train_and_get_feature_importances(X_train, columns, n_iter=5, target="Target"):
-    """
-    Entrena un modelo LightGBM usando RandomizedSearchCV y devuelve el clasificador, el buscador y las importancias de variables.
+    """Entrena un modelo LightGBM usando RandomizedSearchCV y devuelve las ``feature_importances``.
+
+    Args:
+        X_train (pandas.DataFrame): Datos de entrenamiento; debe contener
+            ``columns`` y la columna target.
+        columns (list[str]): Columnas de features usadas para entrenar el modelo.
+        n_iter (int): Cantidad de combinaciones de hiperparámetros que muestrea
+            ``RandomizedSearchCV``. Por defecto ``5`` para que el notebook
+            pueda usar un valor rápido por defecto.
+        target (str): Nombre de la columna target. Por defecto ``"Target"``.
+
+    Returns:
+        tuple: ``(model, searcher, importances)`` donde ``importances`` es
+        una ``pandas.Series`` de importancias de features indexada por
+        ``columns``.
     """
     model, searcher = generar_modelo_y_buscador(n_iter=n_iter)
     searcher.fit(X_train[columns], X_train[target])
@@ -121,4 +138,59 @@ def train_and_get_feature_importances(X_train, columns, n_iter=5, target="Target
     print("Best score: ", searcher.best_score_)
     print(searcher)
     return model, searcher, importances
+
+
+def evaluate_deciles_train(
+    X_train, probs_train
+):
+    """Calcula los deciles por fila para el set de entrenamiento e imprime los resultados.
+
+    Args:
+        X_train (pandas.DataFrame): Datos de entrenamiento con ``Target``.
+        probs_train (numpy.ndarray): Salida de ``predict_proba`` para train.
+
+    Returns:
+        pandas.DataFrame: Resultado del set de entrenamiento.
+    """
+    print("train:")
+    result_train = process_model_results(X_train, probs_train)
+    print(result_train.decil.value_counts())
+    print(result_train[result_train.Target == 1].decil.value_counts())
+    print(result_train.groupby("decil")["Prob1"].agg("min"))
+    return result_train
+
+
+def evaluate_deciles_test(
+    X_test, probs_test, cotas
+):
+    """Calcula los deciles por fila para el set de test,
+    imprime los resultados, después aplica ``cotas`` fijas al set de testeo
+    y finalmente recalcula los deciles del test con ``pd.qcut`` ("trampa").
+
+    Args:
+        X_test (pandas.DataFrame): Datos de test con ``Target``.
+        probs_test (numpy.ndarray): Salida de ``predict_proba`` para test.
+        cotas (list[float]): Bins fijos (incluyendo los extremos ``-inf`` /
+            ``inf``) usados para asignar deciles al set de testeo.
+
+    Returns:
+        pandas.DataFrame: Resultado del set de testeo después del recálculo
+        de deciles (columna ``decil`` actualizada con ``pd.qcut``).
+    """
+    print("test:")
+    result_test = process_model_results(X_test, probs_test, cotas)
+    print(result_test.decil.value_counts())
+    print(result_test[result_test.Target == 1].decil.value_counts())
+    print("result_test:")
+    print(result_test)
+
+    print("test trampa: recalculo las cotas...") # TODO
+    result_test = result_test.drop(columns=["decil"])
+    result_test["decil"] = pd.qcut(
+        result_test["Prob1"], q=10, labels=DECILE_LABELS
+    )
+    print(result_test.decil.value_counts())
+    print(result_test[result_test.Target == 1].decil.value_counts())
+    print(result_test.groupby("decil")["Prob1"].agg("min"))
+    return result_test
 

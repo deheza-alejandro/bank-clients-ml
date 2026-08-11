@@ -73,3 +73,22 @@ def print_value_counts(df, col):
     print(df[col].value_counts())
     print("")
 
+
+def filter_nonzero(df, columns):
+    """Filtra el ``df`` devolviendo las filas donde todas las columnas de ``columns`` son distintas de cero.
+
+    Args:
+        df (pandas.DataFrame): DataFrame de origen.
+        columns (list[str]): Columnas a evaluar; cada una debe ser != 0
+            para que la fila se mantenga.
+
+    Returns:
+        pandas.DataFrame: Subconjunto de ``df`` donde se cumple ``df[columns] != 0`` para todas las
+        columnas indicadas (con ``client_id`` si está presente).
+    """
+    mask = (df[columns] != 0).all(axis='columns')
+    keep = columns
+    if "client_id" in df.columns and "client_id" not in keep:
+        keep = ["client_id", *columns]
+    return df.loc[mask, keep]
+
