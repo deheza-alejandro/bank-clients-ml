@@ -28,9 +28,13 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-from bank_clients_ml.utils import print_df_personalizado, print_threshold_violations, describe_full, print_value_counts
-from bank_clients_ml.features import compute_percentage, replace_null_with_value, calculate_target_percentage_by_category
-from bank_clients_ml.models import train_and_get_feature_importances
+from bank_clients_ml.utils import print_df_personalizado, print_threshold_violations, describe_full, print_value_counts, filter_nonzero
+from bank_clients_ml.features import (
+    compute_percentage, replace_null_with_value, calculate_target_percentage_by_category,
+    columnas_minimo_entre, columnas_con_ceros, safe_denominator, a_datetime, group_columns_by_source,
+    min_max_normalize, min_max_normalize_weighted, apply_binning_by_ranges,
+)
+from bank_clients_ml.models import train_and_get_feature_importances, evaluate_deciles_train, evaluate_deciles_test, process_model_results
 
 ```
 
@@ -185,9 +189,8 @@ print("cantidad de registros con nulos en SavingAccount_Balance_Average:", data_
 
 ```python
 # analizando valores monetarios de SavingAccount
-data_entrenamiento[[
-    "client_id", 
-    'SavingAccount_Balance_Average', 
+saving_account_cols = [
+    "SavingAccount_Balance_Average", 
     "SavingAccount_Balance_FirstDate", 
     "SavingAccount_Balance_LastDate",
     "SavingAccount_Total_Amount",
@@ -200,47 +203,20 @@ data_entrenamiento[[
     "SavingAccount_Transfer_Out_Amount",
     "SavingAccount_DebitCard_Spend_Amount",
     "SavingAccount_Debits_Amounts"
-]] [data_entrenamiento["SavingAccount_Balance_Average"].isna()]
+]
+
+# registros con nulos en SavingAccount_Balance_Average
+data_entrenamiento[["client_id"] + saving_account_cols][
+    data_entrenamiento["SavingAccount_Balance_Average"].isna()
+]
 ```
 
 ```python
-data_entrenamiento[[
-    "client_id", 
-    'SavingAccount_Balance_Average', 
-    "SavingAccount_Balance_FirstDate", 
-    "SavingAccount_Balance_LastDate",
-    "SavingAccount_Total_Amount",
-    "SavingAccount_Salary_Payment_Amount",
-    "SavingAccount_Transfer_In_Amount",
-    "SavingAccount_Credits_Amounts",
-    "SavingAccount_ATM_Extraction_Amount",
-    "SavingAccount_Service_Payment_Amount",
-    "SavingAccount_CreditCard_Payment_Amount",
-    "SavingAccount_Transfer_Out_Amount",
-    "SavingAccount_DebitCard_Spend_Amount",
-    "SavingAccount_Debits_Amounts"
-]] [
-    (data_entrenamiento["SavingAccount_Balance_Average"] != 0) &
-    (data_entrenamiento["SavingAccount_Balance_FirstDate"] != 0) &
-    (data_entrenamiento["SavingAccount_Balance_LastDate"] != 0) &
-    (data_entrenamiento["SavingAccount_Total_Amount"] != 0) &
-    (data_entrenamiento["SavingAccount_Salary_Payment_Amount"] != 0) &
-    (data_entrenamiento["SavingAccount_Transfer_In_Amount"] != 0) &
-    (data_entrenamiento["SavingAccount_Credits_Amounts"] != 0) &
-    (data_entrenamiento["SavingAccount_ATM_Extraction_Amount"] != 0) &
-    (data_entrenamiento["SavingAccount_Service_Payment_Amount"] != 0) &
-    (data_entrenamiento["SavingAccount_CreditCard_Payment_Amount"] != 0) &
-    (data_entrenamiento["SavingAccount_Transfer_Out_Amount"] != 0) &
-    (data_entrenamiento["SavingAccount_DebitCard_Spend_Amount"] != 0) &
-    (data_entrenamiento["SavingAccount_Debits_Amounts"] != 0)
-    ]
+filter_nonzero(data_entrenamiento, saving_account_cols)
 ```
 
 # Feature Engineering
 
-```python
-from bank_clients_ml.features import columnas_minimo_entre, columnas_con_ceros, safe_denominator, a_datetime
-```
 
 ## Completando 'SavingAccount_Balance_Average'
 
@@ -390,9 +366,8 @@ data_entrenamiento = data_entrenamiento.sort_values(['client_id', 'Month'])
 
 ```python
 # analizando valores monetarios de CreditCard
-data_entrenamiento[[
-    "client_id", 
-    'CreditCard_Balance_ARG', 
+credit_card_cols = [
+    "CreditCard_Balance_ARG", 
     "CreditCard_Balance_DOLLAR", 
     "CreditCard_Total_Limit",
     "CreditCard_Total_Spending",
@@ -401,17 +376,9 @@ data_entrenamiento[[
     "CreditCard_Spending_CrossBoarder",
     "CreditCard_Spending_Aut_Debits",
     "CreditCard_Revolving",
-]] [
-    (data_entrenamiento["CreditCard_Balance_ARG"] != 0) &
-    (data_entrenamiento["CreditCard_Balance_DOLLAR"] != 0) &
-    (data_entrenamiento["CreditCard_Total_Limit"] != 0) &
-    (data_entrenamiento["CreditCard_Total_Spending"] != 0) &
-    (data_entrenamiento["CreditCard_Spending_1_Installment"] != 0) &
-    (data_entrenamiento["CreditCard_Spending_Installments"] != 0) &
-    (data_entrenamiento["CreditCard_Spending_CrossBoarder"] != 0) &
-    (data_entrenamiento["CreditCard_Spending_Aut_Debits"] != 0) &
-    (data_entrenamiento["CreditCard_Revolving"] != 0)
-    ]
+]
+
+filter_nonzero(data_entrenamiento, credit_card_cols)
 ```
 
 ```python
@@ -822,92 +789,47 @@ print_df_personalizado("ABT", ABT)
 ## Agrego transformadas extras luego de las operaciones de agregacion
 
 ```python
-SavingAccount_Days_with_use_count_nonzero_min = ABT["SavingAccount_Days_with_use_count_nonzero"].min()
-SavingAccount_Days_with_use_count_nonzero_max = ABT["SavingAccount_Days_with_use_count_nonzero"].max()
-
-SavingAccount_Days_with_use_min_min = ABT["SavingAccount_Days_with_use_min"].min()
-SavingAccount_Days_with_use_min_max = ABT["SavingAccount_Days_with_use_min"].max()
-
-SavingAccount_CreditCard_Payment_Transactions_count_nonzero_min = ABT["SavingAccount_CreditCard_Payment_Transactions_count_nonzero"].min()
-SavingAccount_CreditCard_Payment_Transactions_count_nonzero_max = ABT["SavingAccount_CreditCard_Payment_Transactions_count_nonzero"].max()
-
-Operations_total_count_nonzero_min = ABT["Operations_total_count_nonzero"].min()
-Operations_total_count_nonzero_max = ABT["Operations_total_count_nonzero"].max()
-
-CreditCard_Payment_total_max_min = ABT["CreditCard_Payment_total_max"].min()
-CreditCard_Payment_total_max_max = ABT["CreditCard_Payment_total_max"].max()
-
-CreditCard_Payment_presenciales_max_min = ABT["CreditCard_Payment_presenciales_max"].min()
-CreditCard_Payment_presenciales_max_max = ABT["CreditCard_Payment_presenciales_max"].max()
-
-print("SavingAccount_Days_with_use_count_nonzero_min:", SavingAccount_Days_with_use_count_nonzero_min)
-print("SavingAccount_Days_with_use_count_nonzero_max:", SavingAccount_Days_with_use_count_nonzero_max)
-print("SavingAccount_Days_with_use_min_min:", SavingAccount_Days_with_use_min_min)
-print("SavingAccount_Days_with_use_min_max:", SavingAccount_Days_with_use_min_max)
-print("SavingAccount_CreditCard_Payment_Transactions_count_nonzero_min:", SavingAccount_CreditCard_Payment_Transactions_count_nonzero_min)
-print("SavingAccount_CreditCard_Payment_Transactions_count_nonzero_max:", SavingAccount_CreditCard_Payment_Transactions_count_nonzero_max)
-print("Operations_total_count_nonzero_min:", Operations_total_count_nonzero_min)
-print("Operations_total_count_nonzero_max:", Operations_total_count_nonzero_max)
-print("CreditCard_Payment_total_max_min:", CreditCard_Payment_total_max_min)
-print("CreditCard_Payment_total_max_max:", CreditCard_Payment_total_max_max)
-print("CreditCard_Payment_presenciales_max_min:", CreditCard_Payment_presenciales_max_min)
-print("CreditCard_Payment_presenciales_max_max:", CreditCard_Payment_presenciales_max_max)
-
-ABT = ABT.assign(
-    
-SUMATORIA_USOS = (
-    (ABT["SavingAccount_Days_with_use_count_nonzero"] - SavingAccount_Days_with_use_count_nonzero_min)/(SavingAccount_Days_with_use_count_nonzero_max - SavingAccount_Days_with_use_count_nonzero_min)
-    + (ABT["SavingAccount_Days_with_use_min"] - SavingAccount_Days_with_use_min_min)/(SavingAccount_Days_with_use_min_max - SavingAccount_Days_with_use_min_min)
-    + (ABT["SavingAccount_CreditCard_Payment_Transactions_count_nonzero"] - SavingAccount_CreditCard_Payment_Transactions_count_nonzero_min)/(SavingAccount_CreditCard_Payment_Transactions_count_nonzero_max - SavingAccount_CreditCard_Payment_Transactions_count_nonzero_min)
-    + (ABT["Operations_total_count_nonzero"] - Operations_total_count_nonzero_min)/(Operations_total_count_nonzero_max - Operations_total_count_nonzero_min)
+sumatoria_usos = (
+    min_max_normalize(ABT["SavingAccount_Days_with_use_count_nonzero"])
+    + min_max_normalize(ABT["SavingAccount_Days_with_use_min"])
+    + min_max_normalize(ABT["SavingAccount_CreditCard_Payment_Transactions_count_nonzero"])
+    + min_max_normalize(ABT["Operations_total_count_nonzero"])
+    + min_max_normalize(ABT["CreditCard_Payment_total_max"])
+    + min_max_normalize(ABT["CreditCard_Payment_presenciales_max"])
     + (ABT["Operations_presenciales_porc_max"] > 0).astype(int)
-    + (ABT["CreditCard_Payment_total_max"] - CreditCard_Payment_total_max_min)/(CreditCard_Payment_total_max_max - CreditCard_Payment_total_max_min)
     + (ABT["CreditCard_Payment_Aut_Debit_max"] > 0).astype(int)
     + (ABT["CreditCard_Payment_TAS_max"] > 0).astype(int)
-    + (ABT["CreditCard_Payment_presenciales_max"] - CreditCard_Payment_presenciales_max_min)/(CreditCard_Payment_presenciales_max_max - CreditCard_Payment_presenciales_max_min)
 )
 
-)
+ABT = ABT.assign(SUMATORIA_USOS=sumatoria_usos)
 ```
 
 ```python
-SavingAccount_CreditCard_Payment_Amount_max_min = ABT["SavingAccount_CreditCard_Payment_Amount_max"].min()
-SavingAccount_CreditCard_Payment_Amount_max_max = ABT["SavingAccount_CreditCard_Payment_Amount_max"].max()
-
-CreditCard_Total_Limit_diff_rel_min = ABT["CreditCard_Total_Limit_diff_rel"].min()
-CreditCard_Total_Limit_diff_rel_max = ABT["CreditCard_Total_Limit_diff_rel"].max()
-
 ABT = ABT.assign(
-    
-Amount_operations = (
-    (ABT["SavingAccount_CreditCard_Payment_Amount_max"] - SavingAccount_CreditCard_Payment_Amount_max_min)/(SavingAccount_CreditCard_Payment_Amount_max_max - SavingAccount_CreditCard_Payment_Amount_max_min)
-    * ABT["Operations_total_count_nonzero"]
+
+Amount_operations = min_max_normalize_weighted(
+    ABT["SavingAccount_CreditCard_Payment_Amount_max"], ABT["Operations_total_count_nonzero"]
 ),
 
-Amount_transactions = (
-    (ABT["SavingAccount_CreditCard_Payment_Amount_max"] - SavingAccount_CreditCard_Payment_Amount_max_min)/(SavingAccount_CreditCard_Payment_Amount_max_max - SavingAccount_CreditCard_Payment_Amount_max_min)
-    * ABT["SavingAccount_CreditCard_Payment_Transactions_count_nonzero"]
+Amount_transactions = min_max_normalize_weighted(
+    ABT["SavingAccount_CreditCard_Payment_Amount_max"], ABT["SavingAccount_CreditCard_Payment_Transactions_count_nonzero"]
 ),
 
-Amount_payment = (
-    (ABT["SavingAccount_CreditCard_Payment_Amount_max"] - SavingAccount_CreditCard_Payment_Amount_max_min)/(SavingAccount_CreditCard_Payment_Amount_max_max - SavingAccount_CreditCard_Payment_Amount_max_min)
-    * ABT["CreditCard_Payment_total_max"]
+Amount_payment = min_max_normalize_weighted(
+    ABT["SavingAccount_CreditCard_Payment_Amount_max"], ABT["CreditCard_Payment_total_max"]
 ),
 
-Limit_operations = (
-    (ABT["CreditCard_Total_Limit_diff_rel"] - CreditCard_Total_Limit_diff_rel_min)/(CreditCard_Total_Limit_diff_rel_max - CreditCard_Total_Limit_diff_rel_min)
-    * ABT["Operations_total_count_nonzero"]
+Limit_operations = min_max_normalize_weighted(
+    ABT["CreditCard_Total_Limit_diff_rel"], ABT["Operations_total_count_nonzero"]
 ),
 
-Limit_transactions = (
-    (ABT["CreditCard_Total_Limit_diff_rel"] - CreditCard_Total_Limit_diff_rel_min)/(CreditCard_Total_Limit_diff_rel_max - CreditCard_Total_Limit_diff_rel_min)
-    * ABT["SavingAccount_CreditCard_Payment_Transactions_count_nonzero"]
+Limit_transactions = min_max_normalize_weighted(
+    ABT["CreditCard_Total_Limit_diff_rel"], ABT["SavingAccount_CreditCard_Payment_Transactions_count_nonzero"]
 ),
 
-Limit_payment = (
-    (ABT["CreditCard_Total_Limit_diff_rel"] - CreditCard_Total_Limit_diff_rel_min)/(CreditCard_Total_Limit_diff_rel_max - CreditCard_Total_Limit_diff_rel_min)
-    * ABT["CreditCard_Payment_total_max"]
-)
+Limit_payment = min_max_normalize_weighted(
+    ABT["CreditCard_Total_Limit_diff_rel"], ABT["CreditCard_Payment_total_max"]
+),
 
 )
 ```
@@ -1036,40 +958,19 @@ from bank_clients_ml.models import generar_split, generar_modelo_y_buscador, pro
 ```
 
 ```python
-columnas_saving_account_days_transactions = [
-    x for x in ABT_estandarizado.columns
-    if x.startswith('SavingAccount_Days_with_') or (x.startswith("SavingAccount_") and "Transactions" in x)
-]
+grupos = group_columns_by_source(ABT_estandarizado)
+columnas_saving_account_days_transactions = grupos["saving_account_days_transactions"]
+columnas_saving_account_monetarios = grupos["saving_account_monetary"]
+columnas_operation = grupos["operations"]
+columnas_credit_card_payment = grupos["credit_card_payment"]
+columnas_credit_card_monetarios = grupos["credit_card_monetary"]
+columnas_otros = grupos["others"]
+
 print("columnas_saving_account_days_transactions:", len(columnas_saving_account_days_transactions))
-
-columnas_saving_account_monetarios = [
-    x for x in ABT_estandarizado.columns
-    if x.startswith('SavingAccount_') and not x.startswith('SavingAccount_Active_') and x not in columnas_saving_account_days_transactions
-]
 print("columnas_saving_account_monetarios:", len(columnas_saving_account_monetarios))
-
-columnas_operation = [ 
-    x for x in ABT_estandarizado.columns 
-    if x.startswith('Operations_')
-]
 print("columnas_operation:", len(columnas_operation))
-
-columnas_credit_card_payment = [
-    x for x in ABT_estandarizado.columns
-    if x.startswith('CreditCard_Payment_')
-]
 print("columnas_credit_card_payment:", len(columnas_credit_card_payment))
-
-columnas_credit_card_monetarios = [
-    x for x in ABT_estandarizado.columns
-    if x.startswith('CreditCard_') and x not in ["CreditCard_Premium", "CreditCard_Active", "CreditCard_CoBranding", "CreditCard_Product"] and x not in columnas_credit_card_payment
-]
 print("columnas_credit_card_monetarios:", len(columnas_credit_card_monetarios))
-
-columnas_otros = [
-    x for x in ABT_estandarizado.columns 
-    if x not in columnas_saving_account_days_transactions + columnas_saving_account_monetarios + columnas_operation + columnas_credit_card_payment + columnas_credit_card_monetarios + ["client_id", "Target"]
-]
 print("columnas_otros:", len(columnas_otros))
 print("total deberia ser igual a", len(ABT_estandarizado.columns), "- 2:", 
       len(columnas_saving_account_days_transactions) + len(columnas_saving_account_monetarios) + len(columnas_operation) + len(columnas_credit_card_payment) + len(columnas_credit_card_monetarios) + len(columnas_otros))
@@ -1094,135 +995,51 @@ todas_las_columnas = (
     columnas_otros
 )
 
-modelo_LightGBM_clasificador_0, buscador_mejores_hiperparametros_0 = generar_modelo_y_buscador(n_iter=5)
-
-buscador_mejores_hiperparametros_0.fit(
-    X_train[todas_las_columnas], 
-    X_train['Target']
+_, _, variables_mas_importantes_0 = train_and_get_feature_importances(
+    X_train, todas_las_columnas
 )
-```
-
-```python
-variables_mas_importantes_0 = pd.Series(
-    buscador_mejores_hiperparametros_0.best_estimator_.feature_importances_, 
-    index = todas_las_columnas
-)
-
-print("Best score: ", buscador_mejores_hiperparametros_0.best_score_)
 ```
 
 ```python
 # SAVING ACCOUNT DAYS TRANSACTIONS
-modelo_LightGBM_clasificador_1, buscador_mejores_hiperparametros_1 = generar_modelo_y_buscador(n_iter=5)
-
-buscador_mejores_hiperparametros_1.fit(
-    X_train[columnas_saving_account_days_transactions], 
-    X_train['Target']
+_, _, variables_mas_importantes_1 = train_and_get_feature_importances(
+    X_train, columnas_saving_account_days_transactions
 )
-```
-
-```python
-variables_mas_importantes_1 = pd.Series(
-    buscador_mejores_hiperparametros_1.best_estimator_.feature_importances_, 
-    index = columnas_saving_account_days_transactions
-)
-
-print("Best score: ", buscador_mejores_hiperparametros_1.best_score_)
 ```
 
 ```python
 # SAVING ACCOUNT MONETARIOS
-modelo_LightGBM_clasificador_2, buscador_mejores_hiperparametros_2 = generar_modelo_y_buscador(n_iter=5)
-
-buscador_mejores_hiperparametros_2.fit(
-    X_train[columnas_saving_account_monetarios], 
-    X_train['Target']
+_, _, variables_mas_importantes_2 = train_and_get_feature_importances(
+    X_train, columnas_saving_account_monetarios
 )
-```
-
-```python
-variables_mas_importantes_2 = pd.Series(
-    buscador_mejores_hiperparametros_2.best_estimator_.feature_importances_, 
-    index = columnas_saving_account_monetarios
-)
-
-print("Best score: ", buscador_mejores_hiperparametros_2.best_score_)
 ```
 
 ```python
 # OPERATION
-modelo_LightGBM_clasificador_3, buscador_mejores_hiperparametros_3 = generar_modelo_y_buscador(n_iter=5)
-
-buscador_mejores_hiperparametros_3.fit(
-    X_train[columnas_operation], 
-    X_train['Target']
+_, _, variables_mas_importantes_3 = train_and_get_feature_importances(
+    X_train, columnas_operation
 )
-```
-
-```python
-variables_mas_importantes_3 = pd.Series(
-    buscador_mejores_hiperparametros_3.best_estimator_.feature_importances_, 
-    index = columnas_operation
-)
-
-print("Best score: ", buscador_mejores_hiperparametros_3.best_score_)
 ```
 
 ```python
 # CREDIT CARD PAYMENT
-modelo_LightGBM_clasificador_4, buscador_mejores_hiperparametros_4 = generar_modelo_y_buscador(n_iter=5)
-
-buscador_mejores_hiperparametros_4.fit(
-    X_train[columnas_credit_card_payment], 
-    X_train['Target']
+_, _, variables_mas_importantes_4 = train_and_get_feature_importances(
+    X_train, columnas_credit_card_payment
 )
-```
-
-```python
-variables_mas_importantes_4 = pd.Series(
-    buscador_mejores_hiperparametros_4.best_estimator_.feature_importances_, 
-    index = columnas_credit_card_payment
-)
-
-print("Best score: ", buscador_mejores_hiperparametros_4.best_score_)
 ```
 
 ```python
 # CREDIT CARD MONETARIOS
-modelo_LightGBM_clasificador_5, buscador_mejores_hiperparametros_5 = generar_modelo_y_buscador(n_iter=5)
-
-buscador_mejores_hiperparametros_5.fit(
-    X_train[columnas_credit_card_monetarios], 
-    X_train['Target']
+_, _, variables_mas_importantes_5 = train_and_get_feature_importances(
+    X_train, columnas_credit_card_monetarios
 )
-```
-
-```python
-variables_mas_importantes_5 = pd.Series(
-    buscador_mejores_hiperparametros_5.best_estimator_.feature_importances_, 
-    index = columnas_credit_card_monetarios
-)
-
-print("Best score: ", buscador_mejores_hiperparametros_5.best_score_)
 ```
 
 ```python
 # OTROS
-modelo_LightGBM_clasificador_6, buscador_mejores_hiperparametros_6 = generar_modelo_y_buscador(n_iter=5)
-
-buscador_mejores_hiperparametros_6.fit(
-    X_train[columnas_otros], 
-    X_train['Target']
+_, _, variables_mas_importantes_6 = train_and_get_feature_importances(
+    X_train, columnas_otros
 )
-```
-
-```python
-variables_mas_importantes_6 = pd.Series(
-    buscador_mejores_hiperparametros_6.best_estimator_.feature_importances_, 
-    index = columnas_otros
-)
-
-print("Best score: ", buscador_mejores_hiperparametros_6.best_score_)
 ```
 
 ```python
@@ -1442,21 +1259,9 @@ prueba = [
     "CreditCard_Payment_presenciales_max"
 ]
 
-modelo_LightGBM_clasificador, buscador_mejores_hiperparametros = generar_modelo_y_buscador()
-
-buscador_mejores_hiperparametros.fit(
-    X_train[prueba], 
-    X_train['Target']
+_, _, variables_mas_importantes_7 = train_and_get_feature_importances(
+    X_train, prueba
 )
-```
-
-```python
-variables_mas_importantes_7 = pd.Series(
-    buscador_mejores_hiperparametros.best_estimator_.feature_importances_, 
-    index = prueba
-)
-
-print("Best score: ", buscador_mejores_hiperparametros.best_score_)
 ```
 
 ```python
@@ -1492,21 +1297,9 @@ prueba_2 = [
     "Cantidad_Productos_Activos_min",
 ]
 
-modelo_LightGBM_clasificador, buscador_mejores_hiperparametros = generar_modelo_y_buscador()
-
-buscador_mejores_hiperparametros.fit(
-    X_train[prueba_2], 
-    X_train['Target']
+_, _, variables_mas_importantes_8 = train_and_get_feature_importances(
+    X_train, prueba_2
 )
-```
-
-```python
-variables_mas_importantes_8 = pd.Series(
-    buscador_mejores_hiperparametros.best_estimator_.feature_importances_, 
-    index = prueba_2
-)
-
-print("Best score: ", buscador_mejores_hiperparametros.best_score_)
 ```
 
 ```python
@@ -1553,22 +1346,9 @@ prueba_3 = [
     "Client_Age_grp"
 ]
 
-modelo_LightGBM_clasificador, buscador_mejores_hiperparametros = generar_modelo_y_buscador()
-
-buscador_mejores_hiperparametros.fit(
-    X_train[prueba_3], 
-    X_train['Target']
+_, _, variables_mas_importantes_9 = train_and_get_feature_importances(
+    X_train, prueba_3
 )
-```
-
-```python
-variables_mas_importantes_9 = pd.Series(
-    buscador_mejores_hiperparametros.best_estimator_.feature_importances_, 
-    index = prueba_3
-)
-
-
-print("Best score: ", buscador_mejores_hiperparametros.best_score_)
 ```
 
 ```python
@@ -1587,134 +1367,128 @@ variables_mas_importantes_9.nlargest(25)
 
 # CreditCard_Product
 # junto los tipos de tarjetas de bajo porcentaje de target y los tipos de tarjetas poco representativas en un solo bin
-condiciones = [
-    (ABT_reducida_3['CreditCard_Product'].between(36.890, 36.950)), # tipo tarjeta 202
-    (ABT_reducida_3['CreditCard_Product'].between(45.680, 45.690))  # tipo tarjeta 104
-]
-valores = [36.940, 45.686]
+ABT_reducida_3['CreditCard_Product_t'] = apply_binning_by_ranges(
+    ABT_reducida_3['CreditCard_Product'],
+    ranges=[(36.890, 36.950), (45.680, 45.690)],  # tipo tarjeta 202 y 104 respectivamente
+    values=[36.940, 45.686],
+    default=9.005,
+)
 # default -> agrupo totas las demas tarjetas (sin tarjeta de credito + 102 + 123 + 124 + 702 + 1002)
-ABT_reducida_3['CreditCard_Product_t'] = np.select(condiciones, valores, default=9.005)
 print(ABT_reducida_3['CreditCard_Product_t'].value_counts())
 print("")
 
 # Client_Age_grp
-condiciones = [
-    (ABT_reducida_3['Client_Age_grp'].between(34.880, 39.772))  # agrupo "Entre 50 y 59 años" + "Entre 60 y 64 años" + "Entre 65 y 69 años" (final: "Entre 50 y 69 años")
-]
-valores = [36.224]
+ABT_reducida_3['Client_Age_grp_t'] = apply_binning_by_ranges(
+    ABT_reducida_3['Client_Age_grp'],
+    ranges=[(34.880, 39.772)], # agrupo "Entre 50 y 59 años" + "Entre 60 y 64 años" + "Entre 65 y 69 años" (final: "Entre 50 y 69 años")
+    values=[36.224],
+    default=25.093,
+)
 # default -> totas las demas edades ("Entre 18 y 29 años" + "Entre 30 y 39 años" + "Entre 40 y 49 años" + "Mayor a 70 años")
-ABT_reducida_3['Client_Age_grp_t'] = np.select(condiciones, valores, default=25.093)
 print(ABT_reducida_3['Client_Age_grp_t'].value_counts())
 print("")
 
-"""
-# Region
-condiciones = [
-    (ABT_reducida_3['Region'].between(24.370, 24.375))  # mantengo "REGION CENTRO"
-]
-valores = [24.372]
-# default -> totas las demas regiones (NORTE GRANDE ARGENTINO + CUYO + CABA Centro/Norte + AMBA Resto + BUENOS AIRES + REGION PATAGONICA)
-ABT_reducida_3['Region_t'] = np.select(condiciones, valores, default=30.663)
-print(ABT_reducida_3['Region_t'].value_counts())
-print("")
-
-
-
-
-# Cantidad_Productos_Activos_min
-condiciones = [
-    (ABT_reducida_3['Cantidad_Productos_Activos_min'].between(0, 3)),
-    (ABT_reducida_3['Cantidad_Productos_Activos_min'].between(5, 8))
-]
-valores = [17.664, 61.729]
-ABT_reducida_3['Cantidad_Productos_Activos_min_t'] = np.select(condiciones, valores, default=40.000)
-print(ABT_reducida_3['Cantidad_Productos_Activos_min_t'].value_counts())
-print("")
-
-# Operations_presenciales_max
-condiciones = [
-    (ABT_reducida_3['Operations_presenciales_max'].between(1, 2)),
-    (ABT_reducida_3['Operations_presenciales_max'].between(3, 44))
-]
-valores = [36.971, 54.786]
-ABT_reducida_3['Operations_presenciales_max_t'] = np.select(condiciones, valores, default=17.000)
-print(ABT_reducida_3['Operations_presenciales_max_t'].value_counts())
-print("")
-"""
-
 # Operations_total_count_nonzero
-condiciones = [
-    (ABT_reducida_3['Operations_total_count_nonzero'].between(0, 0)),
-    (ABT_reducida_3['Operations_total_count_nonzero'].between(1, 3)),
-    (ABT_reducida_3['Operations_total_count_nonzero'].between(4, 5))
-]
-valores = [10.148, 18.896, 29.131]
-ABT_reducida_3['Operations_total_count_nonzero_t'] = np.select(condiciones, valores, default=47.939)
+ABT_reducida_3['Operations_total_count_nonzero_t'] = apply_binning_by_ranges(
+    ABT_reducida_3['Operations_total_count_nonzero'],
+    ranges=[(0, 0), (1, 3), (4, 5)],
+    values=[10.148, 18.896, 29.131],
+    default=47.939,
+)
 print(ABT_reducida_3['Operations_total_count_nonzero_t'].value_counts())
 print("")
 
-"""
-# Dias_entre_primer_y_ultimo_producto
-condiciones = [
-    (ABT_reducida_3['Dias_entre_primer_y_ultimo_producto'].between(0, 441)),
-    (ABT_reducida_3['Dias_entre_primer_y_ultimo_producto'].between(442, 1142)),
-    (ABT_reducida_3['Dias_entre_primer_y_ultimo_producto'].between(1143, 2130))
-]
-valores = [21.764, 25.244, 33.003]
-ABT_reducida_3['Dias_entre_primer_y_ultimo_producto_t'] = np.select(condiciones, valores, default=48.858)
-print(ABT_reducida_3['Dias_entre_primer_y_ultimo_producto_t'].value_counts())
-print("")
 
-# Recencia_en_dias
-condiciones = [
-    (ABT_reducida_3['Recencia_en_dias'].between(1, 408)),
-    (ABT_reducida_3['Recencia_en_dias'].between(409, 650))
-]
-valores = [33.822, 29.220]
-ABT_reducida_3['Recencia_en_dias_t'] = np.select(condiciones, valores, default=23.845)
-print(ABT_reducida_3['Recencia_en_dias_t'].value_counts())
-print("")
+# # Region
+# ABT_reducida_3['Region_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['Region'],
+#     ranges=[(24.370, 24.375)],  # mantengo "REGION CENTRO"
+#     values=[24.372],
+#     default=30.663,
+# )
+# # default -> totas las demas regiones (NORTE GRANDE ARGENTINO + CUYO + CABA Centro/Norte + AMBA Resto + BUENOS AIRES + REGION PATAGONICA)
+# print(ABT_reducida_3['Region_t'].value_counts())
+# print("")
 
-# CreditCard_Total_Spending_median
-condiciones = [
-    (ABT_reducida_3['CreditCard_Total_Spending_median'].between(0.5, 1979.9)),
-    (ABT_reducida_3['CreditCard_Total_Spending_median'].between(1980.2, 4078.7)),
-    (ABT_reducida_3['CreditCard_Total_Spending_median'].between(4079.0, 117452))
-]
-valores = [33.866, 41.667, 46.154]
-ABT_reducida_3['CreditCard_Total_Spending_median_t'] = np.select(condiciones, valores, default=9.000)
-print(ABT_reducida_3['CreditCard_Total_Spending_median_t'].value_counts())
-print("")
-    
-# SavingAccount_Balance_Average_median
-condiciones = [
-    (ABT_reducida_3['SavingAccount_Balance_Average_median'].between(163.3, 2823.9)),
-    (ABT_reducida_3['SavingAccount_Balance_Average_median'].between(2824.0, 1515662.7))
-]
-valores = [30.999, 50.143]
-ABT_reducida_3['SavingAccount_Balance_Average_median_t'] = np.select(condiciones, valores, default=22.243)
-print(ABT_reducida_3['SavingAccount_Balance_Average_median_t'].value_counts())
-print("")
+# # Cantidad_Productos_Activos_min
+# ABT_reducida_3['Cantidad_Productos_Activos_min_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['Cantidad_Productos_Activos_min'],
+#     ranges=[(0, 3), (5, 8)],
+#     values=[17.664, 61.729],
+#     default=40.000,
+# )
+# print(ABT_reducida_3['Cantidad_Productos_Activos_min_t'].value_counts())
+# print("")
 
-# SavingAccount_Transactions_Transactions_median
-condiciones = [
-    (ABT_reducida_3['SavingAccount_Transactions_Transactions_median'].between(0, 3)),
-    (ABT_reducida_3['SavingAccount_Transactions_Transactions_median'].between(3.5, 7))
-]
-valores = [21.781, 31.686]
-ABT_reducida_3['SavingAccount_Transactions_Transactions_median_t'] = np.select(condiciones, valores, default=54.346)
-print(ABT_reducida_3['SavingAccount_Transactions_Transactions_median_t'].value_counts())
-print("")
+# # Operations_presenciales_max
+# ABT_reducida_3['Operations_presenciales_max_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['Operations_presenciales_max'],
+#     ranges=[(1, 2), (3, 44)],
+#     values=[36.971, 54.786],
+#     default=17.000,
+# )
+# print(ABT_reducida_3['Operations_presenciales_max_t'].value_counts())
+# print("")
 
-# SavingAccount_CreditCard_Payment_Amount_median
-condiciones = [
-    (ABT_reducida_3['SavingAccount_CreditCard_Payment_Amount_median'].between(0, 0))
-]
-valores = [21.000]
-ABT_reducida_3['SavingAccount_CreditCard_Payment_Amount_median_t'] = np.select(condiciones, valores, default=55.253)
-print(ABT_reducida_3['SavingAccount_CreditCard_Payment_Amount_median_t'].value_counts())
-print("")
-"""
+# # Dias_entre_primer_y_ultimo_producto
+# ABT_reducida_3['Dias_entre_primer_y_ultimo_producto_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['Dias_entre_primer_y_ultimo_producto'],
+#     ranges=[(0, 441), (442, 1142), (1143, 2130)],
+#     values=[21.764, 25.244, 33.003],
+#     default=48.858,
+# )
+# print(ABT_reducida_3['Dias_entre_primer_y_ultimo_producto_t'].value_counts())
+# print("")
+
+# # Recencia_en_dias
+# ABT_reducida_3['Recencia_en_dias_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['Recencia_en_dias'],
+#     ranges=[(1, 408), (409, 650)],
+#     values=[33.822, 29.220],
+#     default=23.845,
+# )
+# print(ABT_reducida_3['Recencia_en_dias_t'].value_counts())
+# print("")
+
+# # CreditCard_Total_Spending_median
+# ABT_reducida_3['CreditCard_Total_Spending_median_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['CreditCard_Total_Spending_median'],
+#     ranges=[(0.5, 1979.9), (1980.2, 4078.7), (4079.0, 117452)],
+#     values=[33.866, 41.667, 46.154],
+#     default=9.000,
+# )
+# print(ABT_reducida_3['CreditCard_Total_Spending_median_t'].value_counts())
+# print("")
+
+# # SavingAccount_Balance_Average_median
+# ABT_reducida_3['SavingAccount_Balance_Average_median_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['SavingAccount_Balance_Average_median'],
+#     ranges=[(163.3, 2823.9), (2824.0, 1515662.7)],
+#     values=[30.999, 50.143],
+#     default=22.243,
+# )
+# print(ABT_reducida_3['SavingAccount_Balance_Average_median_t'].value_counts())
+# print("")
+
+# # SavingAccount_Transactions_Transactions_median
+# ABT_reducida_3['SavingAccount_Transactions_Transactions_median_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['SavingAccount_Transactions_Transactions_median'],
+#     ranges=[(0, 3), (3.5, 7)],
+#     values=[21.781, 31.686],
+#     default=54.346,
+# )
+# print(ABT_reducida_3['SavingAccount_Transactions_Transactions_median_t'].value_counts())
+# print("")
+
+# # SavingAccount_CreditCard_Payment_Amount_median
+# ABT_reducida_3['SavingAccount_CreditCard_Payment_Amount_median_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['SavingAccount_CreditCard_Payment_Amount_median'],
+#     ranges=[(0, 0)],
+#     values=[21.000],
+#     default=55.253,
+# )
+# print(ABT_reducida_3['SavingAccount_CreditCard_Payment_Amount_median_t'].value_counts())
+# print("")
 ```
 
 ```python
@@ -1752,21 +1526,9 @@ X_train_final, X_test_final = generar_split(ABT_reducida_3) # dataframe con vari
 ```
 
 ```python
-modelo_LightGBM_clasificador, buscador_mejores_hiperparametros = generar_modelo_y_buscador()
-
-buscador_mejores_hiperparametros.fit(
-    X_train_final[mejores_variables], 
-    X_train_final['Target']
+_, buscador_mejores_hiperparametros, variables_mas_importantes = train_and_get_feature_importances(
+    X_train_final, mejores_variables, n_iter=100
 )
-```
-
-```python
-variables_mas_importantes = pd.Series(
-    buscador_mejores_hiperparametros.best_estimator_.feature_importances_, 
-    index = mejores_variables
-)
-
-print("Best score: ", buscador_mejores_hiperparametros.best_score_)
 ```
 
 ```python
@@ -1777,10 +1539,6 @@ variables_mas_importantes.nlargest(20).plot(kind='barh', figsize=(8,10))
 
 ```python
 buscador_mejores_hiperparametros.best_estimator_
-```
-
-```python
-import matplotlib.pyplot as plt
 ```
 
 ```python
@@ -1808,51 +1566,19 @@ probabilities_test  = modelo_LightGBM_clasificador_final.predict_proba(X_test_fi
 ```
 
 ```python
-result = process_model_results(X_train_final, probabilities_train)
-
-print(result.decil.value_counts())
-print(result[result.Target == 1].decil.value_counts())
-print(result.groupby('decil')['Prob1'].agg("min"))
+_ = evaluate_deciles_train(
+    X_train_final, probabilities_train
+)
 ```
 
 ```python
-# test
-
 # Cotas fijas....
 # basado en los porcentajes de training
 cotas = [-np.inf, 0.035669, 0.054470, 0.204116, 0.241664, 0.269271, 0.393079, 0.443684, 0.541165, 0.548265, np.inf]
 
-result = process_model_results(X_test_final, probabilities_test, cotas)
-
-print(result.decil.value_counts())
-print(result[result.Target == 1].decil.value_counts())
-```
-
-```python
-pd.reset_option('display.max_rows')
-```
-
-```python
-result
-```
-
-```python
-result = result.drop(columns=['decil'])
-```
-
-```python
-##############################################
-# test  - trampa, todo el tiempo recalculo las cotas....
-
-result['decil'] = pd.qcut(
-    result['Prob1'], 
-    q=10, 
-    labels=['10', '9', '8', '7', '6', '5', '4', '3', '2', '1']
-    )
-
-print(result.decil.value_counts())
-print(result[result.Target == 1].decil.value_counts())
-print(result.groupby('decil')['Prob1'].agg("min"))
+result_test = evaluate_deciles_test(
+    X_test_final, probabilities_test, cotas
+)
 ```
 
 # ROC
@@ -1860,7 +1586,7 @@ print(result.groupby('decil')['Prob1'].agg("min"))
 ```python
 from bank_clients_ml.graphs import plot_roc_and_metrics
 
-plot_roc_and_metrics(result["Target"], result["Prob1"], y_pred)
+plot_roc_and_metrics(result_test["Target"], result_test["Prob1"], y_pred)
 ```
 
 # Resultados del excel
@@ -1905,51 +1631,23 @@ probabilities_test_log       = modelo.predict_proba(X_test_final[mejores_variabl
 ```
 
 ```python
-result_log = process_model_results(X_train_final, probabilities_train_log)
-
-print(result_log.decil.value_counts())
-print(result_log[result_log.Target == 1].decil.value_counts())
-print(result_log.groupby('decil')['Prob1'].agg("min"))
+_ = evaluate_deciles_train(
+    X_train_final, probabilities_train_log
+)
 ```
 
 ```python
-# test
 # Cotas fijas....
 # basado en los porcentajes de training
-
 cotas = [-np.inf, 0.051719, 0.079377, 0.170491, 0.197105, 0.267983, 0.366586, 0.467006, 0.579763, 0.580742, np.inf]
 
-result_log = process_model_results(X_test_final, probabilities_test_log, cotas)
-
-print(result_log.decil.value_counts())
-print(result_log[result_log.Target == 1].decil.value_counts())
+result_test_log = evaluate_deciles_test(
+    X_test_final, probabilities_test_log, cotas
+)
 ```
 
 ```python
-result_log
-```
-
-```python
-result_log = result_log.drop(columns=['decil'])
-```
-
-```python
-##############################################
-# test  - trampa, todo el tiempo recalculo las cotas....
-
-result_log['decil'] = pd.qcut(
-    result_log['Prob1'], 
-    q=10, 
-    labels=['10', '9', '8', '7', '6', '5', '4', '3', '2', '1']
-    )
-
-print(result_log.decil.value_counts())
-print(result_log[result_log.Target == 1].decil.value_counts())
-print(result_log.groupby('decil')['Prob1'].agg("min"))
-```
-
-```python
-plot_roc_and_metrics(result_log["Target"], result_log["Prob1"], y_pred_log)
+plot_roc_and_metrics(result_test_log["Target"], result_test_log["Prob1"], y_pred_log)
 ```
 
 ```python
