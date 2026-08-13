@@ -863,8 +863,9 @@ print(columnas_minimo_entre(ABT, -1, 1))
 ## Elimino columnas con valores unicos
 
 ```python
-columnas_con_describe = pd.DataFrame(ABT.describe().T)
-columnas_con_valores_unicos = columnas_con_describe[columnas_con_describe['min'] == columnas_con_describe['max']].reset_index()
+mins = ABT.min(numeric_only=True)
+maxs = ABT.max(numeric_only=True)
+columnas_con_valores_unicos = mins[maxs == mins].reset_index()
 print(columnas_con_valores_unicos)
 print("")
 print('ABT original: ' , ABT.shape)
