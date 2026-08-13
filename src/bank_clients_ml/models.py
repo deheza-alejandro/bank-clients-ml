@@ -39,30 +39,6 @@ def generar_split(
     return train, test
 
 
-def generar_modelo_y_buscador(n_iter=100):
-
-    modelo_LightGBM_clasificador = lgb.LGBMClassifier(
-        random_state=314,
-        n_jobs=1,
-        # verbosity = 2, # para debug
-        metric="auc",
-    )
-
-    buscador_mejores_hiperparametros = RandomizedSearchCV(
-        estimator=modelo_LightGBM_clasificador,
-        param_distributions=param_test,
-        n_iter=n_iter,  # Va a probar 100 combinaciones diferentes al azar
-        scoring="roc_auc",
-        n_jobs=-1,
-        refit=True,
-        cv=StratifiedKFold(n_splits=3),  # K-FOLD CROSS-VALIDATION con k = 3
-        verbose=1,  # 4 para debug
-        random_state=314,
-    )
-
-    return modelo_LightGBM_clasificador, buscador_mejores_hiperparametros
-
-
 DECILE_LABELS = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
 
 
@@ -129,7 +105,25 @@ def train_and_get_feature_importances(X_train, columns, n_iter=5, target="Target
         una ``pandas.Series`` de importancias de features indexada por
         ``columns``.
     """
-    model, searcher = generar_modelo_y_buscador(n_iter=n_iter)
+    model = lgb.LGBMClassifier(
+        random_state=314,
+        n_jobs=1,
+        # verbosity = 2, # para debug
+        metric="auc",
+    )
+
+    searcher = RandomizedSearchCV(
+        estimator=model,
+        param_distributions=param_test,
+        n_iter=n_iter,  # Va a probar n_iter combinaciones diferentes al azar
+        scoring="roc_auc",
+        n_jobs=-1,
+        refit=True,
+        cv=StratifiedKFold(n_splits=3),  # K-FOLD CROSS-VALIDATION con k = 3
+        verbose=1,  # 4 para debug
+        random_state=314,
+    )
+
     searcher.fit(X_train[columns], X_train[target])
     importances = pd.Series(
         searcher.best_estimator_.feature_importances_,
