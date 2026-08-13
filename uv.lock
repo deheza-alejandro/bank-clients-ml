@@ -43,7 +43,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fpdf2" },
-    { name = "ipython" },
     { name = "lightgbm" },
     { name = "matplotlib" },
     { name = "numpy" },
@@ -56,6 +55,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "ipykernel" },
+    { name = "ipython" },
     { name = "jupytext" },
     { name = "pyrefly" },
     { name = "ruff" },
@@ -64,7 +64,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fpdf2", specifier = ">=2.8.7" },
-    { name = "ipython", specifier = ">=9.16.1" },
     { name = "lightgbm", specifier = ">=4.7.0" },
     { name = "matplotlib", specifier = ">=3.11.1" },
     { name = "numpy", specifier = ">=2.5.1" },
@@ -77,6 +76,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "ipykernel", specifier = ">=7.3.0" },
+    { name = "ipython", specifier = ">=9.16.1" },
     { name = "jupytext", specifier = ">=1.19.5" },
     { name = "pyrefly", specifier = ">=1.2.0" },
     { name = "ruff", specifier = ">=0.16.1" },
