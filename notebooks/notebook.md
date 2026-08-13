@@ -26,7 +26,7 @@ if ipython is not None:
 ```python
 import pandas as pd
 import numpy as np
-from datetime import datetime
+
 
 from bank_clients_ml.utils import print_df_personalizado, print_threshold_violations, describe_full, print_value_counts, filter_nonzero
 from bank_clients_ml.features import (
@@ -34,7 +34,7 @@ from bank_clients_ml.features import (
     columnas_minimo_entre, columnas_con_ceros, safe_denominator, a_datetime, group_columns_by_source,
     min_max_normalize, min_max_normalize_weighted, apply_binning_by_ranges,
 )
-from bank_clients_ml.models import train_and_get_feature_importances, evaluate_deciles_train, evaluate_deciles_test, process_model_results
+from bank_clients_ml.models import train_and_get_feature_importances, evaluate_deciles_train, evaluate_deciles_test
 
 ```
 
@@ -954,7 +954,7 @@ print_df_personalizado("ABT_estandarizado", ABT_estandarizado)
 ### Model training
 
 ```python
-from bank_clients_ml.models import generar_split, generar_modelo_y_buscador, process_model_results
+from bank_clients_ml.models import generar_split
 ```
 
 ```python
