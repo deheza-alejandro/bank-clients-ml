@@ -8,9 +8,13 @@ def print_df_personalizado(nombre_df, df):
     """
     print(nombre_df, "shape:", df.shape)
     print("")
-    nulos = df.columns[df.isnull().any()].tolist()
-    print("Columnas con nulos:", len(nulos))
+    nulos = df.columns[df.isna().any()].tolist()
+    print("Columnas con nulos: NaN, None o NaT", len(nulos))
     print(nulos)
+    print("")
+    inf = df.columns[(df == np.inf).any() | (df == -np.inf).any()].tolist()
+    print("Columnas con inf:", len(inf))
+    print(inf)
     print("")
     c_x = [x for x in df.columns if x.endswith("_x")]
     print("Columnas terminadas con _x:", len(c_x))
@@ -19,14 +23,6 @@ def print_df_personalizado(nombre_df, df):
     c_y = [x for x in df.columns if x.endswith("_y")]
     print("Columnas terminadas con _y:", len(c_y))
     print(c_y)
-    print("")
-    nan = df.columns[df.isna().any()].tolist()
-    print("Columnas con NaN:", len(nan))
-    print(nan)
-    print("")
-    inf = df.columns[(df == np.inf).any() | (df == -np.inf).any()].tolist()
-    print("Columnas con inf:", len(inf))
-    print(inf)
 
 
 def print_threshold_violations(
