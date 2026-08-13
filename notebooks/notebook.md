@@ -768,6 +768,7 @@ data_agg = data_agg[orden_original + cols_derivadas]
 
 ```python
 # reiniciar índice (esto pasa 'client_id' a ser una columna)
+# se hace el .copy() para evitar el warning
 data_agg = data_agg.copy().reset_index()
 
 # borrar las columnas "_rounded" auxiliares de data_entrenamiento para liberar RAM
@@ -1108,10 +1109,6 @@ destino_analisis_bivariado = 'variables'
 ```
 
 ```python
-ABT_reducida_3 = ABT_reducida.copy()
-```
-
-```python
 columnas_a_graficar = [
     "SavingAccount_Days_with_use_count_nonzero",                      
     "SavingAccount_Transfer_In_Transactions_count_nonzero",           
@@ -1176,7 +1173,7 @@ columnas_a_graficar = [
 ]
 
 Graficar_Variables(
-    ABT_reducida_3[columnas_a_graficar], # dataset con variables sin standarizar
+    ABT_reducida[columnas_a_graficar], # dataset con variables sin standarizar
     "client_id",
     "Target",
     20, # cantidad de bines
@@ -1186,8 +1183,6 @@ Graficar_Variables(
 ```
 
 ```python
-ABT_2 = ABT.copy()
-
 graf = [
     "CreditCard_Payment_total_var",
     
@@ -1217,7 +1212,7 @@ graf = [
 ]
 
 Graficar_Variables(
-    ABT_2[graf], # dataset con variables sin standarizar
+    ABT[graf], # dataset con variables sin standarizar
     "client_id",
     "Target",
     10, # cantidad de bines
@@ -1361,6 +1356,10 @@ variables_mas_importantes_9.nlargest(25)
 ```
 
 # Transformando mejores variables segun analisis bivariado y LightGBM
+
+```python
+ABT_reducida_3 = ABT_reducida.copy()
+```
 
 ```python
 # transformo variables agregando porcentaje de target a cada variable y agrupo valores. y agrupo variables categoricas (ya las transforme anteriormente)
