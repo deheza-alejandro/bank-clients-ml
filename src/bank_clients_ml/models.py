@@ -88,7 +88,7 @@ def process_model_results(
     return combined_df
 
 
-def train_and_get_feature_importances(X_train, columns, n_iter=5, target="Target"):
+def train_and_get_feature_importances(X_train, columns, n_iter=2, target="Target"):
     """Entrena un modelo LightGBM usando RandomizedSearchCV y devuelve las ``feature_importances``.
 
     Args:

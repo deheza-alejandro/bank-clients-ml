@@ -1527,7 +1527,7 @@ X_train_final, X_test_final = generar_split(ABT_reducida_3) # dataframe con vari
 
 ```python
 _, buscador_mejores_hiperparametros, variables_mas_importantes = train_and_get_feature_importances(
-    X_train_final, mejores_variables, n_iter=100
+    X_train_final, mejores_variables, n_iter=20
 )
 ```
 
