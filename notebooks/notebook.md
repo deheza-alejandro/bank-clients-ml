@@ -332,14 +332,14 @@ for col in ['Client_Age_grp', 'Region', 'CreditCard_Product']:
 
 ```python
 data_if['First_product_dt'] = (a_datetime(data_if['Last_product_dt']) - a_datetime(data_if['First_product_dt'])).dt.days
-data_if.rename(columns={'First_product_dt': 'Dias_entre_primer_y_ultimo_producto'}, inplace=True)
+data_if.rename(columns={'First_product_dt': 'Days_between_first_and_last_product'}, inplace=True)
 print("")
-print(data_if[['Dias_entre_primer_y_ultimo_producto']].value_counts())
+print(data_if[['Days_between_first_and_last_product']].value_counts())
 
 data_if['Last_product_dt'] = (a_datetime(ultimo_mes_entrenamiento) + pd.DateOffset(months=1) - a_datetime(data_if['Last_product_dt'])).dt.days
-data_if.rename(columns={'Last_product_dt': 'Recencia_en_dias'}, inplace=True)
+data_if.rename(columns={'Last_product_dt': 'Recency_in_days'}, inplace=True)
 print("")
-print(data_if[['Recencia_en_dias']].value_counts())
+print(data_if[['Recency_in_days']].value_counts())
 
 print("")
 print("data_if:", data_if.shape)
@@ -393,7 +393,7 @@ transformadas_1 = {
 'Operations_digitales': (data_entrenamiento['Operations_HomeBanking'] + data_entrenamiento['Operations_Mobile'] + data_entrenamiento['Operations_Ivr'] + 
     data_entrenamiento['Operations_Telemarketer']),
 
-'Operations_presenciales': (data_entrenamiento['Operations_Bank'] + data_entrenamiento['Operations_Terminal'] + data_entrenamiento['Operations_ATM']),
+'Operations_in_person': (data_entrenamiento['Operations_Bank'] + data_entrenamiento['Operations_Terminal'] + data_entrenamiento['Operations_ATM']),
 
 
     
@@ -403,7 +403,7 @@ transformadas_1 = {
 
 'CreditCard_Payment_digitales': data_entrenamiento['CreditCard_Payment_Aut_Debit'] + data_entrenamiento['CreditCard_Payment_Web'],
 
-'CreditCard_Payment_presenciales': (data_entrenamiento['CreditCard_Payment_External'] + data_entrenamiento['CreditCard_Payment_Cash'] + 
+'CreditCard_Payment_in_person': (data_entrenamiento['CreditCard_Payment_External'] + data_entrenamiento['CreditCard_Payment_Cash'] + 
                                                          data_entrenamiento['CreditCard_Payment_ATM'] + data_entrenamiento['CreditCard_Payment_TAS']),
     
 }
@@ -482,7 +482,7 @@ transformadas_2 = {
 
 # OPERATION
 'Operations_digitales_porc': compute_percentage(data_entrenamiento['Operations_digitales'], data_entrenamiento['Operations_total']), 
-'Operations_presenciales_porc': compute_percentage(data_entrenamiento['Operations_presenciales'], data_entrenamiento['Operations_total']), 
+'Operations_in_person_porc': compute_percentage(data_entrenamiento['Operations_in_person'], data_entrenamiento['Operations_total']), 
 
 'Operations_Bank_porc': compute_percentage(data_entrenamiento['Operations_Bank'], data_entrenamiento['Operations_total']), 
 'Operations_Terminal_porc': compute_percentage(data_entrenamiento['Operations_Terminal'], data_entrenamiento['Operations_total']), 
@@ -493,13 +493,13 @@ transformadas_2 = {
 'Operations_ATM_porc': compute_percentage(data_entrenamiento['Operations_ATM'], data_entrenamiento['Operations_total']), 
 
 
-'Operations_Bank_P_porc': compute_percentage(data_entrenamiento['Operations_Bank'], data_entrenamiento['Operations_presenciales']), 
-'Operations_Terminal_P_porc': compute_percentage(data_entrenamiento['Operations_Terminal'], data_entrenamiento['Operations_presenciales']), 
+'Operations_Bank_P_porc': compute_percentage(data_entrenamiento['Operations_Bank'], data_entrenamiento['Operations_in_person']), 
+'Operations_Terminal_P_porc': compute_percentage(data_entrenamiento['Operations_Terminal'], data_entrenamiento['Operations_in_person']), 
 'Operations_HomeBanking_D_porc': compute_percentage(data_entrenamiento['Operations_HomeBanking'], data_entrenamiento['Operations_digitales']), 
 'Operations_Mobile_D_porc': compute_percentage(data_entrenamiento['Operations_Mobile'], data_entrenamiento['Operations_digitales']), 
 'Operations_Ivr_D_porc': compute_percentage(data_entrenamiento['Operations_Ivr'], data_entrenamiento['Operations_digitales']), 
 'Operations_Telemarketer_D_porc': compute_percentage(data_entrenamiento['Operations_Telemarketer'], data_entrenamiento['Operations_digitales']), 
-'Operations_ATM_P_porc': compute_percentage(data_entrenamiento['Operations_ATM'], data_entrenamiento['Operations_presenciales']), 
+'Operations_ATM_P_porc': compute_percentage(data_entrenamiento['Operations_ATM'], data_entrenamiento['Operations_in_person']), 
 
 
 
@@ -510,7 +510,7 @@ transformadas_2 = {
 
 # CREDIT CARD
 'CreditCard_Payment_digitales_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_digitales'], data_entrenamiento['CreditCard_Payment_total']), 
-'CreditCard_Payment_presenciales_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_presenciales'], data_entrenamiento['CreditCard_Payment_total']), 
+'CreditCard_Payment_in_person_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_in_person'], data_entrenamiento['CreditCard_Payment_total']), 
 
 
 'CreditCard_Payment_Aut_Debit_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Aut_Debit'], data_entrenamiento['CreditCard_Payment_total']), 
@@ -521,11 +521,11 @@ transformadas_2 = {
 'CreditCard_Payment_TAS_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_TAS'], data_entrenamiento['CreditCard_Payment_total']), 
 
 'CreditCard_Payment_Aut_Debit_D_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Aut_Debit'], data_entrenamiento['CreditCard_Payment_digitales']), 
-'CreditCard_Payment_External_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_External'], data_entrenamiento['CreditCard_Payment_presenciales']), 
-'CreditCard_Payment_Cash_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Cash'], data_entrenamiento['CreditCard_Payment_presenciales']), 
+'CreditCard_Payment_External_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_External'], data_entrenamiento['CreditCard_Payment_in_person']), 
+'CreditCard_Payment_Cash_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Cash'], data_entrenamiento['CreditCard_Payment_in_person']), 
 'CreditCard_Payment_Web_D_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_Web'], data_entrenamiento['CreditCard_Payment_digitales']), 
-'CreditCard_Payment_ATM_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_ATM'], data_entrenamiento['CreditCard_Payment_presenciales']), 
-'CreditCard_Payment_TAS_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_TAS'], data_entrenamiento['CreditCard_Payment_presenciales']), 
+'CreditCard_Payment_ATM_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_ATM'], data_entrenamiento['CreditCard_Payment_in_person']), 
+'CreditCard_Payment_TAS_P_porc': compute_percentage(data_entrenamiento['CreditCard_Payment_TAS'], data_entrenamiento['CreditCard_Payment_in_person']), 
 
 
 'CreditCard_Balance_ARG_limit_porc': compute_percentage(data_entrenamiento['CreditCard_Balance_ARG'], data_entrenamiento['CreditCard_Total_Limit']), 
@@ -551,7 +551,7 @@ transformadas_2 = {
 
 
 # OTROS
-'Cantidad_Productos_Activos': (
+'Quantity_Active_Products': (
     data_entrenamiento['CreditCard_Premium']
     + data_entrenamiento['CreditCard_Active']
     + data_entrenamiento['Loan_Active']
@@ -569,7 +569,7 @@ transformadas_2 = {
     + data_entrenamiento['Insurance_Unemployment']
 ),
 
-'Cantidad_Productos_Comunes_Activos': (
+'Quantity_Common_Active_Product': (
     data_entrenamiento['CreditCard_Active']
     + data_entrenamiento['SavingAccount_Active_ARG']
     + data_entrenamiento['SavingAccount_Active_DOLLAR']
@@ -796,8 +796,8 @@ sumatoria_usos = (
     + min_max_normalize(ABT["SavingAccount_CreditCard_Payment_Transactions_count_nonzero"])
     + min_max_normalize(ABT["Operations_total_count_nonzero"])
     + min_max_normalize(ABT["CreditCard_Payment_total_max"])
-    + min_max_normalize(ABT["CreditCard_Payment_presenciales_max"])
-    + (ABT["Operations_presenciales_porc_max"] > 0).astype(int)
+    + min_max_normalize(ABT["CreditCard_Payment_in_person_max"])
+    + (ABT["Operations_in_person_porc_max"] > 0).astype(int)
     + (ABT["CreditCard_Payment_Aut_Debit_max"] > 0).astype(int)
     + (ABT["CreditCard_Payment_TAS_max"] > 0).astype(int)
 )
@@ -1045,56 +1045,95 @@ _, _, variables_mas_importantes_6 = train_and_get_feature_importances(
 ```
 
 ```python
-variables_mas_importantes_0.nlargest(60).plot(kind='barh', figsize=(8,10))
+from bank_clients_ml.graphs import save_axes_as_svg
 ```
+
+```python
+save_axes_as_svg(
+    variables_mas_importantes_0.nlargest(60).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables_0"
+)
+```
+
+![most_important_variables_0](images\most_important_variables_0.svg)
 
 ```python
 variables_mas_importantes_0.nlargest(100)
 ```
 
 ```python
-variables_mas_importantes_1.nlargest(40).plot(kind='barh', figsize=(8,10))
+save_axes_as_svg(
+    variables_mas_importantes_1.nlargest(40).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables_1"
+)
 ```
+
+![most_important_variables_1](images\most_important_variables_1.svg)
 
 ```python
 variables_mas_importantes_1.nlargest(20)
 ```
 
 ```python
-variables_mas_importantes_2.nlargest(60).plot(kind='barh', figsize=(8,10))
+save_axes_as_svg(
+    variables_mas_importantes_2.nlargest(60).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables_2"
+)
 ```
+
+![most_important_variables_2](images\most_important_variables_2.svg)
 
 ```python
 variables_mas_importantes_2.nlargest(20)
 ```
 
 ```python
-variables_mas_importantes_3.nlargest(40).plot(kind='barh', figsize=(8,10))
+save_axes_as_svg(
+    variables_mas_importantes_3.nlargest(40).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables_3"
+)
 ```
+
+![most_important_variables_3](images\most_important_variables_3.svg)
 
 ```python
 variables_mas_importantes_3.nlargest(20)
 ```
 
 ```python
-variables_mas_importantes_4.nlargest(25).plot(kind='barh', figsize=(8,10))
+save_axes_as_svg(
+    variables_mas_importantes_4.nlargest(25).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables_4"
+)
 ```
+
+![most_important_variables_4](images\most_important_variables_4.svg)
 
 ```python
 variables_mas_importantes_4.nlargest(20)
 ```
 
 ```python
-variables_mas_importantes_5.nlargest(60).plot(kind='barh', figsize=(8,10))
+save_axes_as_svg(
+    variables_mas_importantes_5.nlargest(60).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables_5"
+)
 ```
+
+![most_important_variables_5](images\most_important_variables_5.svg)
 
 ```python
 variables_mas_importantes_5.nlargest(20)
 ```
 
 ```python
-variables_mas_importantes_6.nlargest(40).plot(kind='barh', figsize=(8,10))
+save_axes_as_svg(
+    variables_mas_importantes_6.nlargest(40).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables_6"
+)
 ```
+
+![most_important_variables_6](images\most_important_variables_6.svg)
 
 ```python
 variables_mas_importantes_6.nlargest(20)
@@ -1103,123 +1142,207 @@ variables_mas_importantes_6.nlargest(20)
 # Analisis Bivariado
 
 ```python
-from bank_clients_ml.graphs import Graficar_Variables, graficar_top_20
-
-destino_analisis_bivariado = 'variables'
+from bank_clients_ml.graphs import graph_top_20, graph_variables
 ```
 
 ```python
 columnas_a_graficar = [
-    "SavingAccount_Days_with_use_count_nonzero",                      
-    "SavingAccount_Transfer_In_Transactions_count_nonzero",           
-    "SavingAccount_Transfer_In_Transactions_max",                    
-    "SavingAccount_Days_with_use_min",                                
-    "SavingAccount_Days_with_Credits_porc_var",                       
-    "SavingAccount_CreditCard_Payment_Transactions_max",              
-    "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",     
-    
-    "SavingAccount_Balance_FirstDate_max",                     
-    "SavingAccount_CreditCard_Payment_Amount_max",             
-    "SavingAccount_Transfer_In_Amount_max",                    
-    "SavingAccount_Total_Amount_min",                           
-    "SavingAccount_Total_Amount_diff",                          
-    "SavingAccount_Balance_LastDate_diff_rel",                  
-    
-    "Operations_total_count_nonzero",           
-    "Operations_total_min",                     
-    "Operations_total_var",                     
-    "Operations_Telemarketer_porc_max",        
-    "Operations_presenciales_porc_min",         
-    "Operations_presenciales_porc_max",        
-    
-    "CreditCard_Payment_total_max",                   
-    "CreditCard_Payment_Aut_Debit_max",                
-    "CreditCard_Payment_total_min",                    
-    "CreditCard_Payment_TAS_max",                     
-    "CreditCard_Payment_Cash_max",                     
-    "CreditCard_Payment_Web_max",                      
-    "CreditCard_Payment_Aut_Debit_min",                 
-    "CreditCard_Payment_Aut_Debit_diff",                
-    "CreditCard_Payment_ATM_max",                      
-    "CreditCard_Payment_presenciales_porc_diff_rel",    
+    "SavingAccount_Days_with_use_count_nonzero",
+    "SavingAccount_Transfer_In_Transactions_count_nonzero",
+    "SavingAccount_Transfer_In_Transactions_max",
+    "SavingAccount_Days_with_use_min",
+    "SavingAccount_Days_with_Credits_porc_var",
+    "SavingAccount_CreditCard_Payment_Transactions_max",
+    "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",
 
-    "CreditCard_Payment_presenciales_max",
+    "SavingAccount_Balance_FirstDate_max",
+    "SavingAccount_CreditCard_Payment_Amount_max",
+    "SavingAccount_Transfer_In_Amount_max",
+    "SavingAccount_Total_Amount_min",
+    "SavingAccount_Total_Amount_diff",
+    "SavingAccount_Balance_LastDate_diff_rel",
 
-    "CreditCard_Total_Limit_var",                                    
-    "CreditCard_Total_Limit_diff_rel",                               
-    "CreditCard_Balance_ARG_SP_porc_max",                           
-    "CreditCard_Total_Limit_min",                                    
-    "CreditCard_Revolving_min",                                      
-    "CreditCard_Total_Spending_diff_rel",                            
-    "CreditCard_Spending_Aut_Debits_diff_rel",                        
-    
-    "CreditCard_Product",                                  
-    "Recencia_en_dias",                                    
-    "Dias_entre_primer_y_ultimo_producto",                 
-    "Client_Age_grp",                                      
-    "Cantidad_Productos_Activos_min",                      
-    "Cantidad_Productos_Activos_nunique",                  
-    "SavingAccount_Active_ARG_Salary",                     
-    "Sex",                                                 
-    "SavingAccount_Active_DOLLAR",                         
-    "Region",                                              
-    "Cantidad_Productos_Activos_var",                      
-    "Investment_Numbers_max",                             
-    "Email",                                               
-    
-    "Cantidad_Productos_Comunes_Activos_count_nonzero",     
+    "Operations_total_count_nonzero",
+    "Operations_total_min",
+    "Operations_total_var",
+    "Operations_Telemarketer_porc_max",
+    "Operations_in_person_porc_min",
+    "Operations_in_person_porc_max",
+
+    "CreditCard_Payment_total_max",
+    "CreditCard_Payment_Aut_Debit_max",
+    "CreditCard_Payment_total_min",
+    "CreditCard_Payment_TAS_max",
+    "CreditCard_Payment_Cash_max",
+    "CreditCard_Payment_Web_max",
+    "CreditCard_Payment_Aut_Debit_min",
+    "CreditCard_Payment_Aut_Debit_diff",
+    "CreditCard_Payment_ATM_max",
+    "CreditCard_Payment_in_person_porc_diff_rel",
+
+    "CreditCard_Payment_in_person_max",
+
+    "CreditCard_Total_Limit_var",
+    "CreditCard_Total_Limit_diff_rel",
+    "CreditCard_Balance_ARG_SP_porc_max",
+    "CreditCard_Total_Limit_min",
+    "CreditCard_Revolving_min",
+    "CreditCard_Total_Spending_diff_rel",
+    "CreditCard_Spending_Aut_Debits_diff_rel",
+
+    "CreditCard_Product",
+    "Recency_in_days",
+    "Days_between_first_and_last_product",
+    "Client_Age_grp",
+    "Quantity_Active_Products_min",
+    "Quantity_Active_Products_nunique",
+    "SavingAccount_Active_ARG_Salary",
+    "Sex",
+    "SavingAccount_Active_DOLLAR",
+    "Region",
+    "Quantity_Active_Products_var",
+    "Investment_Numbers_max",
+    "Email",
+
+    "Quantity_Common_Active_Product_count_nonzero",
 
     "client_id", "Target"
 ]
 
-Graficar_Variables(
+graph_variables(
     ABT_reducida[columnas_a_graficar], # dataset con variables sin standarizar
     "client_id",
     "Target",
     20, # cantidad de bines
-    destino_analisis_bivariado,
-    "Analisis"
+    "analysis"
 )
 ```
+
+![SavingAccount_Days_with_use_count_nonzero](images\analysis\SavingAccount_Days_with_use_count_nonzero.svg)
+![SavingAccount_Transfer_In_Transactions_count_nonzero](images\analysis\SavingAccount_Transfer_In_Transactions_count_nonzero.svg)
+![SavingAccount_Transfer_In_Transactions_max](images\analysis\SavingAccount_Transfer_In_Transactions_max.svg)
+![SavingAccount_Days_with_use_min](images\analysis\SavingAccount_Days_with_use_min.svg)
+![SavingAccount_Days_with_Credits_porc_var](images\analysis\SavingAccount_Days_with_Credits_porc_var.svg)
+![SavingAccount_CreditCard_Payment_Transactions_max](images\analysis\SavingAccount_CreditCard_Payment_Transactions_max.svg)
+![SavingAccount_CreditCard_Payment_Transactions_count_nonzero](images\analysis\SavingAccount_CreditCard_Payment_Transactions_count_nonzero.svg)
+
+![SavingAccount_Balance_FirstDate_max](images\analysis\SavingAccount_Balance_FirstDate_max.svg)
+![SavingAccount_CreditCard_Payment_Amount_max](images\analysis\SavingAccount_CreditCard_Payment_Amount_max.svg)
+![SavingAccount_Transfer_In_Amount_max](images\analysis\SavingAccount_Transfer_In_Amount_max.svg)
+![SavingAccount_Total_Amount_min](images\analysis\SavingAccount_Total_Amount_min.svg)
+![SavingAccount_Total_Amount_diff](images\analysis\SavingAccount_Total_Amount_diff.svg)
+![SavingAccount_Balance_LastDate_diff_rel](images\analysis\SavingAccount_Balance_LastDate_diff_rel.svg)
+
+![Operations_total_count_nonzero](images\analysis\Operations_total_count_nonzero.svg)
+![Operations_total_min](images\analysis\Operations_total_min.svg)
+![Operations_total_var](images\analysis\Operations_total_var.svg)
+![Operations_Telemarketer_porc_max](images\analysis\Operations_Telemarketer_porc_max.svg)
+![Operations_in_person_porc_min](images\analysis\Operations_in_person_porc_min.svg)
+![Operations_in_person_porc_max](images\analysis\Operations_in_person_porc_max.svg)
+
+![CreditCard_Payment_total_max](images\analysis\CreditCard_Payment_total_max.svg)
+![CreditCard_Payment_Aut_Debit_max](images\analysis\CreditCard_Payment_Aut_Debit_max.svg)
+![CreditCard_Payment_total_min](images\analysis\CreditCard_Payment_total_min.svg)
+![CreditCard_Payment_TAS_max](images\analysis\CreditCard_Payment_TAS_max.svg)
+![CreditCard_Payment_Cash_max](images\analysis\CreditCard_Payment_Cash_max.svg)
+![CreditCard_Payment_Web_max](images\analysis\CreditCard_Payment_Web_max.svg)
+![CreditCard_Payment_Aut_Debit_min](images\analysis\CreditCard_Payment_Aut_Debit_min.svg)
+![CreditCard_Payment_Aut_Debit_diff](images\analysis\CreditCard_Payment_Aut_Debit_diff.svg)
+![CreditCard_Payment_ATM_max](images\analysis\CreditCard_Payment_ATM_max.svg)
+![CreditCard_Payment_in_person_porc_diff_rel](images\analysis\CreditCard_Payment_in_person_porc_diff_rel.svg)
+
+![CreditCard_Payment_in_person_max](images\analysis\CreditCard_Payment_in_person_max.svg)
+
+![CreditCard_Total_Limit_var](images\analysis\CreditCard_Total_Limit_var.svg)
+![CreditCard_Total_Limit_diff_rel](images\analysis\CreditCard_Total_Limit_diff_rel.svg)
+![CreditCard_Balance_ARG_SP_porc_max](images\analysis\CreditCard_Balance_ARG_SP_porc_max.svg)
+![CreditCard_Total_Limit_min](images\analysis\CreditCard_Total_Limit_min.svg)
+![CreditCard_Revolving_min](images\analysis\CreditCard_Revolving_min.svg)
+![CreditCard_Total_Spending_diff_rel](images\analysis\CreditCard_Total_Spending_diff_rel.svg)
+![CreditCard_Spending_Aut_Debits_diff_rel](images\analysis\CreditCard_Spending_Aut_Debits_diff_rel.svg)
+
+![CreditCard_Product](images\analysis\CreditCard_Product.svg)
+![Recency_in_days](images\analysis\Recency_in_days.svg)
+![Days_between_first_and_last_product](images\analysis\Days_between_first_and_last_product.svg)
+![Client_Age_grp](images\analysis\Client_Age_grp.svg)
+![Quantity_Active_Products_min](images\analysis\Quantity_Active_Products_min.svg)
+![Quantity_Active_Products_nunique](images\analysis\Quantity_Active_Products_nunique.svg)
+![SavingAccount_Active_ARG_Salary](images\analysis\SavingAccount_Active_ARG_Salary.svg)
+![Sex](images\analysis\Sex.svg)
+![SavingAccount_Active_DOLLAR](images\analysis\SavingAccount_Active_DOLLAR.svg)
+![Region](images\analysis\Region.svg)
+![Quantity_Active_Products_var](images\analysis\Quantity_Active_Products_var.svg)
+![Investment_Numbers_max](images\analysis\Investment_Numbers_max.svg)
+![Email](images\analysis\Email.svg)
+
+![Quantity_Common_Active_Product_count_nonzero](images\analysis\Quantity_Common_Active_Product_count_nonzero.svg)
+
+![Target](images\analysis\Target.svg)
 
 ```python
 graf = [
     "CreditCard_Payment_total_var",
-    
+
     "Limit_operations",
 
     "SavingAccount_CreditCard_Payment_Amount_max",
     "CreditCard_Total_Limit_diff_rel",
-    
+
     "SavingAccount_Days_with_use_count_nonzero",
     "SavingAccount_Days_with_use_min",
     "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",
 
     "Operations_total_count_nonzero",
-    "Operations_presenciales_porc_max",
+    "Operations_in_person_porc_max",
 
     "CreditCard_Payment_total_max",
     "CreditCard_Payment_Aut_Debit_max",
-    "CreditCard_Payment_presenciales_max",
+    "CreditCard_Payment_in_person_max",
 
     "CreditCard_Product",
-    "Dias_entre_primer_y_ultimo_producto",
+    "Days_between_first_and_last_product",
     "Client_Age_grp",
-    "Cantidad_Productos_Activos_min",
-    "Recencia_en_dias",
+    "Quantity_Active_Products_min",
+    "Recency_in_days",
 
     "client_id", "Target"
 ]
 
-Graficar_Variables(
+graph_variables(
     ABT[graf], # dataset con variables sin standarizar
     "client_id",
     "Target",
     10, # cantidad de bines
-    destino_analisis_bivariado,
-    "Analisis_2"
+    "analysis_2"
 )
 ```
+
+![CreditCard_Payment_total_var](images\analysis_2\CreditCard_Payment_total_var.svg)
+
+![Limit_operations](images\analysis_2\Limit_operations.svg)
+
+![SavingAccount_CreditCard_Payment_Amount_max](images\analysis_2\SavingAccount_CreditCard_Payment_Amount_max.svg)
+![CreditCard_Total_Limit_diff_rel](images\analysis_2\CreditCard_Total_Limit_diff_rel.svg)
+
+![SavingAccount_Days_with_use_count_nonzero](images\analysis_2\SavingAccount_Days_with_use_count_nonzero.svg)
+![SavingAccount_Days_with_use_min](images\analysis_2\SavingAccount_Days_with_use_min.svg)
+![SavingAccount_CreditCard_Payment_Transactions_count_nonzero](images\analysis_2\SavingAccount_CreditCard_Payment_Transactions_count_nonzero.svg)
+
+![Operations_total_count_nonzero](images\analysis_2\Operations_total_count_nonzero.svg)
+![Operations_in_person_porc_max](images\analysis_2\Operations_in_person_porc_max.svg)
+
+![CreditCard_Payment_total_max](images\analysis_2\CreditCard_Payment_total_max.svg)
+![CreditCard_Payment_Aut_Debit_max](images\analysis_2\CreditCard_Payment_Aut_Debit_max.svg)
+![CreditCard_Payment_in_person_max](images\analysis_2\CreditCard_Payment_in_person_max.svg)
+
+![CreditCard_Product](images\analysis_2\CreditCard_Product.svg)
+![Days_between_first_and_last_product](images\analysis_2\Days_between_first_and_last_product.svg)
+![Client_Age_grp](images\analysis_2\Client_Age_grp.svg)
+![Quantity_Active_Products_min](images\analysis_2\Quantity_Active_Products_min.svg)
+![Recency_in_days](images\analysis_2\Recency_in_days.svg)
+
+![Target](images\analysis_2\Target.svg)
+
 
 ## Re-entreno con las mejores variables
 
@@ -1237,8 +1360,8 @@ prueba = [
     "Operations_total_min",                     
     "Operations_total_var",                     
     "Operations_Telemarketer_porc_max",        
-    "Operations_presenciales_porc_min",         
-    "Operations_presenciales_porc_max",        
+    "Operations_in_person_porc_min",         
+    "Operations_in_person_porc_max",        
 
     "CreditCard_Payment_total_var",
     "CreditCard_Payment_total_max",                   
@@ -1250,9 +1373,9 @@ prueba = [
     "CreditCard_Payment_Aut_Debit_min",                 
     "CreditCard_Payment_Aut_Debit_diff",                
     "CreditCard_Payment_ATM_max",                      
-    "CreditCard_Payment_presenciales_porc_diff_rel",    
+    "CreditCard_Payment_in_person_porc_diff_rel",    
 
-    "CreditCard_Payment_presenciales_max"
+    "CreditCard_Payment_in_person_max"
 ]
 
 _, _, variables_mas_importantes_7 = train_and_get_feature_importances(
@@ -1261,8 +1384,13 @@ _, _, variables_mas_importantes_7 = train_and_get_feature_importances(
 ```
 
 ```python
-variables_mas_importantes_7.nlargest(25).plot(kind='barh', figsize=(8,10))
+save_axes_as_svg(
+    variables_mas_importantes_7.nlargest(25).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables_7"
+)
 ```
+
+![most_important_variables_7](images\most_important_variables_7.svg)
 
 ```python
 variables_mas_importantes_7.nlargest(25)
@@ -1279,18 +1407,18 @@ prueba_2 = [
     "SavingAccount_CreditCard_Payment_Amount_max",
 
     "Operations_total_count_nonzero",
-    "Operations_presenciales_porc_max",
+    "Operations_in_person_porc_max",
 
     "CreditCard_Payment_total_max",
     "CreditCard_Payment_Aut_Debit_max",
-    "CreditCard_Payment_presenciales_max",
+    "CreditCard_Payment_in_person_max",
 
     "CreditCard_Total_Limit_diff_rel",
 
     "CreditCard_Product",
-    "Dias_entre_primer_y_ultimo_producto",
+    "Days_between_first_and_last_product",
     "Client_Age_grp",
-    "Cantidad_Productos_Activos_min",
+    "Quantity_Active_Products_min",
 ]
 
 _, _, variables_mas_importantes_8 = train_and_get_feature_importances(
@@ -1299,8 +1427,13 @@ _, _, variables_mas_importantes_8 = train_and_get_feature_importances(
 ```
 
 ```python
-variables_mas_importantes_8.nlargest(25).plot(kind='barh', figsize=(8,10))
+save_axes_as_svg(
+    variables_mas_importantes_8.nlargest(25).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables_8"
+)
 ```
+
+![most_important_variables_8](images\most_important_variables_8.svg)
 
 ```python
 variables_mas_importantes_8.nlargest(25)
@@ -1320,9 +1453,9 @@ for x in [
     "CreditCard_Total_Limit_diff_rel",
 
     "CreditCard_Product",
-    "Dias_entre_primer_y_ultimo_producto",
+    "Days_between_first_and_last_product",
     "Client_Age_grp",
-    "Cantidad_Productos_Activos_min"    
+    "Quantity_Active_Products_min"    
 ]:
     print("Columnas correlacionadas con", x, ":")
     print(triangulo_superior[x][triangulo_superior[x] > 0.50])
@@ -1335,8 +1468,8 @@ for x in [
 prueba_3 = [                      
     #"SavingAccount_CreditCard_Payment_Amount_max",
     #"CreditCard_Total_Limit_diff_rel",
-    #"Dias_entre_primer_y_ultimo_producto",
-    #"Cantidad_Productos_Activos_min"
+    #"Days_between_first_and_last_product",
+    #"Quantity_Active_Products_min"
     "Operations_total_count_nonzero",
     "CreditCard_Product",
     "Client_Age_grp"
@@ -1348,8 +1481,13 @@ _, _, variables_mas_importantes_9 = train_and_get_feature_importances(
 ```
 
 ```python
-variables_mas_importantes_9.nlargest(25).plot(kind='barh', figsize=(8,10))
+save_axes_as_svg(
+    variables_mas_importantes_9.nlargest(25).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables_9"
+)
 ```
+
+![most_important_variables_9](images\most_important_variables_9.svg)
 
 ```python
 variables_mas_importantes_9.nlargest(25)
@@ -1410,44 +1548,44 @@ print("")
 # print(ABT_reducida_3['Region_t'].value_counts())
 # print("")
 
-# # Cantidad_Productos_Activos_min
-# ABT_reducida_3['Cantidad_Productos_Activos_min_t'] = apply_binning_by_ranges(
-#     ABT_reducida_3['Cantidad_Productos_Activos_min'],
+# # Quantity_Active_Products_min
+# ABT_reducida_3['Quantity_Active_Products_min_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['Quantity_Active_Products_min'],
 #     ranges=[(0, 3), (5, 8)],
 #     values=[17.664, 61.729],
 #     default=40.000,
 # )
-# print(ABT_reducida_3['Cantidad_Productos_Activos_min_t'].value_counts())
+# print(ABT_reducida_3['Quantity_Active_Products_min_t'].value_counts())
 # print("")
 
-# # Operations_presenciales_max
-# ABT_reducida_3['Operations_presenciales_max_t'] = apply_binning_by_ranges(
-#     ABT_reducida_3['Operations_presenciales_max'],
+# # Operations_in_person_max
+# ABT_reducida_3['Operations_in_person_max_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['Operations_in_person_max'],
 #     ranges=[(1, 2), (3, 44)],
 #     values=[36.971, 54.786],
 #     default=17.000,
 # )
-# print(ABT_reducida_3['Operations_presenciales_max_t'].value_counts())
+# print(ABT_reducida_3['Operations_in_person_max_t'].value_counts())
 # print("")
 
-# # Dias_entre_primer_y_ultimo_producto
-# ABT_reducida_3['Dias_entre_primer_y_ultimo_producto_t'] = apply_binning_by_ranges(
-#     ABT_reducida_3['Dias_entre_primer_y_ultimo_producto'],
+# # Days_between_first_and_last_product
+# ABT_reducida_3['Days_between_first_and_last_product_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['Days_between_first_and_last_product'],
 #     ranges=[(0, 441), (442, 1142), (1143, 2130)],
 #     values=[21.764, 25.244, 33.003],
 #     default=48.858,
 # )
-# print(ABT_reducida_3['Dias_entre_primer_y_ultimo_producto_t'].value_counts())
+# print(ABT_reducida_3['Days_between_first_and_last_product_t'].value_counts())
 # print("")
 
 # # Recencia_en_dias
-# ABT_reducida_3['Recencia_en_dias_t'] = apply_binning_by_ranges(
-#     ABT_reducida_3['Recencia_en_dias'],
+# ABT_reducida_3['Recency_in_days_t'] = apply_binning_by_ranges(
+#     ABT_reducida_3['Recency_in_days'],
 #     ranges=[(1, 408), (409, 650)],
 #     values=[33.822, 29.220],
 #     default=23.845,
 # )
-# print(ABT_reducida_3['Recencia_en_dias_t'].value_counts())
+# print(ABT_reducida_3['Recency_in_days_t'].value_counts())
 # print("")
 
 # # CreditCard_Total_Spending_median
@@ -1495,20 +1633,24 @@ print("")
 mejores_variables = [
     "CreditCard_Product_t",
     "Client_Age_grp_t",
-    "Operations_total_count_nonzero_t", 
+    "Operations_total_count_nonzero_t",
 
     "client_id", "Target"
 ]
 
-Graficar_Variables(
+graph_variables(
     ABT_reducida_3[mejores_variables], # dataset con variables sin standarizar
     "client_id",
     "Target",
     20,
-    destino_analisis_bivariado,
-    "Analisis_t"
+    "analysis_t"
 )
 ```
+
+![CreditCard_Product_t](images\analysis_t\CreditCard_Product_t.svg)
+![Client_Age_grp_t](images\analysis_t\Client_Age_grp_t.svg)
+![Operations_total_count_nonzero_t](images\analysis_t\Operations_total_count_nonzero_t.svg)
+![Target](images\analysis_t\Target.svg)
 
 ```python
 mejores_variables.remove("client_id")
@@ -1532,8 +1674,14 @@ _, buscador_mejores_hiperparametros, variables_mas_importantes = train_and_get_f
 ```
 
 ```python
-variables_mas_importantes.nlargest(20).plot(kind='barh', figsize=(8,10))
+save_axes_as_svg(
+    variables_mas_importantes.nlargest(20).plot(kind='barh', figsize=(8, 10)),
+    "most_important_variables"
+)
 ```
+
+![most_important_variables](images\most_important_variables.svg)
+
 
 ## Hiperparametros optimos
 
@@ -1543,15 +1691,18 @@ buscador_mejores_hiperparametros.best_estimator_
 
 ```python
 dic = {
-    'CreditCard_Product_t': 'Tipo de Tarjeta de crédito',
-    "Client_Age_grp_t": "Tiene entre 50 y 69 años",
-    "Operations_total_count_nonzero_t": "Cantidad de Meses con al menos una Operación",
+    'CreditCard_Product_t': 'Credit Card Type',
+    "Client_Age_grp_t": "Between 50 and 69 years old",
+    "Operations_total_count_nonzero_t": "Number of months with at least one operation",
 }
 
 variables_mas_importantes_renombradas = variables_mas_importantes.rename(index=dic)
 
-graficar_top_20(variables_mas_importantes_renombradas)
+graph_top_20(variables_mas_importantes_renombradas, graphic_name="top_20_features")
 ```
+
+![top_20_features](images\graph_top_20\top_20_features.svg)
+
 
 # Performance del modelo
 
@@ -1586,8 +1737,11 @@ result_test = evaluate_deciles_test(
 ```python
 from bank_clients_ml.graphs import plot_roc_and_metrics
 
-plot_roc_and_metrics(result_test["Target"], result_test["Prob1"], y_pred)
+plot_roc_and_metrics(result_test["Target"], result_test["Prob1"], y_pred, graphic_name="lightgbm")
 ```
+
+![roc_lightgbm](images\plot_roc_and_metrics\lightgbm.svg)
+
 
 # Resultados del excel
 
@@ -1647,8 +1801,10 @@ result_test_log = evaluate_deciles_test(
 ```
 
 ```python
-plot_roc_and_metrics(result_test_log["Target"], result_test_log["Prob1"], y_pred_log)
+plot_roc_and_metrics(result_test_log["Target"], result_test_log["Prob1"], y_pred_log, graphic_name="logistic_regression")
 ```
+
+![roc_logistic_regression](images\plot_roc_and_metrics\logistic_regression.svg)
 
 ```python
 
