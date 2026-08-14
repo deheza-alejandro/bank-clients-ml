@@ -1055,7 +1055,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables_0](images\most_important_variables_0.svg)
+![most_important_variables_0](images/most_important_variables_0.svg)
 
 ```python
 variables_mas_importantes_0.nlargest(100)
