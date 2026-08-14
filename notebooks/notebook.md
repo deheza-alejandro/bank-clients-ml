@@ -1068,7 +1068,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables_1](images\most_important_variables_1.svg)
+![most_important_variables_1](images/most_important_variables_1.svg)
 
 ```python
 variables_mas_importantes_1.nlargest(20)
@@ -1081,7 +1081,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables_2](images\most_important_variables_2.svg)
+![most_important_variables_2](images/most_important_variables_2.svg)
 
 ```python
 variables_mas_importantes_2.nlargest(20)
@@ -1094,7 +1094,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables_3](images\most_important_variables_3.svg)
+![most_important_variables_3](images/most_important_variables_3.svg)
 
 ```python
 variables_mas_importantes_3.nlargest(20)
@@ -1107,7 +1107,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables_4](images\most_important_variables_4.svg)
+![most_important_variables_4](images/most_important_variables_4.svg)
 
 ```python
 variables_mas_importantes_4.nlargest(20)
@@ -1120,7 +1120,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables_5](images\most_important_variables_5.svg)
+![most_important_variables_5](images/most_important_variables_5.svg)
 
 ```python
 variables_mas_importantes_5.nlargest(20)
@@ -1133,7 +1133,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables_6](images\most_important_variables_6.svg)
+![most_important_variables_6](images/most_important_variables_6.svg)
 
 ```python
 variables_mas_importantes_6.nlargest(20)
@@ -1218,66 +1218,66 @@ graph_variables(
 )
 ```
 
-![SavingAccount_Days_with_use_count_nonzero](images\analysis\SavingAccount_Days_with_use_count_nonzero.svg)
-![SavingAccount_Transfer_In_Transactions_count_nonzero](images\analysis\SavingAccount_Transfer_In_Transactions_count_nonzero.svg)
-![SavingAccount_Transfer_In_Transactions_max](images\analysis\SavingAccount_Transfer_In_Transactions_max.svg)
-![SavingAccount_Days_with_use_min](images\analysis\SavingAccount_Days_with_use_min.svg)
-![SavingAccount_Days_with_Credits_porc_var](images\analysis\SavingAccount_Days_with_Credits_porc_var.svg)
-![SavingAccount_CreditCard_Payment_Transactions_max](images\analysis\SavingAccount_CreditCard_Payment_Transactions_max.svg)
-![SavingAccount_CreditCard_Payment_Transactions_count_nonzero](images\analysis\SavingAccount_CreditCard_Payment_Transactions_count_nonzero.svg)
+![SavingAccount_Days_with_use_count_nonzero](images/analysis/SavingAccount_Days_with_use_count_nonzero.svg)
+![SavingAccount_Transfer_In_Transactions_count_nonzero](images/analysis/SavingAccount_Transfer_In_Transactions_count_nonzero.svg)
+![SavingAccount_Transfer_In_Transactions_max](images/analysis/SavingAccount_Transfer_In_Transactions_max.svg)
+![SavingAccount_Days_with_use_min](images/analysis/SavingAccount_Days_with_use_min.svg)
+![SavingAccount_Days_with_Credits_porc_var](images/analysis/SavingAccount_Days_with_Credits_porc_var.svg)
+![SavingAccount_CreditCard_Payment_Transactions_max](images/analysis/SavingAccount_CreditCard_Payment_Transactions_max.svg)
+![SavingAccount_CreditCard_Payment_Transactions_count_nonzero](images/analysis/SavingAccount_CreditCard_Payment_Transactions_count_nonzero.svg)
 
-![SavingAccount_Balance_FirstDate_max](images\analysis\SavingAccount_Balance_FirstDate_max.svg)
-![SavingAccount_CreditCard_Payment_Amount_max](images\analysis\SavingAccount_CreditCard_Payment_Amount_max.svg)
-![SavingAccount_Transfer_In_Amount_max](images\analysis\SavingAccount_Transfer_In_Amount_max.svg)
-![SavingAccount_Total_Amount_min](images\analysis\SavingAccount_Total_Amount_min.svg)
-![SavingAccount_Total_Amount_diff](images\analysis\SavingAccount_Total_Amount_diff.svg)
-![SavingAccount_Balance_LastDate_diff_rel](images\analysis\SavingAccount_Balance_LastDate_diff_rel.svg)
+![SavingAccount_Balance_FirstDate_max](images/analysis/SavingAccount_Balance_FirstDate_max.svg)
+![SavingAccount_CreditCard_Payment_Amount_max](images/analysis/SavingAccount_CreditCard_Payment_Amount_max.svg)
+![SavingAccount_Transfer_In_Amount_max](images/analysis/SavingAccount_Transfer_In_Amount_max.svg)
+![SavingAccount_Total_Amount_min](images/analysis/SavingAccount_Total_Amount_min.svg)
+![SavingAccount_Total_Amount_diff](images/analysis/SavingAccount_Total_Amount_diff.svg)
+![SavingAccount_Balance_LastDate_diff_rel](images/analysis/SavingAccount_Balance_LastDate_diff_rel.svg)
 
-![Operations_total_count_nonzero](images\analysis\Operations_total_count_nonzero.svg)
-![Operations_total_min](images\analysis\Operations_total_min.svg)
-![Operations_total_var](images\analysis\Operations_total_var.svg)
-![Operations_Telemarketer_porc_max](images\analysis\Operations_Telemarketer_porc_max.svg)
-![Operations_in_person_porc_min](images\analysis\Operations_in_person_porc_min.svg)
-![Operations_in_person_porc_max](images\analysis\Operations_in_person_porc_max.svg)
+![Operations_total_count_nonzero](images/analysis/Operations_total_count_nonzero.svg)
+![Operations_total_min](images/analysis/Operations_total_min.svg)
+![Operations_total_var](images/analysis/Operations_total_var.svg)
+![Operations_Telemarketer_porc_max](images/analysis/Operations_Telemarketer_porc_max.svg)
+![Operations_in_person_porc_min](images/analysis/Operations_in_person_porc_min.svg)
+![Operations_in_person_porc_max](images/analysis/Operations_in_person_porc_max.svg)
 
-![CreditCard_Payment_total_max](images\analysis\CreditCard_Payment_total_max.svg)
-![CreditCard_Payment_Aut_Debit_max](images\analysis\CreditCard_Payment_Aut_Debit_max.svg)
-![CreditCard_Payment_total_min](images\analysis\CreditCard_Payment_total_min.svg)
-![CreditCard_Payment_TAS_max](images\analysis\CreditCard_Payment_TAS_max.svg)
-![CreditCard_Payment_Cash_max](images\analysis\CreditCard_Payment_Cash_max.svg)
-![CreditCard_Payment_Web_max](images\analysis\CreditCard_Payment_Web_max.svg)
-![CreditCard_Payment_Aut_Debit_min](images\analysis\CreditCard_Payment_Aut_Debit_min.svg)
-![CreditCard_Payment_Aut_Debit_diff](images\analysis\CreditCard_Payment_Aut_Debit_diff.svg)
-![CreditCard_Payment_ATM_max](images\analysis\CreditCard_Payment_ATM_max.svg)
-![CreditCard_Payment_in_person_porc_diff_rel](images\analysis\CreditCard_Payment_in_person_porc_diff_rel.svg)
+![CreditCard_Payment_total_max](images/analysis/CreditCard_Payment_total_max.svg)
+![CreditCard_Payment_Aut_Debit_max](images/analysis/CreditCard_Payment_Aut_Debit_max.svg)
+![CreditCard_Payment_total_min](images/analysis/CreditCard_Payment_total_min.svg)
+![CreditCard_Payment_TAS_max](images/analysis/CreditCard_Payment_TAS_max.svg)
+![CreditCard_Payment_Cash_max](images/analysis/CreditCard_Payment_Cash_max.svg)
+![CreditCard_Payment_Web_max](images/analysis/CreditCard_Payment_Web_max.svg)
+![CreditCard_Payment_Aut_Debit_min](images/analysis/CreditCard_Payment_Aut_Debit_min.svg)
+![CreditCard_Payment_Aut_Debit_diff](images/analysis/CreditCard_Payment_Aut_Debit_diff.svg)
+![CreditCard_Payment_ATM_max](images/analysis/CreditCard_Payment_ATM_max.svg)
+![CreditCard_Payment_in_person_porc_diff_rel](images/analysis/CreditCard_Payment_in_person_porc_diff_rel.svg)
 
-![CreditCard_Payment_in_person_max](images\analysis\CreditCard_Payment_in_person_max.svg)
+![CreditCard_Payment_in_person_max](images/analysis/CreditCard_Payment_in_person_max.svg)
 
-![CreditCard_Total_Limit_var](images\analysis\CreditCard_Total_Limit_var.svg)
-![CreditCard_Total_Limit_diff_rel](images\analysis\CreditCard_Total_Limit_diff_rel.svg)
-![CreditCard_Balance_ARG_SP_porc_max](images\analysis\CreditCard_Balance_ARG_SP_porc_max.svg)
-![CreditCard_Total_Limit_min](images\analysis\CreditCard_Total_Limit_min.svg)
-![CreditCard_Revolving_min](images\analysis\CreditCard_Revolving_min.svg)
-![CreditCard_Total_Spending_diff_rel](images\analysis\CreditCard_Total_Spending_diff_rel.svg)
-![CreditCard_Spending_Aut_Debits_diff_rel](images\analysis\CreditCard_Spending_Aut_Debits_diff_rel.svg)
+![CreditCard_Total_Limit_var](images/analysis/CreditCard_Total_Limit_var.svg)
+![CreditCard_Total_Limit_diff_rel](images/analysis/CreditCard_Total_Limit_diff_rel.svg)
+![CreditCard_Balance_ARG_SP_porc_max](images/analysis/CreditCard_Balance_ARG_SP_porc_max.svg)
+![CreditCard_Total_Limit_min](images/analysis/CreditCard_Total_Limit_min.svg)
+![CreditCard_Revolving_min](images/analysis/CreditCard_Revolving_min.svg)
+![CreditCard_Total_Spending_diff_rel](images/analysis/CreditCard_Total_Spending_diff_rel.svg)
+![CreditCard_Spending_Aut_Debits_diff_rel](images/analysis/CreditCard_Spending_Aut_Debits_diff_rel.svg)
 
-![CreditCard_Product](images\analysis\CreditCard_Product.svg)
-![Recency_in_days](images\analysis\Recency_in_days.svg)
-![Days_between_first_and_last_product](images\analysis\Days_between_first_and_last_product.svg)
-![Client_Age_grp](images\analysis\Client_Age_grp.svg)
-![Quantity_Active_Products_min](images\analysis\Quantity_Active_Products_min.svg)
-![Quantity_Active_Products_nunique](images\analysis\Quantity_Active_Products_nunique.svg)
-![SavingAccount_Active_ARG_Salary](images\analysis\SavingAccount_Active_ARG_Salary.svg)
-![Sex](images\analysis\Sex.svg)
-![SavingAccount_Active_DOLLAR](images\analysis\SavingAccount_Active_DOLLAR.svg)
-![Region](images\analysis\Region.svg)
-![Quantity_Active_Products_var](images\analysis\Quantity_Active_Products_var.svg)
-![Investment_Numbers_max](images\analysis\Investment_Numbers_max.svg)
-![Email](images\analysis\Email.svg)
+![CreditCard_Product](images/analysis/CreditCard_Product.svg)
+![Recency_in_days](images/analysis/Recency_in_days.svg)
+![Days_between_first_and_last_product](images/analysis/Days_between_first_and_last_product.svg)
+![Client_Age_grp](images/analysis/Client_Age_grp.svg)
+![Quantity_Active_Products_min](images/analysis/Quantity_Active_Products_min.svg)
+![Quantity_Active_Products_nunique](images/analysis/Quantity_Active_Products_nunique.svg)
+![SavingAccount_Active_ARG_Salary](images/analysis/SavingAccount_Active_ARG_Salary.svg)
+![Sex](images/analysis/Sex.svg)
+![SavingAccount_Active_DOLLAR](images/analysis/SavingAccount_Active_DOLLAR.svg)
+![Region](images/analysis/Region.svg)
+![Quantity_Active_Products_var](images/analysis/Quantity_Active_Products_var.svg)
+![Investment_Numbers_max](images/analysis/Investment_Numbers_max.svg)
+![Email](images/analysis/Email.svg)
 
-![Quantity_Common_Active_Product_count_nonzero](images\analysis\Quantity_Common_Active_Product_count_nonzero.svg)
+![Quantity_Common_Active_Product_count_nonzero](images/analysis/Quantity_Common_Active_Product_count_nonzero.svg)
 
-![Target](images\analysis\Target.svg)
+![Target](images/analysis/Target.svg)
 
 ```python
 graf = [
@@ -1317,31 +1317,31 @@ graph_variables(
 )
 ```
 
-![CreditCard_Payment_total_var](images\analysis_2\CreditCard_Payment_total_var.svg)
+![CreditCard_Payment_total_var](images/analysis_2/CreditCard_Payment_total_var.svg)
 
-![Limit_operations](images\analysis_2\Limit_operations.svg)
+![Limit_operations](images/analysis_2/Limit_operations.svg)
 
-![SavingAccount_CreditCard_Payment_Amount_max](images\analysis_2\SavingAccount_CreditCard_Payment_Amount_max.svg)
-![CreditCard_Total_Limit_diff_rel](images\analysis_2\CreditCard_Total_Limit_diff_rel.svg)
+![SavingAccount_CreditCard_Payment_Amount_max](images/analysis_2/SavingAccount_CreditCard_Payment_Amount_max.svg)
+![CreditCard_Total_Limit_diff_rel](images/analysis_2/CreditCard_Total_Limit_diff_rel.svg)
 
-![SavingAccount_Days_with_use_count_nonzero](images\analysis_2\SavingAccount_Days_with_use_count_nonzero.svg)
-![SavingAccount_Days_with_use_min](images\analysis_2\SavingAccount_Days_with_use_min.svg)
-![SavingAccount_CreditCard_Payment_Transactions_count_nonzero](images\analysis_2\SavingAccount_CreditCard_Payment_Transactions_count_nonzero.svg)
+![SavingAccount_Days_with_use_count_nonzero](images/analysis_2/SavingAccount_Days_with_use_count_nonzero.svg)
+![SavingAccount_Days_with_use_min](images/analysis_2/SavingAccount_Days_with_use_min.svg)
+![SavingAccount_CreditCard_Payment_Transactions_count_nonzero](images/analysis_2/SavingAccount_CreditCard_Payment_Transactions_count_nonzero.svg)
 
-![Operations_total_count_nonzero](images\analysis_2\Operations_total_count_nonzero.svg)
-![Operations_in_person_porc_max](images\analysis_2\Operations_in_person_porc_max.svg)
+![Operations_total_count_nonzero](images/analysis_2/Operations_total_count_nonzero.svg)
+![Operations_in_person_porc_max](images/analysis_2/Operations_in_person_porc_max.svg)
 
-![CreditCard_Payment_total_max](images\analysis_2\CreditCard_Payment_total_max.svg)
-![CreditCard_Payment_Aut_Debit_max](images\analysis_2\CreditCard_Payment_Aut_Debit_max.svg)
-![CreditCard_Payment_in_person_max](images\analysis_2\CreditCard_Payment_in_person_max.svg)
+![CreditCard_Payment_total_max](images/analysis_2/CreditCard_Payment_total_max.svg)
+![CreditCard_Payment_Aut_Debit_max](images/analysis_2/CreditCard_Payment_Aut_Debit_max.svg)
+![CreditCard_Payment_in_person_max](images/analysis_2/CreditCard_Payment_in_person_max.svg)
 
-![CreditCard_Product](images\analysis_2\CreditCard_Product.svg)
-![Days_between_first_and_last_product](images\analysis_2\Days_between_first_and_last_product.svg)
-![Client_Age_grp](images\analysis_2\Client_Age_grp.svg)
-![Quantity_Active_Products_min](images\analysis_2\Quantity_Active_Products_min.svg)
-![Recency_in_days](images\analysis_2\Recency_in_days.svg)
+![CreditCard_Product](images/analysis_2/CreditCard_Product.svg)
+![Days_between_first_and_last_product](images/analysis_2/Days_between_first_and_last_product.svg)
+![Client_Age_grp](images/analysis_2/Client_Age_grp.svg)
+![Quantity_Active_Products_min](images/analysis_2/Quantity_Active_Products_min.svg)
+![Recency_in_days](images/analysis_2/Recency_in_days.svg)
 
-![Target](images\analysis_2\Target.svg)
+![Target](images/analysis_2/Target.svg)
 
 
 ## Re-entreno con las mejores variables
@@ -1390,7 +1390,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables_7](images\most_important_variables_7.svg)
+![most_important_variables_7](images/most_important_variables_7.svg)
 
 ```python
 variables_mas_importantes_7.nlargest(25)
@@ -1433,7 +1433,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables_8](images\most_important_variables_8.svg)
+![most_important_variables_8](images/most_important_variables_8.svg)
 
 ```python
 variables_mas_importantes_8.nlargest(25)
@@ -1487,7 +1487,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables_9](images\most_important_variables_9.svg)
+![most_important_variables_9](images/most_important_variables_9.svg)
 
 ```python
 variables_mas_importantes_9.nlargest(25)
@@ -1647,10 +1647,10 @@ graph_variables(
 )
 ```
 
-![CreditCard_Product_t](images\analysis_t\CreditCard_Product_t.svg)
-![Client_Age_grp_t](images\analysis_t\Client_Age_grp_t.svg)
-![Operations_total_count_nonzero_t](images\analysis_t\Operations_total_count_nonzero_t.svg)
-![Target](images\analysis_t\Target.svg)
+![CreditCard_Product_t](images/analysis_t/CreditCard_Product_t.svg)
+![Client_Age_grp_t](images/analysis_t/Client_Age_grp_t.svg)
+![Operations_total_count_nonzero_t](images/analysis_t/Operations_total_count_nonzero_t.svg)
+![Target](images/analysis_t/Target.svg)
 
 ```python
 mejores_variables.remove("client_id")
@@ -1680,7 +1680,7 @@ save_axes_as_svg(
 )
 ```
 
-![most_important_variables](images\most_important_variables.svg)
+![most_important_variables](images/most_important_variables.svg)
 
 
 ## Hiperparametros optimos
@@ -1701,7 +1701,7 @@ variables_mas_importantes_renombradas = variables_mas_importantes.rename(index=d
 graph_top_20(variables_mas_importantes_renombradas, graphic_name="top_20_features")
 ```
 
-![top_20_features](images\graph_top_20\top_20_features.svg)
+![top_20_features](images/graph_top_20/top_20_features.svg)
 
 
 # Performance del modelo
@@ -1740,7 +1740,7 @@ from bank_clients_ml.graphs import plot_roc_and_metrics
 plot_roc_and_metrics(result_test["Target"], result_test["Prob1"], y_pred, graphic_name="lightgbm")
 ```
 
-![roc_lightgbm](images\plot_roc_and_metrics\lightgbm.svg)
+![roc_lightgbm](images/plot_roc_and_metrics/lightgbm.svg)
 
 
 # Resultados del excel
@@ -1804,7 +1804,7 @@ result_test_log = evaluate_deciles_test(
 plot_roc_and_metrics(result_test_log["Target"], result_test_log["Prob1"], y_pred_log, graphic_name="logistic_regression")
 ```
 
-![roc_logistic_regression](images\plot_roc_and_metrics\logistic_regression.svg)
+![roc_logistic_regression](images/plot_roc_and_metrics/logistic_regression.svg)
 
 ```python
 
