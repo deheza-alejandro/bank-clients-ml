@@ -1,90 +1,117 @@
-import numpy as np
-import pandas as pd
+import operator
+from collections.abc import Sequence
+from typing import Literal
+
+import polars as pl
+import polars.selectors as cs
+
+ConditionSymbol = Literal["<", ">", "<=", ">=", "==", "!="]
+
+OPERATORS = {
+    "<": operator.lt,
+    ">": operator.gt,
+    "<=": operator.le,
+    ">=": operator.ge,
+    "==": operator.eq,
+    "!=": operator.ne,
+}
 
 
-def print_df_personalizado(nombre_df, df):
+def get_true_cols(mask: pl.DataFrame) -> list[str]:
     """
-    print personalizado
+    Helper idiomático: convierte un DF booleano de 1 fila en una lista de columnas True
     """
-    print(nombre_df, "shape:", df.shape)
-    print("")
-    nulos = df.columns[df.isna().any()].tolist()
-    print("Columnas con nulos: NaN, None o NaT", len(nulos))
-    print(nulos)
-    print("")
-    inf = df.columns[(df == np.inf).any() | (df == -np.inf).any()].tolist()
-    print("Columnas con inf:", len(inf))
-    print(inf)
-    print("")
-    c_x = [x for x in df.columns if x.endswith("_x")]
-    print("Columnas terminadas con _x:", len(c_x))
-    print(c_x)
-    print("")
-    c_y = [x for x in df.columns if x.endswith("_y")]
-    print("Columnas terminadas con _y:", len(c_y))
-    print(c_y)
+    if mask.width == 0:
+        return []
+    return mask.unpivot().filter(pl.col("value"))["variable"].to_list()
+
+
+def print_df_personalizado(df_name: str, df: pl.DataFrame) -> None:
+    """
+    Imprime un resumen personalizado del DataFrame incluyendo dimensiones,
+    columnas con nulos, NaN, infinitos y sufijos _x / _y (join de pandas) o _right (join de polars).
+    """
+    print(f"Dataframe: {df_name}, shape: {df.shape}\n")
+
+    null_cols = get_true_cols(df.null_count() > 0)
+    print(f"Columnas con null, None o NaT ({len(null_cols)}):\n{null_cols}\n")
+
+    nan_cols = get_true_cols(df.select(cs.float().is_nan().any()))
+    print(f"Columnas con NaN ({len(nan_cols)}):\n{nan_cols}\n")
+
+    inf_cols = get_true_cols(df.select(cs.float().is_infinite().any()))
+    print(f"Columnas con inf ({len(inf_cols)}):\n{inf_cols}\n")
+
+    cols_x = df.select(cs.ends_with("_x")).columns
+    print(f"Columnas terminadas con _x (join de pandas) ({len(cols_x)}):\n{cols_x}\n")
+
+    cols_y = df.select(cs.ends_with("_y", "_right")).columns
+    print(f"Columnas terminadas con _y o _right ({len(cols_y)}):\n{cols_y}\n")
 
 
 def print_threshold_violations(
-    df: pd.DataFrame, column_name: str, threshold: int, condition: str = "lt"
+    df: pl.DataFrame,
+    columns: Sequence[str] | str,
+    threshold: int,
+    condition: ConditionSymbol = "<"
 ) -> None:
-    """Cuenta y muestra la cantidad de registros en una columna que superan o están por debajo de un umbral determinado.
+    """Muestra la cantidad de registros que sobrepasan un límite para una o varias columnas.
 
     Parámetros:
-    df (pd.DataFrame): El DataFrame con los datos a analizar.
-    column_name (str): El nombre de la columna a evaluar.
-    threshold (int): El valor límite para la comparación.
-    condition (str): Tipo de comparación. 'lt' para menor que (<) o 'gt' para
-    mayor que (>). Por defecto es 'lt'.
+    df: El DataFrame con los datos a analizar.
+    columns: El nombre de la columna o columnas a evaluar.
+    threshold: El valor límite para la comparación.
+    condition: Tipo de comparación.
+        "<" para menor que,
+        ">" para mayor que,
+        "<=" para menor o igual que,
+        ">=" para mayor o igual que,
+        "==" para igual que,
+        "!=" para distinto que.
+        Por defecto es 'lt'.
     """
-    # Validar que la condición sea una de las permitidas por Pandas
-    if condition not in ["lt", "gt"]:
-        raise ValueError("La condición debe ser 'lt' (menor que) o 'gt' (mayor que).")
+    if isinstance(columns, str):
+        columns = [columns]
 
-    # Asignar el símbolo correcto para el mensaje en consola
-    symbol = "<" if condition == "lt" else ">"
+    if condition not in OPERATORS:
+        raise ValueError(f"Condición no válida. Usa una de: {list(OPERATORS.keys())}")
 
-    # Ejecutar dinámicamente el método de pandas (.lt o .gt) y sumar los True
-    total_count = getattr(df[column_name], condition)(threshold).sum()
+    op_func = OPERATORS[condition]
 
-    # Imprimir el resultado con el formato requerido
-    print(f"Cantidad de registros {symbol} {threshold} en {column_name}: {total_count}")
+    counts_dict = df.select(op_func(pl.col(columns), threshold).sum()).row(0, named=True)
+
+    for col, count in counts_dict.items():
+        print(f"Cantidad de registros {condition} {threshold} en {col}: {count}")
+    print("\n")
 
 
-def describe_full(df):
+def print_value_counts(df: pl.DataFrame) -> None:
+    """Calcula el value_counts de todas las columnas simultáneamente en paralelo
+    y luego los imprime
     """
-    Muestra la descripción completa del DataFrame sin truncar filas.
-    Para que la consola no corte el output.
-    """
-    pd.set_option('display.max_rows', None)
-    result = df.describe(include='all').T
-    pd.reset_option('display.max_rows')
-    return result
+    counts = df.select(pl.all().value_counts(sort=True).implode())
+
+    for col in counts.columns:
+        print(counts[col].explode().struct.unnest())
+        print("\n")
 
 
-def print_value_counts(df, col):
-    """
-    Imprime el value_counts de una columna seguido de una línea en blanco.
-    """
-    print(df[col].value_counts())
-    print("")
-
-
-def filter_nonzero(df, columns):
-    """Filtra el ``df`` devolviendo las filas donde todas las columnas de ``columns`` son distintas de cero.
+def filter_nonzero(df: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
+    """Filtra el DataFrame devolviendo las filas donde todas las
+    columnas de columns son distintas de cero.
 
     Args:
-        df (pandas.DataFrame): DataFrame de origen.
-        columns (list[str]): Columnas a evaluar; cada una debe ser != 0
-            para que la fila se mantenga.
+        df: DataFrame de origen.
+        columns: Columnas a evaluar
 
     Returns:
-        pandas.DataFrame: Subconjunto de ``df`` donde se cumple ``df[columns] != 0`` para todas las
-        columnas indicadas (con ``client_id`` si está presente).
+        Subconjunto de df donde se cumple df[columns] != 0 para todas las
+        columnas indicadas (con client_id si está presente).
     """
-    mask = (df[columns] != 0).all(axis='columns')
-    keep = columns
-    if "client_id" in df.columns and "client_id" not in keep:
-        keep = ["client_id", *columns]
-    return df.loc[mask, keep]
+    keep = ["client_id", *columns] if "client_id" in df.columns and "client_id" not in columns else columns
+
+    return (
+        df.filter(pl.all_horizontal(pl.col(columns) != 0))
+          .select(keep)
+    )
 
