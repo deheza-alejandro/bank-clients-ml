@@ -53,7 +53,7 @@ def print_threshold_violations(
     df: pl.DataFrame,
     columns: Sequence[str] | str,
     threshold: int,
-    condition: ConditionSymbol = "<"
+    condition: ConditionSymbol = "<",
 ) -> None:
     """Muestra la cantidad de registros que sobrepasan un límite para una o varias columnas.
 
@@ -78,7 +78,9 @@ def print_threshold_violations(
 
     op_func = OPERATORS[condition]
 
-    counts_dict = df.select(op_func(pl.col(columns), threshold).sum()).row(0, named=True)
+    counts_dict = df.select(op_func(pl.col(columns), threshold).sum()).row(
+        0, named=True
+    )
 
     for col, count in counts_dict.items():
         print(f"Cantidad de registros {condition} {threshold} en {col}: {count}")
@@ -108,10 +110,10 @@ def filter_nonzero(df: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
         Subconjunto de df donde se cumple df[columns] != 0 para todas las
         columnas indicadas (con client_id si está presente).
     """
-    keep = ["client_id", *columns] if "client_id" in df.columns and "client_id" not in columns else columns
-
-    return (
-        df.filter(pl.all_horizontal(pl.col(columns) != 0))
-          .select(keep)
+    keep = (
+        ["client_id", *columns]
+        if "client_id" in df.columns and "client_id" not in columns
+        else columns
     )
 
+    return df.filter(pl.all_horizontal(pl.col(columns) != 0)).select(keep)
