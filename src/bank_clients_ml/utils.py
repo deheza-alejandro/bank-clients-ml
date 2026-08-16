@@ -17,45 +17,70 @@ OPERATORS = {
 }
 
 
-def get_true_cols(mask: pl.DataFrame) -> list[str]:
+def print_without_trunc(df: pl.DataFrame) -> None:
+    """Imprime un DataFrame de Polars completo en la consola sin truncar
+    filas, columnas ni cadenas largas.
     """
-    Helper idiomático: convierte un DF booleano de 1 fila en una lista de columnas True
+    with pl.Config(tbl_rows=-1, tbl_cols=-1, fmt_str_lengths=100):
+        print(df)
+
+
+def scan_anomalies(df: pl.DataFrame) -> pl.DataFrame:
     """
-    if mask.width == 0:
-        return []
-    return mask.unpivot().filter(pl.col("value"))["variable"].to_list()
-
-
-def print_df_personalizado(df_name: str, df: pl.DataFrame) -> None:
+    Devuelve un DataFrame de diagnóstico con las columnas que presentan
+    nulos, NaNs, Infs o sufijos de joins de pandas (_x, _y)
+    o sufijos de joins de polars (_right).
     """
-    Imprime un resumen personalizado del DataFrame incluyendo dimensiones,
-    columnas con nulos, NaN, infinitos y sufijos _x / _y (join de pandas) o _right (join de polars).
-    """
-    print(f"Dataframe: {df_name}, shape: {df.shape}\n")
+    null_counts = df.null_count()
+    null_cols = [c for c in df.columns if null_counts[c][0] > 0]
 
-    null_cols = get_true_cols(df.null_count() > 0)
-    print(f"Columnas con null, None o NaT ({len(null_cols)}):\n{null_cols}\n")
+    float_df = df.select(cs.float())
+    if float_df.width > 0:
+        nan_flags = float_df.select(pl.all().is_nan().any())
+        inf_flags = float_df.select(pl.all().is_infinite().any())
+        nan_cols = [c for c in float_df.columns if nan_flags[c][0]]
+        inf_cols = [c for c in float_df.columns if inf_flags[c][0]]
+    else:
+        nan_cols, inf_cols = [], []
 
-    nan_cols = get_true_cols(df.select(cs.float().is_nan().any()))
-    print(f"Columnas con NaN ({len(nan_cols)}):\n{nan_cols}\n")
+    cols_x = [c for c in df.columns if c.endswith("_x")]
+    cols_y_right = [c for c in df.columns if c.endswith(("_y", "_right"))]
 
-    inf_cols = get_true_cols(df.select(cs.float().is_infinite().any()))
-    print(f"Columnas con inf ({len(inf_cols)}):\n{inf_cols}\n")
+    return pl.DataFrame(
+        {
+            "metric": [
+                "Columns with null, None or NaT",
+                "Columns with NaN",
+                "Columns with inf",
+                "Columns ended with _x (pandas join)",
+                "Columns ended with _y (pandas join) or o _right (polars join)",
+            ],
+            "total": [
+                len(null_cols),
+                len(nan_cols),
+                len(inf_cols),
+                len(cols_x),
+                len(cols_y_right),
+            ],
+            "columns": [null_cols, nan_cols, inf_cols, cols_x, cols_y_right],
+        }
+    )
 
-    cols_x = df.select(cs.ends_with("_x")).columns
-    print(f"Columnas terminadas con _x (join de pandas) ({len(cols_x)}):\n{cols_x}\n")
 
-    cols_y = df.select(cs.ends_with("_y", "_right")).columns
-    print(f"Columnas terminadas con _y o _right ({len(cols_y)}):\n{cols_y}\n")
+def get_operator(condition: ConditionSymbol):
+    if condition not in OPERATORS:
+        raise ValueError(f"Condición no válida. Usa una de: {list(OPERATORS.keys())}")
+
+    return OPERATORS[condition]
 
 
-def print_threshold_violations(
+def count_row_matches(
     df: pl.DataFrame,
     columns: Sequence[str] | str,
-    threshold: int,
+    threshold: float,
     condition: ConditionSymbol = "<",
-) -> None:
-    """Muestra la cantidad de registros que sobrepasan un límite para una o varias columnas.
+) -> pl.DataFrame:
+    """Retorna un DataFrame con la cantidad de registros que cumplen la condición por columna.
 
     Parámetros:
     df: El DataFrame con los datos a analizar.
@@ -73,29 +98,46 @@ def print_threshold_violations(
     if isinstance(columns, str):
         columns = [columns]
 
-    if condition not in OPERATORS:
-        raise ValueError(f"Condición no válida. Usa una de: {list(OPERATORS.keys())}")
+    op_func = get_operator(condition)
 
-    op_func = OPERATORS[condition]
-
-    counts_dict = df.select(op_func(pl.col(columns), threshold).sum()).row(
-        0, named=True
+    return df.select(op_func(pl.col(columns), threshold).sum()).unpivot(
+        variable_name="Column name",
+        value_name=f"Number of rows {condition} {threshold}",
     )
 
-    for col, count in counts_dict.items():
-        print(f"Cantidad de registros {condition} {threshold} en {col}: {count}")
-    print("\n")
+
+def n_unique_matches(
+    df: pl.DataFrame, condition: ConditionSymbol = ">", threshold: int = 10
+) -> pl.DataFrame:
+    """Devuelve un DataFrame con las columnas con una cantidad de valores unicos
+    que cumplen la condición, indicando la cantidad de valores unicos de cada columna."""
+    op_func = get_operator(condition)
+
+    return (
+        df.select(pl.all().n_unique())
+        .unpivot(variable_name="column", value_name="n_unique")
+        .filter(op_func(pl.col("n_unique"), threshold))
+    )
 
 
-def print_value_counts(df: pl.DataFrame) -> None:
-    """Calcula el value_counts de todas las columnas simultáneamente en paralelo
-    y luego los imprime
+def all_value_counts(df: pl.DataFrame, max_n_unique: int = 10) -> pl.DataFrame:
+    """Calcula el value_counts de las columnas con una cantidad de valores únicos <= max_n_unique
+    y devuelve un único DataFrame en formato largo (column, value, count).
     """
-    counts = df.select(pl.all().value_counts(sort=True).implode())
+    cols_to_keep = n_unique_matches(df, "<=", max_n_unique)["column"].to_list()
 
-    for col in counts.columns:
-        print(counts[col].explode().struct.unnest())
-        print("\n")
+    if not cols_to_keep:
+        return pl.DataFrame(
+            schema={"column": pl.String, "value": pl.String, "count": pl.UInt32}
+        )
+
+    return (
+        df.select(pl.col(cols_to_keep).cast(pl.String))
+        .unpivot(variable_name="column", value_name="value")
+        .group_by(["column", "value"])
+        .len("count")
+        .sort(["column", "count"], descending=[False, True])
+    )
 
 
 def filter_nonzero(df: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
