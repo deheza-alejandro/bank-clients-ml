@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 import lightgbm as lgb
 import numpy as np
 import polars as pl
@@ -9,17 +7,16 @@ from sklearn.model_selection import (
     StratifiedKFold,
 )
 
+from bank_clients_ml.config import Settings, get_settings
 
-@dataclass(slots=True, frozen=True)
-class GeneralModelsConfig:
-    target: str = "Target"
-    random_state: int = 314
+RANDOM_STATE: int = 314
 
 
 def stratified_train_test_split(
     df: pl.DataFrame,
     test_ratio: float = 0.3,
-    general_config: GeneralModelsConfig | None = None,
+    random_state: int = RANDOM_STATE,
+    settings: Settings | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Genera particiones de entrenamiento y test estratificadas
     (manteniendo la proporcion de buenos y malos en ambos sets de train y test) usando Polars.
@@ -35,15 +32,15 @@ def stratified_train_test_split(
     --------
         Tupla con los DataFrames de entrenamiento y test.
     """
-    if general_config is None:
-        general_config = GeneralModelsConfig()
+    if settings is None:
+        settings = get_settings()
 
-    df_shuffled = df.sample(fraction=1.0, shuffle=True, seed=general_config.random_state)
+    df_shuffled = df.sample(fraction=1.0, shuffle=True, seed=random_state)
 
     test_indices = (
-        df_shuffled.select(pl.col(general_config.target))
+        df_shuffled.select(pl.col(settings.target))
         .with_row_index("_idx")
-        .group_by(general_config.target)
+        .group_by(settings.target)
         .agg(pl.col("_idx").head((pl.len() * test_ratio).round().cast(pl.Int64)))
         .explode("_idx")
         .get_column("_idx")
@@ -55,18 +52,13 @@ def stratified_train_test_split(
     return train, test
 
 
-@dataclass(slots=True, frozen=True)
-class TrainConfig:
-    splits_cross_validation: int = 3
-    debug: bool = False
-
-
 def get_feature_importances(
     X_train: pl.DataFrame,
     columns: list[str],
     n_iter: int = 2,
-    general_config: GeneralModelsConfig | None = None,
-    train_config: TrainConfig | None = None,
+    splits_cross_validation: int = 3,
+    random_state: int = RANDOM_STATE,
+    settings: Settings | None = None,
 ) -> tuple[RandomizedSearchCV, pl.DataFrame]:
     """Entrena un modelo LightGBM usando RandomizedSearchCV y devuelve las
     importancias de features en un DataFrame de Polars.
@@ -87,24 +79,23 @@ def get_feature_importances(
         ``(searcher, importances)`` El objeto searcher entrenado
         y el DataFrame con las importancias ordenadas descendentemente.
     """
-    if general_config is None:
-        general_config = GeneralModelsConfig()
+    if settings is None:
+        settings = get_settings()
 
-    if train_config is None:
-        train_config = TrainConfig()
-
-    verbose: int = 3 if train_config.debug else 1
+    verbose: int = 3 if settings.debug else 1
 
     model = lgb.LGBMClassifier(
-        random_state=general_config.random_state,
+        random_state=random_state,
         n_jobs=1,
-        verbose = verbose,
+        verbose=verbose,
         metric="auc",
     )
 
     param_test = {
         "n_estimators": np.arange(6, 50, 1),
-        "max_depth": np.arange(4, 10, 1), # [4, 5, 6, 7, 8, 9] de 4 a (10-1) aumentando de a 1
+        "max_depth": np.arange(
+            4, 10, 1
+        ),  # [4, 5, 6, 7, 8, 9] de 4 a (10-1) aumentando de a 1
         "num_leaves": np.arange(3, 20, 1),
         "subsample": sp_uniform(loc=0.2, scale=0.8),
         "learning_rate": [0.01, 0.05, 0.1, 0.2],
@@ -119,15 +110,15 @@ def get_feature_importances(
         n_jobs=-1,
         refit=True,
         cv=StratifiedKFold(
-            n_splits=train_config.splits_cross_validation,
+            n_splits=splits_cross_validation,
             shuffle=True,
-            random_state=general_config.random_state,
+            random_state=random_state,
         ),
         verbose=verbose,
-        random_state=general_config.random_state,
+        random_state=random_state,
     )
 
-    searcher.fit(X_train.select(columns), X_train[general_config.target])
+    searcher.fit(X_train.select(columns), X_train[settings.target])
     best_estimator: lgb.LGBMClassifier = searcher.best_estimator_
     importances = pl.DataFrame(
         {
@@ -146,7 +137,7 @@ def compute_prediction_deciles(
     df: pl.DataFrame,
     probabilities: np.ndarray,
     bins: list[float] | None = None,
-    general_config: GeneralModelsConfig | None = None,
+    settings: Settings | None = None,
 ) -> pl.DataFrame:
     """Combina los datos del cliente con sus probabilidades de predicción,
     calcula los deciles y calcula métricas por decil utilizando Polars.
@@ -164,25 +155,27 @@ def compute_prediction_deciles(
     --------
         DataFrame con metricas de los deciles
     """
-    if general_config is None:
-        general_config = GeneralModelsConfig()
+    if settings is None:
+        settings = get_settings()
 
     decil_expr = (
         pl.col("probabilities").cut(breaks=bins, labels=DECILE_LABELS)
         if bins
-        else pl.col("probabilities").qcut(10, labels=DECILE_LABELS, allow_duplicates=True)
+        else pl.col("probabilities").qcut(
+            10, labels=DECILE_LABELS, allow_duplicates=True
+        )
     )
 
     return (
         df.select(
-            general_config.target,
+            settings.target,
             probabilities=probabilities[:, 1],
         )
         .with_columns(decil=decil_expr.cast(DECILE_DTYPE))
         .group_by("decil")
         .agg(
             count=pl.len(),
-            target_1_count=pl.col(general_config.target).sum(),
+            target_1_count=pl.col(settings.target).sum(),
             min_probability=pl.col("probabilities").min(),
         )
         .sort("decil")
@@ -213,7 +206,6 @@ def print_test_deciles(
     """
     print(f"test:\n{test_deciles}")
 
-    print("test trampa: recalculo las cotas...") # TODO
+    print("test trampa: recalculo las cotas...")  # TODO
     test_deciles = compute_prediction_deciles(df, probabilities)
     print(test_deciles)
-
