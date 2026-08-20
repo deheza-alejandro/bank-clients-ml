@@ -5,6 +5,8 @@ from typing import Literal
 import polars as pl
 import polars.selectors as cs
 
+from bank_clients_ml.config import Settings, get_settings
+
 ConditionSymbol = Literal["<", ">", "<=", ">=", "==", "!="]
 
 OPERATORS = {
@@ -140,7 +142,9 @@ def all_value_counts(df: pl.DataFrame, max_n_unique: int = 10) -> pl.DataFrame:
     )
 
 
-def filter_nonzero(df: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
+def filter_nonzero(
+    df: pl.DataFrame, columns: list[str], settings: Settings | None = None
+) -> pl.DataFrame:
     """Filtra el DataFrame devolviendo las filas donde todas las
     columnas de columns son distintas de cero.
 
@@ -152,9 +156,12 @@ def filter_nonzero(df: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
         Subconjunto de df donde se cumple df[columns] != 0 para todas las
         columnas indicadas (con client_id si está presente).
     """
+    if settings is None:
+        settings = get_settings()
+
     keep = (
-        ["client_id", *columns]
-        if "client_id" in df.columns and "client_id" not in columns
+        [settings.id, *columns]
+        if settings.id in df.columns and settings.id not in columns
         else columns
     )
 
