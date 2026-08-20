@@ -1,6 +1,8 @@
 import polars as pl
 import polars.selectors as cs
 
+from bank_clients_ml.config import Settings, get_settings
+
 
 def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.DataFrame:
     """Calcula las columnas numéricas cuyos valores mínimos se encuentran entre un rango dado.
@@ -70,7 +72,7 @@ def compute_percentage(numerator: str, denominator: str) -> pl.Expr:
 
 
 def target_encode_columns(
-    df: pl.DataFrame, columns: list[str], target: str = "Target"
+    df: pl.DataFrame, columns: list[str], settings: Settings | None = None
 ) -> pl.DataFrame:
     """Calcula porcentajes respecto al target por columna categorica usando Polars.
 
@@ -82,11 +84,14 @@ def target_encode_columns(
     Returns:
         DataFrame con cada columna categórica y su porcentaje de target.
     """
+    if settings is None:
+        settings = get_settings()
+
     expressions = []
 
     for column in columns:
-        count_1 = (pl.col(target) == 1.0).sum().over(column)
-        total = pl.col(target).is_in([0.0, 1.0]).sum().over(column)
+        count_1 = (pl.col(settings.target) == 1.0).sum().over(column)
+        total = pl.col(settings.target).is_in([0.0, 1.0]).sum().over(column)
 
         # el pl.col("total") nunca deberia ser 0. si da 0 es porque estoy haciendo algo mal
         if df.select((total == 0).any()).item():
@@ -102,7 +107,9 @@ def target_encode_columns(
     return df.with_columns(expressions)
 
 
-def group_columns_by_source(df: pl.DataFrame) -> dict[str, list[str]]:
+def group_columns_by_source(
+    df: pl.DataFrame, settings: Settings | None = None
+) -> dict[str, list[str]]:
     """Agrupa las columnas de un DataFrame de Polars según su fuente de negocio.
 
     Args:
@@ -111,6 +118,9 @@ def group_columns_by_source(df: pl.DataFrame) -> dict[str, list[str]]:
     Returns:
         Diccionario con los grupos de columnas clasificados.
     """
+    if settings is None:
+        settings = get_settings()
+
     groups: dict[str, list[str]] = {
         "saving_account_days_transactions": [],
         "saving_account_monetary": [],
@@ -126,7 +136,7 @@ def group_columns_by_source(df: pl.DataFrame) -> dict[str, list[str]]:
         "CreditCard_CoBranding",
         "CreditCard_Product",
     }
-    ignored = {"client_id", "Target"}
+    ignored = {settings.id, settings.target}
 
     for col in df.columns:
         if col in ignored:
