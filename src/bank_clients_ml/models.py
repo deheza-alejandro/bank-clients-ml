@@ -1,190 +1,219 @@
-import numpy as np
-import pandas as pd
+from dataclasses import dataclass
+
 import lightgbm as lgb
+import numpy as np
+import polars as pl
 from scipy.stats import uniform as sp_uniform
 from sklearn.model_selection import (
     RandomizedSearchCV,
-    train_test_split,
     StratifiedKFold,
 )
 
-param_test = {
-    "n_estimators": np.arange(6, 50, 1),
-    "max_depth": np.arange(
-        4, 10, 1
-    ),  # "arange" genera un array de este tipo [4, 5, 6, 7, 8, 9] de 4 a (10-1) aumentando de a 1
-    "num_leaves": np.arange(3, 20, 1),
-    "subsample": sp_uniform(loc=0.2, scale=0.8),
-    "learning_rate": [0.01, 0.05, 0.1, 0.2],
-    "min_child_samples": np.arange(1000, 3000, 100),
-}
+
+@dataclass(slots=True, frozen=True)
+class GeneralModelsConfig:
+    target: str = "Target"
+    random_state: int = 314
 
 
-def generar_split(
-    df,
-    target="Target",
-    test_size=0.3,  # 70% en training y 30% en test
-    random_state=42,
-):
+def stratified_train_test_split(
+    df: pl.DataFrame,
+    test_ratio: float = 0.3,
+    general_config: GeneralModelsConfig | None = None,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Genera particiones de entrenamiento y test estratificadas
+    (manteniendo la proporcion de buenos y malos en ambos sets de train y test) usando Polars.
 
-    train, test = train_test_split(
-        df,
-        test_size=test_size,
-        random_state=random_state,
-        stratify=df[
-            target
-        ],  # mantiene la proporcion de buenos y malos en ambos sets de train y test
+    Parámetros:
+    -----------
+    df : DataFrame de Polars con los datos.
+    target : Nombre de la columna objetivo.
+    test_size : Proporción del conjunto de test.
+    random_state : Semilla aleatoria.
+
+    Retorna:
+    --------
+        Tupla con los DataFrames de entrenamiento y test.
+    """
+    if general_config is None:
+        general_config = GeneralModelsConfig()
+
+    df_shuffled = df.sample(fraction=1.0, shuffle=True, seed=general_config.random_state)
+
+    test_indices = (
+        df_shuffled.select(pl.col(general_config.target))
+        .with_row_index("_idx")
+        .group_by(general_config.target)
+        .agg(pl.col("_idx").head((pl.len() * test_ratio).round().cast(pl.Int64)))
+        .explode("_idx")
+        .get_column("_idx")
     )
+
+    test = df_shuffled.filter(pl.int_range(0, pl.len()).is_in(test_indices))
+    train = df_shuffled.filter(~pl.int_range(0, pl.len()).is_in(test_indices))
 
     return train, test
 
 
-DECILE_LABELS = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
+@dataclass(slots=True, frozen=True)
+class TrainConfig:
+    splits_cross_validation: int = 3
+    debug: bool = False
 
 
-def process_model_results(
-    df: pd.DataFrame, probabilities: np.ndarray, bins: list[int] = []
-) -> pd.DataFrame:
-    """
-    Combina los datos del cliente con sus probabilidades de predicción,
-    calcula los deciles y, opcionalmente, el rango porcentual.
-
-    Parámetros:
-    -----------
-    df : pd.DataFrame
-        DataFrame original que contiene las columnas 'Target' y 'client_id'.
-    probabilities : np.ndarray
-        Array bidimensional con las probabilidades predichas por el modelo.
-    bins : list[int], opcional
-        Si no esta vacia, usa los bins y calcula la columna de porcentaje 'porc' para tests
-        (por defecto esta vacia).
-
-    Retorna:
-    --------
-    pd.DataFrame
-        DataFrame procesado con las columnas unidas, deciles y porcentajes si aplica.
-    """
-    # Seleccionar columnas clave y reiniciar el índice
-    selected_features = df[["Target", "client_id"]].reset_index()
-
-    # Extraer la segunda columna de probabilidades (clase 1)
-    probabilities_df = pd.DataFrame(probabilities[:, 1], columns=["Prob1"])
-
-    # Concatenar las características con las probabilidades
-    combined_df = pd.concat([selected_features, probabilities_df], axis="columns")
-
-    decile_labels = DECILE_LABELS
-
-    if bins:
-        # Si tiene bins, calcular el rango porcentual y usar los bins
-        combined_df["porc"] = combined_df["Prob1"].rank(pct=True) * 100
-        combined_df["decil"] = pd.cut(
-            combined_df["Prob1"], bins=bins, labels=decile_labels
-        )
-    else:
-        # Sino calcular los deciles del 10 al 1
-        combined_df["decil"] = pd.qcut(combined_df["Prob1"], q=10, labels=decile_labels)
-
-    return combined_df
-
-
-def train_and_get_feature_importances(X_train, columns, n_iter=2, target="Target"):
-    """Entrena un modelo LightGBM usando RandomizedSearchCV y devuelve las ``feature_importances``.
+def get_feature_importances(
+    X_train: pl.DataFrame,
+    columns: list[str],
+    n_iter: int = 2,
+    general_config: GeneralModelsConfig | None = None,
+    train_config: TrainConfig | None = None,
+) -> tuple[RandomizedSearchCV, pl.DataFrame]:
+    """Entrena un modelo LightGBM usando RandomizedSearchCV y devuelve las
+    importancias de features en un DataFrame de Polars.
 
     Args:
-        X_train (pandas.DataFrame): Datos de entrenamiento; debe contener
+        X_train : Datos de entrenamiento; debe contener
             ``columns`` y la columna target.
-        columns (list[str]): Columnas de features usadas para entrenar el modelo.
-        n_iter (int): Cantidad de combinaciones de hiperparámetros que muestrea
-            ``RandomizedSearchCV``. Por defecto ``5`` para que el notebook
-            pueda usar un valor rápido por defecto.
-        target (str): Nombre de la columna target. Por defecto ``"Target"``.
+        columns : Columnas de features usadas para entrenar el modelo.
+        n_iter : Cantidad de combinaciones de hiperparámetros a probar al azar con
+            ``RandomizedSearchCV``.
+        target : Nombre de la columna target.
+        splits_cross_validation : Cantidad de k-fold cross-validation para usar con
+        ``RandomizedSearchCV``. por defecto es 3
+        random_state :
+        debug :
 
     Returns:
-        tuple: ``(model, searcher, importances)`` donde ``importances`` es
-        una ``pandas.Series`` de importancias de features indexada por
-        ``columns``.
+        ``(searcher, importances)`` El objeto searcher entrenado
+        y el DataFrame con las importancias ordenadas descendentemente.
     """
+    if general_config is None:
+        general_config = GeneralModelsConfig()
+
+    if train_config is None:
+        train_config = TrainConfig()
+
+    verbose: int = 3 if train_config.debug else 1
+
     model = lgb.LGBMClassifier(
-        random_state=314,
+        random_state=general_config.random_state,
         n_jobs=1,
-        # verbosity = 2, # para debug
+        verbose = verbose,
         metric="auc",
     )
 
-    searcher = RandomizedSearchCV(
+    param_test = {
+        "n_estimators": np.arange(6, 50, 1),
+        "max_depth": np.arange(4, 10, 1), # [4, 5, 6, 7, 8, 9] de 4 a (10-1) aumentando de a 1
+        "num_leaves": np.arange(3, 20, 1),
+        "subsample": sp_uniform(loc=0.2, scale=0.8),
+        "learning_rate": [0.01, 0.05, 0.1, 0.2],
+        "min_child_samples": np.arange(1000, 3000, 100),
+    }
+
+    searcher: RandomizedSearchCV = RandomizedSearchCV(
         estimator=model,
         param_distributions=param_test,
-        n_iter=n_iter,  # Va a probar n_iter combinaciones diferentes al azar
+        n_iter=n_iter,
         scoring="roc_auc",
         n_jobs=-1,
         refit=True,
-        cv=StratifiedKFold(n_splits=3),  # K-FOLD CROSS-VALIDATION con k = 3
-        verbose=1,  # 4 para debug
-        random_state=314,
+        cv=StratifiedKFold(
+            n_splits=train_config.splits_cross_validation,
+            shuffle=True,
+            random_state=general_config.random_state,
+        ),
+        verbose=verbose,
+        random_state=general_config.random_state,
     )
 
-    searcher.fit(X_train[columns], X_train[target])
-    importances = pd.Series(
-        searcher.best_estimator_.feature_importances_,
-        index=columns
+    searcher.fit(X_train.select(columns), X_train[general_config.target])
+    best_estimator: lgb.LGBMClassifier = searcher.best_estimator_
+    importances = pl.DataFrame(
+        {
+            "variable": columns,
+            "importance": best_estimator.feature_importances_,
+        }
+    ).sort("importance", descending=True)
+    return searcher, importances
+
+
+DECILE_LABELS = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
+DECILE_DTYPE = pl.Enum(DECILE_LABELS)
+
+
+def compute_prediction_deciles(
+    df: pl.DataFrame,
+    probabilities: np.ndarray,
+    bins: list[float] | None = None,
+    general_config: GeneralModelsConfig | None = None,
+) -> pl.DataFrame:
+    """Combina los datos del cliente con sus probabilidades de predicción,
+    calcula los deciles y calcula métricas por decil utilizando Polars.
+
+    Parámetros:
+    -----------
+    df :
+        DataFrame original que contiene las columnas 'Target' y 'client_id'.
+    probabilities :
+        Array bidimensional con las probabilidades predichas por el modelo.
+    bins : opcional
+        Si no es nulo, usa los bins (por defecto es nulo).
+
+    Retorna:
+    --------
+        DataFrame con metricas de los deciles
+    """
+    if general_config is None:
+        general_config = GeneralModelsConfig()
+
+    decil_expr = (
+        pl.col("probabilities").cut(breaks=bins, labels=DECILE_LABELS)
+        if bins
+        else pl.col("probabilities").qcut(10, labels=DECILE_LABELS, allow_duplicates=True)
     )
-    print("Best score: ", searcher.best_score_)
-    print(searcher)
-    return model, searcher, importances
+
+    return (
+        df.select(
+            general_config.target,
+            probabilities=probabilities[:, 1],
+        )
+        .with_columns(decil=decil_expr.cast(DECILE_DTYPE))
+        .group_by("decil")
+        .agg(
+            count=pl.len(),
+            target_1_count=pl.col(general_config.target).sum(),
+            min_probability=pl.col("probabilities").min(),
+        )
+        .sort("decil")
+    )
 
 
-def evaluate_deciles_train(
-    X_train, probs_train
-):
-    """Calcula los deciles por fila para el set de entrenamiento e imprime los resultados.
-
-    Args:
-        X_train (pandas.DataFrame): Datos de entrenamiento con ``Target``.
-        probs_train (numpy.ndarray): Salida de ``predict_proba`` para train.
-
-    Returns:
-        pandas.DataFrame: Resultado del set de entrenamiento.
-    """
-    print("train:")
-    result_train = process_model_results(X_train, probs_train)
-    print(result_train.decil.value_counts())
-    print(result_train[result_train.Target == 1].decil.value_counts())
-    print(result_train.groupby("decil")["Prob1"].agg("min"))
-    return result_train
+def print_roc(searcher: RandomizedSearchCV):
+    print(f"\nBest score (ROC AUC): {searcher.best_score_:.6f}")
 
 
-def evaluate_deciles_test(
-    X_test, probs_test, cotas
-):
-    """Calcula los deciles por fila para el set de test,
-    imprime los resultados, después aplica ``cotas`` fijas al set de testeo
-    y finalmente recalcula los deciles del test con ``pd.qcut`` ("trampa").
+def print_train_deciles(train_deciles: pl.DataFrame):
+    """imprime metricas de los deciles del set de entrenamiento.
 
     Args:
-        X_test (pandas.DataFrame): Datos de test con ``Target``.
-        probs_test (numpy.ndarray): Salida de ``predict_proba`` para test.
-        cotas (list[float]): Bins fijos (incluyendo los extremos ``-inf`` /
-            ``inf``) usados para asignar deciles al set de testeo.
-
-    Returns:
-        pandas.DataFrame: Resultado del set de testeo después del recálculo
-        de deciles (columna ``decil`` actualizada con ``pd.qcut``).
+        train_deciles: deciles del set de entrenamiento
     """
-    print("test:")
-    result_test = process_model_results(X_test, probs_test, cotas)
-    print(result_test.decil.value_counts())
-    print(result_test[result_test.Target == 1].decil.value_counts())
-    print("result_test:")
-    print(result_test)
+    print(f"train:\n{train_deciles}")
+
+
+def print_test_deciles(
+    test_deciles: pl.DataFrame, df: pl.DataFrame, probabilities: np.ndarray
+):
+    """imprime metricas de los deciles del set de test
+    e imprime metricas de los deciles recalculados ("trampa").
+
+    Args:
+        test_deciles: deciles del set de test
+    """
+    print(f"test:\n{test_deciles}")
 
     print("test trampa: recalculo las cotas...") # TODO
-    result_test = result_test.drop(columns=["decil"])
-    result_test["decil"] = pd.qcut(
-        result_test["Prob1"], q=10, labels=DECILE_LABELS
-    )
-    print(result_test.decil.value_counts())
-    print(result_test[result_test.Target == 1].decil.value_counts())
-    print(result_test.groupby("decil")["Prob1"].agg("min"))
-    return result_test
+    test_deciles = compute_prediction_deciles(df, probabilities)
+    print(test_deciles)
 
