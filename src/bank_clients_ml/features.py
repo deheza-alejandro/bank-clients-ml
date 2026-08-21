@@ -79,7 +79,7 @@ def target_encode_columns(
     Args:
         df: DataFrame de Polars de entrada.
         columns: Columnas categóricas para agrupar.
-        target: Nombre de la columna objetivo (por defecto "Target").
+        target: Nombre de la columna objetivo (por defecto settings.col_target).
 
     Returns:
         DataFrame con cada columna categórica y su porcentaje de target.
@@ -90,8 +90,8 @@ def target_encode_columns(
     expressions = []
 
     for column in columns:
-        count_1 = (pl.col(settings.target) == 1.0).sum().over(column)
-        total = pl.col(settings.target).is_in([0.0, 1.0]).sum().over(column)
+        count_1 = (pl.col(settings.col_target) == 1.0).sum().over(column)
+        total = pl.col(settings.col_target).is_in([0.0, 1.0]).sum().over(column)
 
         # el pl.col("total") nunca deberia ser 0. si da 0 es porque estoy haciendo algo mal
         if df.select((total == 0).any()).item():
@@ -136,7 +136,7 @@ def group_columns_by_source(
         "CreditCard_CoBranding",
         "CreditCard_Product",
     }
-    ignored = {settings.id, settings.target}
+    ignored = {settings.col_id, settings.col_target}
 
     for col in df.columns:
         if col in ignored:

@@ -38,9 +38,9 @@ def stratified_train_test_split(
     df_shuffled = df.sample(fraction=1.0, shuffle=True, seed=random_state)
 
     test_indices = (
-        df_shuffled.select(pl.col(settings.target))
+        df_shuffled.select(pl.col(settings.col_target))
         .with_row_index("_idx")
-        .group_by(settings.target)
+        .group_by(settings.col_target)
         .agg(pl.col("_idx").head((pl.len() * test_ratio).round().cast(pl.Int64)))
         .explode("_idx")
         .get_column("_idx")
@@ -118,14 +118,14 @@ def get_feature_importances(
         random_state=random_state,
     )
 
-    searcher.fit(X_train.select(columns), X_train[settings.target])
+    searcher.fit(X_train.select(columns), X_train[settings.col_target])
     best_estimator: lgb.LGBMClassifier = searcher.best_estimator_
     importances = pl.DataFrame(
         {
-            "variable": columns,
-            "importance": best_estimator.feature_importances_,
+            settings.col_feature: columns,
+            settings.col_importance: best_estimator.feature_importances_,
         }
-    ).sort("importance", descending=True)
+    ).sort(settings.col_importance, descending=True)
     return searcher, importances
 
 
@@ -168,14 +168,14 @@ def compute_prediction_deciles(
 
     return (
         df.select(
-            settings.target,
+            settings.col_target,
             probabilities=probabilities[:, 1],
         )
         .with_columns(decil=decil_expr.cast(DECILE_DTYPE))
         .group_by("decil")
         .agg(
             count=pl.len(),
-            target_1_count=pl.col(settings.target).sum(),
+            target_1_count=pl.col(settings.col_target).sum(),
             min_probability=pl.col("probabilities").min(),
         )
         .sort("decil")

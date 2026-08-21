@@ -6,8 +6,10 @@ from pydantic_settings import BaseSettings  # , SettingsConfigDict
 
 class Settings(BaseSettings):
     debug: bool = False
-    id: str = "client_id"
-    target: str = "Target"
+    col_id: str = "client_id"
+    col_target: str = "Target"
+    col_feature: str = "Feature"
+    col_importance: str = "Importance"
     # api_key: SecretStr  # Mantiene el secreto oculto en logs y prints
 
     # model_config = SettingsConfigDict(

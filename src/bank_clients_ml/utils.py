@@ -160,8 +160,8 @@ def filter_nonzero(
         settings = get_settings()
 
     keep = (
-        [settings.id, *columns]
-        if settings.id in df.columns and settings.id not in columns
+        [settings.col_id, *columns]
+        if settings.col_id in df.columns and settings.col_id not in columns
         else columns
     )
 
