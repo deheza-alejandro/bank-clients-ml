@@ -62,11 +62,10 @@ from bank_clients_ml.utils import (
 )
 
 settings = get_settings()
-
 ```
 
 ```python
-data = pl.read_parquet('../data/data.parquet')
+data = pl.read_parquet("../data/data.parquet")
 
 print(data.shape)
 data.describe()
@@ -92,18 +91,14 @@ greater_than_thirty_one_columns = [
     "SavingAccount_Days_with_Debits",
 ]
 
-print(count_row_matches(
-    data,
-    columns=less_than_zero_columns,
-    threshold=0,
-    condition="<"
-    ))
-print(count_row_matches(
-    data,
-    columns=greater_than_thirty_one_columns,
-    threshold=31,
-    condition=">"
-    ))
+print(
+    count_row_matches(data, columns=less_than_zero_columns, threshold=0, condition="<")
+)
+print(
+    count_row_matches(
+        data, columns=greater_than_thirty_one_columns, threshold=31, condition=">"
+    )
+)
 ```
 
 ```python
@@ -117,7 +112,9 @@ n_unique_matches(data)
 ## Obtener meses relevantes
 
 ```python
-data = data.with_columns(pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date())
+data = data.with_columns(
+    pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date()
+)
 ```
 
 ```python
@@ -127,15 +124,11 @@ data_dates = data.select(
     ultimo_mes_entrenamiento=last_month.dt.offset_by("-3mo"),
     primer_mes_prediccion=last_month.dt.offset_by("-1mo"),
     meses_entrenamiento=pl.date_range(
-        last_month.dt.offset_by("-8mo"),
-        last_month.dt.offset_by("-3mo"),
-        interval="1mo"
+        last_month.dt.offset_by("-8mo"), last_month.dt.offset_by("-3mo"), interval="1mo"
     ).implode(),
     meses_prediccion=pl.date_range(
-        last_month.dt.offset_by("-1mo"),
-        last_month,
-        interval="1mo"
-    ).implode()
+        last_month.dt.offset_by("-1mo"), last_month, interval="1mo"
+    ).implode(),
 )
 
 ultimo_mes_entrenamiento = data_dates["ultimo_mes_entrenamiento"][0]
@@ -152,32 +145,27 @@ print("primer_mes_prediccion:", primer_mes_prediccion)
 # Definir Universo y Target
 
 ```python
-cant_meses_x_cliente = (
-    data.group_by(settings.col_id)
-    .len(name="cant_meses")
+cant_meses_x_cliente = data.group_by(settings.col_id).len(name="cant_meses")
+print(
+    "cant_meses_x_cliente['cant_meses']:",
+    cant_meses_x_cliente["cant_meses"].value_counts(),
 )
-print("cant_meses_x_cliente['cant_meses']:", cant_meses_x_cliente["cant_meses"].value_counts())
 print("\n")
 
 # filtro clientes que tengan menos de 9 meses de historia
-clientes_validos_1 = (
-    cant_meses_x_cliente
-    .filter(pl.col("cant_meses") == 9)
-    .select(settings.col_id)
+clientes_validos_1 = cant_meses_x_cliente.filter(pl.col("cant_meses") == 9).select(
+    settings.col_id
 )
 print("clientes_validos_1:", clientes_validos_1.shape)
 print("\n")
 
 # filtro clientes con 'Package_Active' y 'CreditCard_CoBranding'
 # en el ultimo mes de la ventana de entrenamiento
-clientes_validos_2 = (
-    data.filter(
-        (pl.col("Package_Active") == "No") &
-        (pl.col("CreditCard_CoBranding") == "No") &
-        (pl.col("Month") == ultimo_mes_entrenamiento)
-    )
-    .select(settings.col_id)
-)
+clientes_validos_2 = data.filter(
+    (pl.col("Package_Active") == "No")
+    & (pl.col("CreditCard_CoBranding") == "No")
+    & (pl.col("Month") == ultimo_mes_entrenamiento)
+).select(settings.col_id)
 print("clientes_validos_2:", clientes_validos_2.shape)
 print("\n")
 
@@ -196,7 +184,10 @@ print("tgt['Target']:", tgt[settings.col_target].value_counts())
 print("\n")
 
 universo_con_target = universo.join(tgt, on=settings.col_id, how="left")
-print("universo_con_target['Target']:", universo_con_target[settings.col_target].value_counts())
+print(
+    "universo_con_target['Target']:",
+    universo_con_target[settings.col_target].value_counts(),
+)
 print("universo_con_target:", universo_con_target.shape)
 print("\n")
 
@@ -204,11 +195,12 @@ print("\n")
 print("data['client_id']:", data[settings.col_id].n_unique())
 print("\n")
 
-data_entrenamiento = (
-    data.filter(pl.col("Month").is_in(meses_entrenamiento))
-    .join(universo_con_target.select(settings.col_id), on=settings.col_id, how="inner")
+data_entrenamiento = data.filter(pl.col("Month").is_in(meses_entrenamiento)).join(
+    universo_con_target.select(settings.col_id), on=settings.col_id, how="inner"
 )
-print("data_entrenamiento['client_id']:", data_entrenamiento[settings.col_id].n_unique())
+print(
+    "data_entrenamiento['client_id']:", data_entrenamiento[settings.col_id].n_unique()
+)
 print("\n")
 print("data_entrenamiento['Month']:", data_entrenamiento["Month"].value_counts())
 ```
@@ -308,10 +300,13 @@ Este no es el calculo correcto para "SavingAccount_Balance_Average", pero no va 
 
 ```python
 data_entrenamiento = data_entrenamiento.with_columns(
-    pl.col("SavingAccount_Balance_Average")
-    .fill_null(
-        (pl.col("SavingAccount_Balance_FirstDate") + pl.col("SavingAccount_Balance_LastDate")) / 2.0
+    pl.col("SavingAccount_Balance_Average").fill_null(
+        (
+            pl.col("SavingAccount_Balance_FirstDate")
+            + pl.col("SavingAccount_Balance_LastDate")
         )
+        / 2.0
+    )
 )
 ```
 
@@ -325,22 +320,28 @@ regiones_x_cliente = (
 )
 print(
     "columnas con nulos en regiones_x_cliente:",
-    [col for col in regiones_x_cliente.columns if regiones_x_cliente[col].null_count() > 0]
+    [
+        col
+        for col in regiones_x_cliente.columns
+        if regiones_x_cliente[col].null_count() > 0
+    ],
 )
 print("cantidad de nulos en Region:", regiones_x_cliente["Region"].null_count())
 
 regiones_x_cliente = regiones_x_cliente.with_columns(
-    pl.col("Region")
-    .fill_null("BUENOS AIRES") # pongo la Region mas comun
+    pl.col("Region").fill_null("BUENOS AIRES")  # pongo la Region mas comun
 )
 print(
     "columnas con nulos en regiones_x_cliente:",
-    [col for col in regiones_x_cliente.columns if regiones_x_cliente[col].null_count() > 0]
+    [
+        col
+        for col in regiones_x_cliente.columns
+        if regiones_x_cliente[col].null_count() > 0
+    ],
 )
 
-data_entrenamiento = (
-    data_entrenamiento.drop("Region")
-    .join(regiones_x_cliente, on=settings.col_id, how="left")
+data_entrenamiento = data_entrenamiento.drop("Region").join(
+    regiones_x_cliente, on=settings.col_id, how="left"
 )
 ```
 
@@ -358,9 +359,8 @@ print(producto_x_cliente["CreditCard_Product"].value_counts())
 ```
 
 ```python
-data_entrenamiento = (
-    data_entrenamiento.drop("CreditCard_Product")
-    .join(producto_x_cliente, on=settings.col_id, how="left")
+data_entrenamiento = data_entrenamiento.drop("CreditCard_Product").join(
+    producto_x_cliente, on=settings.col_id, how="left"
 )
 
 print("\n")
@@ -370,11 +370,17 @@ vc_cc = data_entrenamiento["CreditCard_Product"].value_counts()
 val1 = int(vc_cc.filter(pl.col("CreditCard_Product") == "J55660104XX012")["count"][0])
 
 data_entrenamiento = data_entrenamiento.with_columns(
-    # pongo la mas comun cuando no tiene producto en el futuro pero si tiene producto activo en el pasado
-    pl.when(pl.col("CreditCard_Product").is_null() & (pl.col("CreditCard_Active") == "Yes"))
+    # pongo la mas comun cuando no tiene producto en el futuro
+    # pero si tiene producto activo en el pasado
+    pl.when(
+        pl.col("CreditCard_Product").is_null() & (pl.col("CreditCard_Active") == "Yes")
+    )
     .then(pl.lit("J55660104XX012"))
-    # pongo 0 cuando no tiene producto en el futuro ni en el pasado; o cuando no tiene producto en el pasado, por mas que lo tenga en el futuro
-    .when(pl.col("CreditCard_Product").is_null() | (pl.col("CreditCard_Active") == "No"))
+    # pongo 0 cuando no tiene producto en el futuro ni en el pasado
+    # o cuando no tiene producto en el pasado, por mas que lo tenga en el futuro
+    .when(
+        pl.col("CreditCard_Product").is_null() | (pl.col("CreditCard_Active") == "No")
+    )
     .then(pl.lit("0"))
     .otherwise(pl.col("CreditCard_Product"))
     .alias("CreditCard_Product")
@@ -465,7 +471,9 @@ data_if = data_if.join(universo_con_target, on=settings.col_id, how="inner")
 
 print_without_trunc(all_value_counts(data_if))
 
-data_if = target_encode_columns(data_if, ["Client_Age_grp", "Region", "CreditCard_Product"])
+data_if = target_encode_columns(
+    data_if, ["Client_Age_grp", "Region", "CreditCard_Product"]
+)
 
 print_without_trunc(all_value_counts(data_if))
 ```
@@ -477,9 +485,7 @@ ultimo_mes_plus_1m = pl.lit(ultimo_mes_entrenamiento).dt.offset_by("1mo")
 
 data_if = data_if.with_columns(
     [
-        (
-            pl.col("Last_product_dt") - pl.col("First_product_dt")
-        )
+        (pl.col("Last_product_dt") - pl.col("First_product_dt"))
         .dt.total_days()
         .alias("Days_between_first_and_last_product"),
         (ultimo_mes_plus_1m - pl.col("Last_product_dt"))
@@ -721,7 +727,6 @@ data_entrenamiento = data_entrenamiento.with_columns(
 
 data_entrenamiento = data_entrenamiento.with_columns(
     [
-
         # OPERATION
         compute_percentage("Operations_remote", "Operations_total").alias(
             "Operations_remote_porc"
@@ -805,9 +810,9 @@ data_entrenamiento = data_entrenamiento.with_columns(
         compute_percentage(
             "CreditCard_Payment_Cash", "CreditCard_Payment_in_person"
         ).alias("CreditCard_Payment_Cash_IP_porc"),
-        compute_percentage(
-            "CreditCard_Payment_Web", "CreditCard_Payment_remote"
-        ).alias("CreditCard_Payment_Web_R_porc"),
+        compute_percentage("CreditCard_Payment_Web", "CreditCard_Payment_remote").alias(
+            "CreditCard_Payment_Web_R_porc"
+        ),
         compute_percentage(
             "CreditCard_Payment_ATM", "CreditCard_Payment_in_person"
         ).alias("CreditCard_Payment_ATM_IP_porc"),
@@ -901,15 +906,17 @@ data_entrenamiento.describe()
 ```
 
 ```python
-data_entrenamiento.select([
-    settings.col_id,
-    "SavingAccount_Transactions_Transactions",
-    "Operations_total",
-    "CreditCard_Payment_total"
-]).filter(
-    (pl.col("SavingAccount_Transactions_Transactions") != 0) &
-    (pl.col("Operations_total") != 0) &
-    (pl.col("CreditCard_Payment_total") != 0)
+data_entrenamiento.select(
+    [
+        settings.col_id,
+        "SavingAccount_Transactions_Transactions",
+        "Operations_total",
+        "CreditCard_Payment_total",
+    ]
+).filter(
+    (pl.col("SavingAccount_Transactions_Transactions") != 0)
+    & (pl.col("Operations_total") != 0)
+    & (pl.col("CreditCard_Payment_total") != 0)
 )
 ```
 
@@ -917,54 +924,58 @@ data_entrenamiento.select([
 greater_than_one_hundred_columns = [
     "SavingAccount_Transfer_In_Amount_porc",
     "SavingAccount_Transfer_In_Amount_CR_porc",
-    "SavingAccount_Balance_last_minus_first_date_porc"
+    "SavingAccount_Balance_last_minus_first_date_porc",
 ]
 
 count_row_matches(
     data_entrenamiento,
     columns=greater_than_one_hundred_columns,
     threshold=100,
-    condition=">"
-    )
+    condition=">",
+)
 ```
 
 # Aggregate Features
 
 ```python
 columnas_con_valores_monetarios = [
-    'SavingAccount_Balance_FirstDate',
-    'SavingAccount_Balance_LastDate',
-    'SavingAccount_Balance_Average',
-    'SavingAccount_Salary_Payment_Amount',
-    'SavingAccount_Transfer_In_Amount',
-    'SavingAccount_ATM_Extraction_Amount',
-    'SavingAccount_Service_Payment_Amount',
-    'SavingAccount_CreditCard_Payment_Amount',
-    'SavingAccount_Transfer_Out_Amount',
-    'SavingAccount_DebitCard_Spend_Amount',
-    'SavingAccount_Total_Amount',
-    'SavingAccount_Credits_Amounts',
-    'SavingAccount_Debits_Amounts',
-
-    'SavingAccount_Balance_last_minus_first_date',
-
-    'CreditCard_Balance_ARG', 'CreditCard_Balance_DOLLAR',
-    'CreditCard_Total_Spending', 'CreditCard_Spending_1_Installment',
-    'CreditCard_Spending_Installments', 'CreditCard_Spending_CrossBoarder',
-    'CreditCard_Spending_Aut_Debits', 'CreditCard_Revolving'
+    "SavingAccount_Balance_FirstDate",
+    "SavingAccount_Balance_LastDate",
+    "SavingAccount_Balance_Average",
+    "SavingAccount_Salary_Payment_Amount",
+    "SavingAccount_Transfer_In_Amount",
+    "SavingAccount_ATM_Extraction_Amount",
+    "SavingAccount_Service_Payment_Amount",
+    "SavingAccount_CreditCard_Payment_Amount",
+    "SavingAccount_Transfer_Out_Amount",
+    "SavingAccount_DebitCard_Spend_Amount",
+    "SavingAccount_Total_Amount",
+    "SavingAccount_Credits_Amounts",
+    "SavingAccount_Debits_Amounts",
+    "SavingAccount_Balance_last_minus_first_date",
+    "CreditCard_Balance_ARG",
+    "CreditCard_Balance_DOLLAR",
+    "CreditCard_Total_Spending",
+    "CreditCard_Spending_1_Installment",
+    "CreditCard_Spending_Installments",
+    "CreditCard_Spending_CrossBoarder",
+    "CreditCard_Spending_Aut_Debits",
+    "CreditCard_Revolving",
 ]
 
 columnas_con_cantidades = [
-    x for x in data_entrenamiento.columns
-    if x not in [
+    x
+    for x in data_entrenamiento.columns
+    if x
+    not in [
         *columnas_con_valores_monetarios,
         *data_if.columns,
         "Month",
         "First_product_dt",
         "Last_product_dt",
         settings.col_id,
-        settings.col_target
-        ]
+        settings.col_target,
+    ]
 ]
 
 # ordenar los registros de cada cliente por mes
@@ -974,34 +985,38 @@ data_entrenamiento = data_entrenamiento.sort([settings.col_id, "Month"])
 agg_exprs = []
 
 for col in columnas_con_cantidades:
-    agg_exprs.extend([
-        pl.col(col).min().alias(f"{col}_min"),
-        pl.col(col).max().alias(f"{col}_max"),
-        pl.col(col).mean().alias(f"{col}_mean"),
-        pl.col(col).median().alias(f"{col}_median"),
-        pl.col(col).sum().alias(f"{col}_sum"),
-        (pl.col(col) != 0).sum().alias(f"{col}_count_nonzero"),
-        pl.col(col).var().alias(f"{col}_var"),
-        pl.col(col).std().alias(f"{col}_std"),
-        pl.col(col).n_unique().alias(f"{col}_nunique"),
-        pl.col(col).first().alias(f"{col}_first"),
-        pl.col(col).last().alias(f"{col}_last"),
-    ])
+    agg_exprs.extend(
+        [
+            pl.col(col).min().alias(f"{col}_min"),
+            pl.col(col).max().alias(f"{col}_max"),
+            pl.col(col).mean().alias(f"{col}_mean"),
+            pl.col(col).median().alias(f"{col}_median"),
+            pl.col(col).sum().alias(f"{col}_sum"),
+            (pl.col(col) != 0).sum().alias(f"{col}_count_nonzero"),
+            pl.col(col).var().alias(f"{col}_var"),
+            pl.col(col).std().alias(f"{col}_std"),
+            pl.col(col).n_unique().alias(f"{col}_nunique"),
+            pl.col(col).first().alias(f"{col}_first"),
+            pl.col(col).last().alias(f"{col}_last"),
+        ]
+    )
 
 for col in columnas_con_valores_monetarios:
-    agg_exprs.extend([
-        pl.col(col).min().alias(f"{col}_min"),
-        pl.col(col).max().alias(f"{col}_max"),
-        pl.col(col).mean().alias(f"{col}_mean"),
-        pl.col(col).median().alias(f"{col}_median"),
-        pl.col(col).sum().alias(f"{col}_sum"),
-        (pl.col(col) != 0).sum().alias(f"{col}_count_nonzero"),
-        pl.col(col).var().alias(f"{col}_var"),
-        pl.col(col).std().alias(f"{col}_std"),
-        (pl.col(col) / 1000.0).round().n_unique().alias(f"{col}_rounded_nunique"),
-        pl.col(col).first().alias(f"{col}_first"),
-        pl.col(col).last().alias(f"{col}_last"),
-    ])
+    agg_exprs.extend(
+        [
+            pl.col(col).min().alias(f"{col}_min"),
+            pl.col(col).max().alias(f"{col}_max"),
+            pl.col(col).mean().alias(f"{col}_mean"),
+            pl.col(col).median().alias(f"{col}_median"),
+            pl.col(col).sum().alias(f"{col}_sum"),
+            (pl.col(col) != 0).sum().alias(f"{col}_count_nonzero"),
+            pl.col(col).var().alias(f"{col}_var"),
+            pl.col(col).std().alias(f"{col}_std"),
+            (pl.col(col) / 1000.0).round().n_unique().alias(f"{col}_rounded_nunique"),
+            pl.col(col).first().alias(f"{col}_first"),
+            pl.col(col).last().alias(f"{col}_last"),
+        ]
+    )
 
 data_agg = data_entrenamiento.group_by(settings.col_id).agg(agg_exprs)
 ```
@@ -1020,24 +1035,29 @@ for col in cols_base:
     c_first = pl.col(s_first)
     c_last = pl.col(s_last)
 
-    derived_exprs.extend([
-        (c_max - c_min).alias(f"{col}_ptp"),
-        (c_last - c_first).alias(f"{col}_diff"),
-        # Diferencia relativa: (último / primero)
-        compute_percentage(s_last, s_first).alias(f"{col}_diff_rel"),
-        # Variación porcentual: 1 - diferencia relativa
-        (compute_percentage(s_last, s_first) - 100.0).alias(f"{col}_variacion_porc"),
-    ])
+    derived_exprs.extend(
+        [
+            (c_max - c_min).alias(f"{col}_ptp"),
+            (c_last - c_first).alias(f"{col}_diff"),
+            # Diferencia relativa: (último / primero)
+            compute_percentage(s_last, s_first).alias(f"{col}_diff_rel"),
+            # Variación porcentual: 1 - diferencia relativa
+            (compute_percentage(s_last, s_first) - 100.0).alias(
+                f"{col}_variacion_porc"
+            ),
+        ]
+    )
 
 data_agg = data_agg.with_columns(derived_exprs).drop(
-    *[f"{c}_first" for c in cols_base],
-    *[f"{c}_last" for c in cols_base]
+    *[f"{c}_first" for c in cols_base], *[f"{c}_last" for c in cols_base]
 )
 ```
 
 ```python
-# TODO: SACAR ESTA CELDA SI PODES: sin esto la matriz de correlaciones saca las variables que necesito
-# para sacar esto tendria que agregar manualmente las variables que necesito, o usar otras variables (correlacionadas)
+# TODO: SACAR ESTA CELDA SI PODES:
+# sin esto la matriz de correlaciones saca las variables que necesito
+# para sacar esto tendria que agregar manualmente las variables que necesito,
+# o usar otras variables (correlacionadas)
 
 # Restaurar el orden original de las columnas
 orden_original = []
@@ -1179,7 +1199,9 @@ print("ABT sin columnas con valores unicos: ", ABT_reducida.shape)
 ## Elimino columnas binarias con baja representatividad
 
 ```python
-cols_binarias = [col for col in ABT_reducida.columns if ABT_reducida[col].n_unique() == 2]
+cols_binarias = [
+    col for col in ABT_reducida.columns if ABT_reducida[col].n_unique() == 2
+]
 cols_binarias.remove(settings.col_target)
 print(cols_binarias)
 print("\n")
@@ -1196,7 +1218,7 @@ for x in pocos_representativos:
     print("\n")
 
 ABT_reducida = ABT_reducida.drop(pocos_representativos)
-print('ABT sin columnas binarias poco representativas:' , ABT_reducida.shape)
+print("ABT sin columnas binarias poco representativas:", ABT_reducida.shape)
 ```
 
 ## Elimino columnas correlacionadas entre si
@@ -1209,15 +1231,13 @@ exclude_cols = [settings.col_id, settings.col_target, target_col]
 feature_cols = [c for c in ABT_reducida.columns if c not in exclude_cols]
 
 # Calcular la correlación de Pearson de cada columna contra "CreditCard_Product"
-correlaciones = ABT_reducida.select([
-    pl.corr(col, target_col).alias(col)
-    for col in feature_cols
-])
+correlaciones = ABT_reducida.select(
+    [pl.corr(col, target_col).alias(col) for col in feature_cols]
+)
 
 # Reorganizar a formato largo (feature, correlacion) y ordenar por valor absoluto
 corr_df = (
-    correlaciones
-    .unpivot(variable_name="feature", value_name="correlacion")
+    correlaciones.unpivot(variable_name="feature", value_name="correlacion")
     .with_columns(corr_abs=pl.col("correlacion").abs())
     .sort("corr_abs", descending=True)
 )
@@ -1230,7 +1250,9 @@ print(correlacionadas_80)
 ```
 
 ```python
-features_df = ABT_reducida.drop([settings.col_id, settings.col_target, "CreditCard_Product"])
+features_df = ABT_reducida.drop(
+    [settings.col_id, settings.col_target, "CreditCard_Product"]
+)
 cols = features_df.columns
 
 matriz_corr_df = features_df.corr()
@@ -1264,7 +1286,9 @@ print("ABT sin columnas con correlacion mayor a 80%:", ABT_reducida_2.shape)
 from sklearn.preprocessing import StandardScaler
 
 columnas_sin_client_id_ni_target = [
-    x for x in ABT_reducida_2.columns if (x != settings.col_id) & (x != settings.col_target)
+    x
+    for x in ABT_reducida_2.columns
+    if (x != settings.col_id) & (x != settings.col_target)
 ]
 scaler = StandardScaler(copy=True)
 scaler.fit(ABT_reducida_2.select(columnas_sin_client_id_ni_target))
@@ -1289,7 +1313,9 @@ scan_anomalies(ABT_estandarizado)
 
 ```python
 columns_by_source = group_columns_by_source(ABT_estandarizado)
-columnas_saving_account_days_transactions = columns_by_source["saving_account_days_transactions"]
+columnas_saving_account_days_transactions = columns_by_source[
+    "saving_account_days_transactions"
+]
 columnas_saving_account_monetarios = columns_by_source["saving_account_monetary"]
 columnas_operation = columns_by_source["operations"]
 columnas_credit_card_payment = columns_by_source["credit_card_payment"]
@@ -1334,7 +1360,7 @@ todas_las_columnas = [
     *columnas_operation,
     *columnas_credit_card_payment,
     *columnas_credit_card_monetarios,
-    *columnas_otros
+    *columnas_otros,
 ]
 
 searcher_0, variables_mas_importantes_0 = get_feature_importances(
@@ -1762,15 +1788,12 @@ variables_mas_importantes_8.head(25)
 
 for x in [
     "SavingAccount_CreditCard_Payment_Amount_max",
-
     "Operations_total_count_nonzero",
-
     "CreditCard_Total_Limit_diff_rel",
-
-    #"CreditCard_Product",
+    # "CreditCard_Product",
     "Days_between_first_and_last_product",
     "Client_Age_grp",
-    "Quantity_Active_Products_min"
+    "Quantity_Active_Products_min",
 ]:
     idx = cols.index(x)
     vals = triangulo_superior[idx]
@@ -1784,18 +1807,16 @@ for x in [
 
 ```python
 prueba_3 = [
-    #"SavingAccount_CreditCard_Payment_Amount_max",
-    #"CreditCard_Total_Limit_diff_rel",
-    #"Days_between_first_and_last_product",
-    #"Quantity_Active_Products_min"
+    # "SavingAccount_CreditCard_Payment_Amount_max",
+    # "CreditCard_Total_Limit_diff_rel",
+    # "Days_between_first_and_last_product",
+    # "Quantity_Active_Products_min"
     "Operations_total_count_nonzero",
     "CreditCard_Product",
-    "Client_Age_grp"
+    "Client_Age_grp",
 ]
 
-searcher_9, variables_mas_importantes_9 = get_feature_importances(
-    X_train, prueba_3
-)
+searcher_9, variables_mas_importantes_9 = get_feature_importances(X_train, prueba_3)
 print_roc(searcher_9)
 searcher_9
 ```
@@ -1827,7 +1848,10 @@ ABT_reducida_3 = ABT_reducida.clone()
 ABT_reducida_3 = ABT_reducida_3.with_columns(
     binning_by_ranges(
         "CreditCard_Product",
-        ranges=[(36.890, 36.950), (45.680, 45.690)],  # tipo tarjeta 202 y 104 respectivamente
+        ranges=[
+            (36.890, 36.950),
+            (45.680, 45.690),
+        ],  # tipo tarjeta 202 y 104 respectivamente
         values=[36.940, 45.686],
         default=9.005,
     ).alias("CreditCard_Product_t")
@@ -1964,13 +1988,13 @@ print("\n")
 mejores_variables = [
     "CreditCard_Product_t",
     "Client_Age_grp_t",
-    "Operations_total_count_nonzero_t"
+    "Operations_total_count_nonzero_t",
 ]
 
 generate_bivariate_charts(
-    ABT_reducida_3, # dataset con variables sin standarizar
+    ABT_reducida_3,  # dataset con variables sin standarizar
     mejores_variables,
-    "analysis_t"
+    "analysis_t",
 )
 ```
 
@@ -2056,9 +2080,7 @@ probabilities_test = modelo_LightGBM_clasificador_final.predict_proba(
 ```
 
 ```python
-print_train_deciles(
-    compute_prediction_deciles(X_train_final, probabilities_train)
-)
+print_train_deciles(compute_prediction_deciles(X_train_final, probabilities_train))
 ```
 
 ```python
@@ -2137,9 +2159,7 @@ probabilities_test_log = modelo.predict_proba(X_test_final.select(mejores_variab
 ```
 
 ```python
-print_train_deciles(
-    compute_prediction_deciles(X_train_final, probabilities_train_log)
-)
+print_train_deciles(compute_prediction_deciles(X_train_final, probabilities_train_log))
 ```
 
 ```python
@@ -2157,7 +2177,9 @@ cotas = [
     0.580742,
 ]
 
-test_deciles_log = compute_prediction_deciles(X_test_final, probabilities_test_log, cotas)
+test_deciles_log = compute_prediction_deciles(
+    X_test_final, probabilities_test_log, cotas
+)
 
 print_test_deciles(test_deciles_log, X_test_final, probabilities_test_log)
 ```
