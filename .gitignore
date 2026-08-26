@@ -17,3 +17,6 @@ wheels/
 .ipynb_checkpoints/
 
 *.pdf
+
+# Javascript
+node_modules
