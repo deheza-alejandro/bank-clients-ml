@@ -1,3 +1,5 @@
+import io
+import subprocess
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -11,6 +13,9 @@ import polars as pl
 from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
 
 from bank_clients_ml.config import Settings, get_settings
+
+matplotlib.rcParams["svg.hashsalt"] = "fixed_seed_for_this_project"
+matplotlib.rcParams["svg.fonttype"] = "path"
 
 
 def _generate_single_bivariate_chart(
@@ -96,8 +101,7 @@ def _generate_single_bivariate_chart(
     ax_graph_target_pct.set_ylabel(f"{settings.col_target} pct (%)")
 
     fig.tight_layout()
-    fig.savefig(output_path, format="svg", bbox_inches="tight")
-    plt.close(fig)
+    _optimize_and_save_svg(fig, output_path)
 
 
 IMAGES_DIR: str = "images"
@@ -180,11 +184,7 @@ def _save_fig_as_svg(
     output_folder = Path(images_dir) / images_sub_dir
     output_folder.mkdir(parents=True, exist_ok=True)
     svg_path = output_folder / f"{graphic_name}.svg"
-
-    try:
-        fig.savefig(svg_path, format="svg", bbox_inches="tight")
-    finally:
-        plt.close(fig)
+    _optimize_and_save_svg(fig, svg_path)
 
 
 def plot_top_features(
@@ -232,10 +232,7 @@ def plot_top_features(
     ax.set_facecolor("#f9f9f9")
     ax.grid(axis="x", linestyle="--", alpha=0.7)
 
-    ax.set_title(
-        f"{graphic_name}: top {top_n} Features",
-        fontsize=label_fontsize
-    )
+    ax.set_title(f"{graphic_name}: top {top_n} Features", fontsize=label_fontsize)
 
     _save_fig_as_svg(fig, graphic_name, images_dir, "plot_top_features")
 
@@ -285,3 +282,26 @@ def plot_roc_and_metrics(
     ax.grid(True, linestyle=":", alpha=0.6)
 
     _save_fig_as_svg(fig, graphic_name, images_dir, "plot_roc_and_metrics")
+
+
+def _optimize_and_save_svg(fig: Figure, output_path: Path):
+    buffer = io.BytesIO()
+    try:
+        fig.savefig(buffer, format="svg", bbox_inches="tight")
+    finally:
+        plt.close(fig)
+
+    cmd = ["bun", "run", "svgo", "--multipass", "-i", "-", "-o", "-"]
+
+    try:
+        with Path.open(output_path, "wb") as out_file:
+            subprocess.run( # noqa: S603
+                cmd,
+                input=buffer.getvalue(),
+                stdout=out_file,
+                check=True,
+            )
+    except FileNotFoundError as err:
+        raise RuntimeError(
+            "Bun no se encuentra en el PATH del sistema. Asegúrate de tener Bun instalado."
+        ) from err
