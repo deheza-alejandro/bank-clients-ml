@@ -13,30 +13,30 @@ jupyter:
     name: python3
 ---
 
-```python
-# esto detecta automáticamente cualquier cambio en los módulos sin necesidad de reiniciar el kernel
-from IPython import get_ipython
+# Setup inicial e imports
 
-ipython = get_ipython()
-if ipython is not None:
-    ipython.run_line_magic("load_ext", "autoreload")
-    ipython.run_line_magic("autoreload", "2")
+```python
+from bank_clients_ml.notebook_config import setup_notebook
+
+setup_notebook()
 ```
 
 ```python
-import numpy as np
 import polars as pl
 
 from bank_clients_ml.config import get_settings
 from bank_clients_ml.features import (
-    binning_by_ranges,
-    columns_with_zeros,
+    CorrelationAnalyzer,
     compute_percentage,
+    get_constant_columns,
+    get_date_windows,
+    get_imbalanced_binary_columns,
+    group_bins_by_ranges,
     group_columns_by_source,
     min_max_normalize,
     min_max_normalize_weighted,
-    mins_in_range,
     safe_denominator,
+    standardize,
     target_encode_columns,
 )
 from bank_clients_ml.graphs import (
@@ -47,16 +47,18 @@ from bank_clients_ml.graphs import (
 from bank_clients_ml.models import (
     compute_prediction_deciles,
     get_feature_importances,
-    print_roc,
+    get_scoring,
     print_test_deciles,
     print_train_deciles,
     stratified_train_test_split,
 )
 from bank_clients_ml.utils import (
-    all_value_counts,
+    columns_with_zeros,
     count_row_matches,
+    filter_columns_by_cardinality,
     filter_nonzero,
-    n_unique_matches,
+    low_cardinality_value_counts,
+    mins_in_range,
     print_without_trunc,
     scan_anomalies,
 )
@@ -64,15 +66,15 @@ from bank_clients_ml.utils import (
 settings = get_settings()
 ```
 
+# EDA (Exploratory Data Analysis)
+
 ```python
 data = pl.read_parquet("../data/data.parquet")
-
-print(data.shape)
-data.describe()
 ```
 
 ```python
-print_without_trunc(scan_anomalies(data))
+print(data.shape)
+data.describe()
 ```
 
 ```python
@@ -102,168 +104,125 @@ print(
 ```
 
 ```python
-print_without_trunc(all_value_counts(data))
+print_without_trunc(low_cardinality_value_counts(data))
 ```
 
 ```python
-n_unique_matches(data)
+print_without_trunc(filter_columns_by_cardinality(data))
+```
+
+```python
+print_without_trunc(scan_anomalies(data))
+```
+
+```python
+print_without_trunc(data.null_count())
+print_without_trunc(data.filter(pl.col(settings.col_target).is_null()))
+print(data.filter(pl.col(settings.col_target).is_null()).select(settings.col_id))
+```
+
+## Limpieza inicial
+
+```python
+print(data.shape)
+data = data.filter(pl.col(settings.col_target).is_not_null())
+print(data.shape)
+```
+
+```python
+print_without_trunc(scan_anomalies(data))
+```
+
+```python
+data = data.with_columns(
+    pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date(),
+    pl.col(settings.col_id).cast(pl.Int64)
+)
 ```
 
 ## Obtener meses relevantes
 
 ```python
-data = data.with_columns(
-    pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date()
+training_months, prediction_months = get_date_windows(
+    data, "Month", prediction_window_size=2
 )
+
+last_training_month = training_months[-1]
+first_prediction_month = prediction_months[0]
+
+print("training_months:", training_months)
+print("prediction_months:", prediction_months)
+print("last_training_month:", last_training_month)
+print("first_prediction_month:", first_prediction_month)
 ```
 
+## Definir Universo y Target
+
 ```python
-last_month = pl.col("Month").max()
-
-data_dates = data.select(
-    ultimo_mes_entrenamiento=last_month.dt.offset_by("-3mo"),
-    primer_mes_prediccion=last_month.dt.offset_by("-1mo"),
-    meses_entrenamiento=pl.date_range(
-        last_month.dt.offset_by("-8mo"), last_month.dt.offset_by("-3mo"), interval="1mo"
-    ).implode(),
-    meses_prediccion=pl.date_range(
-        last_month.dt.offset_by("-1mo"), last_month, interval="1mo"
-    ).implode(),
-)
-
-ultimo_mes_entrenamiento = data_dates["ultimo_mes_entrenamiento"][0]
-primer_mes_prediccion = data_dates["primer_mes_prediccion"][0]
-meses_entrenamiento = data_dates["meses_entrenamiento"][0].to_list()
-meses_prediccion = data_dates["meses_prediccion"][0].to_list()
-
-print("meses_entrenamiento:", meses_entrenamiento)
-print("meses_prediccion:", meses_prediccion)
-print("ultimo_mes_entrenamiento:", ultimo_mes_entrenamiento)
-print("primer_mes_prediccion:", primer_mes_prediccion)
+month_count_by_client = data.group_by(settings.col_id).len(name="month_count")
+print(month_count_by_client['month_count'].value_counts())
 ```
 
-# Definir Universo y Target
+Mantengo los clientes que:
+- tienen 9 meses de historia
+- no tienen 'Package_Active' y 'CreditCard_CoBranding' en el ultimo mes de la ventana de entrenamiento
 
 ```python
-cant_meses_x_cliente = data.group_by(settings.col_id).len(name="cant_meses")
-print(
-    "cant_meses_x_cliente['cant_meses']:",
-    cant_meses_x_cliente["cant_meses"].value_counts(),
+universe = (
+    data.group_by(settings.col_id)
+    .agg(
+        month_count=pl.len(),
+        is_valid_client=(
+            (pl.col("Month") == last_training_month)
+            & (pl.col("Package_Active") == "No")
+            & (pl.col("CreditCard_CoBranding") == "No")
+        ).any(),
+    )
+    .filter((pl.col("month_count") == 9) & pl.col("is_valid_client"))
+    .select(settings.col_id)
 )
-print("\n")
 
-# filtro clientes que tengan menos de 9 meses de historia
-clientes_validos_1 = cant_meses_x_cliente.filter(pl.col("cant_meses") == 9).select(
-    settings.col_id
-)
-print("clientes_validos_1:", clientes_validos_1.shape)
-print("\n")
-
-# filtro clientes con 'Package_Active' y 'CreditCard_CoBranding'
-# en el ultimo mes de la ventana de entrenamiento
-clientes_validos_2 = data.filter(
-    (pl.col("Package_Active") == "No")
-    & (pl.col("CreditCard_CoBranding") == "No")
-    & (pl.col("Month") == ultimo_mes_entrenamiento)
-).select(settings.col_id)
-print("clientes_validos_2:", clientes_validos_2.shape)
-print("\n")
-
-# universo
-universo = clientes_validos_1.join(clientes_validos_2, on=settings.col_id, how="inner")
-print("universo:", universo.shape)
-print("\n")
-
-# Ventana de Prediccion
-tgt = (
-    data.filter(pl.col("Month").is_in(meses_prediccion))
+universe_with_pred_target = (
+    data.filter(pl.col("Month").is_in(prediction_months))
     .select([settings.col_id, settings.col_target])
     .unique()
+    .join(
+        universe,
+        on=settings.col_id,
+        how="semi",
+    )
 )
-print("tgt['Target']:", tgt[settings.col_target].value_counts())
-print("\n")
 
-universo_con_target = universo.join(tgt, on=settings.col_id, how="left")
-print(
-    "universo_con_target['Target']:",
-    universo_con_target[settings.col_target].value_counts(),
+training_data = data.filter(pl.col("Month").is_in(training_months)).join(
+    universe, on=settings.col_id, how="semi"
 )
-print("universo_con_target:", universo_con_target.shape)
-print("\n")
 
-# Ventana de Entrenamiento
-print("data['client_id']:", data[settings.col_id].n_unique())
-print("\n")
-
-data_entrenamiento = data.filter(pl.col("Month").is_in(meses_entrenamiento)).join(
-    universo_con_target.select(settings.col_id), on=settings.col_id, how="inner"
-)
-print(
-    "data_entrenamiento['client_id']:", data_entrenamiento[settings.col_id].n_unique()
-)
-print("\n")
-print("data_entrenamiento['Month']:", data_entrenamiento["Month"].value_counts())
+print(f"universe.shape: {universe.shape} \n")
+print(f"universe_with_pred_target.shape: {universe_with_pred_target.shape} \n")
+print(f"training_data.shape: {training_data.shape} \n")
+print(f"training_data['Month'].value_counts(): {training_data['Month'].value_counts()}")
 ```
 
 ```python
-data_entrenamiento = data_entrenamiento.with_columns(
-    pl.col(settings.col_id).cast(pl.Int64)
-)
-universo_con_target = universo_con_target.with_columns(
-    pl.col(settings.col_id).cast(pl.Int64)
-)
+scan_anomalies(training_data)
 ```
 
-```python
-scan_anomalies(data_entrenamiento)
-```
-
-## Balancear a 50%/50% aprox (oversampling) <- a modo de ejemplo, esto despues no lo uso
-
-```python
-print(data_entrenamiento[settings.col_target].value_counts())
-print(data_entrenamiento.shape)
-
-minoria = data_entrenamiento.filter(pl.col(settings.col_target) == 1)
-minoria_2 = minoria.clone()
-id_maximo: int = data_entrenamiento.select(settings.col_id).max()[0, settings.col_id]
-ids_nuevos = range(id_maximo + 1, id_maximo + 1 + minoria.height)
-
-print("\n")
-print(minoria_2[settings.col_id])
-minoria_2 = minoria_2.with_columns(pl.Series(settings.col_id, ids_nuevos))
-
-print("\n")
-print(id_maximo)
-print(ids_nuevos)
-print("\n")
-print(minoria_2[settings.col_id])
-
-data_entrenamiento_b = pl.concat([data_entrenamiento, minoria_2], how="vertical")
-print("\n")
-print(data_entrenamiento_b[settings.col_target].value_counts())
-print(data_entrenamiento_b.shape)
-```
-
-# EDA (Exploratory Data Analysis)
-
-
+# Feature Engineering
 ## Valores Nulos
 
 ```python
-print(data_entrenamiento["SavingAccount_Balance_Average"].value_counts())
-print("\n")
-print(data_entrenamiento["Region"].value_counts())
-print("\n")
-print(data_entrenamiento["CreditCard_Product"].value_counts())
+null_cols = ["SavingAccount_Balance_Average", "Region", "CreditCard_Product"]
+print(f"{training_data.select(null_cols).describe()} \n")
+print(
+    f"SavingAccount_Balance_Average n_unique: "
+    f"{training_data.select('SavingAccount_Balance_Average').n_unique()} \n"
+)
 ```
 
-```python
-scan_anomalies(data_entrenamiento)
-```
+### Completando 'SavingAccount_Balance_Average'
+Primero se analizan registros con nulos en SavingAccount_Balance_Average y valores monetarios de SavingAccount sin nulos:
 
 ```python
-# analizando valores monetarios de SavingAccount
 saving_account_cols = [
     "SavingAccount_Balance_Average",
     "SavingAccount_Balance_FirstDate",
@@ -280,26 +239,20 @@ saving_account_cols = [
     "SavingAccount_Debits_Amounts",
 ]
 
-# registros con nulos en SavingAccount_Balance_Average
-data_entrenamiento.select([settings.col_id, *saving_account_cols]).filter(
+training_data.select([settings.col_id, *saving_account_cols]).filter(
     pl.col("SavingAccount_Balance_Average").is_null()
 )
 ```
 
 ```python
-filter_nonzero(data_entrenamiento, saving_account_cols)
+filter_nonzero(training_data, saving_account_cols)
 ```
 
-# Feature Engineering
-
-
-## Completando 'SavingAccount_Balance_Average'
-
-Saco el promedio entre "SavingAccount_Balance_FirstDate" y "SavingAccount_Balance_LastDate".
+Luego saco el promedio entre "SavingAccount_Balance_FirstDate" y "SavingAccount_Balance_LastDate".
 Este no es el calculo correcto para "SavingAccount_Balance_Average", pero no va a afectar tanto al modelo porque son solo 4 registros con nulos ademas de que no hay una forma sencilla de calcular el "SavingAccount_Balance_Average" con los datos que tenemos
 
 ```python
-data_entrenamiento = data_entrenamiento.with_columns(
+training_data = training_data.with_columns(
     pl.col("SavingAccount_Balance_Average").fill_null(
         (
             pl.col("SavingAccount_Balance_FirstDate")
@@ -308,109 +261,101 @@ data_entrenamiento = data_entrenamiento.with_columns(
         / 2.0
     )
 )
+
+print(f"{training_data.select('SavingAccount_Balance_Average').describe()} \n")
 ```
 
-## Completando 'Region'
+```python
+training_data.shape
+```
+
+### Completando 'Region'
+Traigo las regiones de  los clientes desde la ventana de prediccion y pongo la Region mas comun para llenar los nulos restantes
 
 ```python
-regiones_x_cliente = (
-    data.filter(pl.col("Month") == primer_mes_prediccion)
+clients_region = (
+    data.filter(pl.col("Month").is_in(prediction_months))
     .select([settings.col_id, "Region"])
-    .with_columns(pl.col(settings.col_id).cast(pl.Int64))
-)
-print(
-    "columnas con nulos en regiones_x_cliente:",
-    [
-        col
-        for col in regiones_x_cliente.columns
-        if regiones_x_cliente[col].null_count() > 0
-    ],
-)
-print("cantidad de nulos en Region:", regiones_x_cliente["Region"].null_count())
-
-regiones_x_cliente = regiones_x_cliente.with_columns(
-    pl.col("Region").fill_null("BUENOS AIRES")  # pongo la Region mas comun
-)
-print(
-    "columnas con nulos en regiones_x_cliente:",
-    [
-        col
-        for col in regiones_x_cliente.columns
-        if regiones_x_cliente[col].null_count() > 0
-    ],
+    .unique()
+    .join(universe, on=settings.col_id, how="semi")
 )
 
-data_entrenamiento = data_entrenamiento.drop("Region").join(
-    regiones_x_cliente, on=settings.col_id, how="left"
+training_data = training_data.drop("Region").join(
+    clients_region.with_columns(pl.col("Region").fill_null("BUENOS AIRES")),
+    on=settings.col_id,
+    how="left",
 )
-```
 
-## Completando 'CreditCard_Product'
-
-```python
-producto_x_cliente = (
-    data.filter(pl.col("Month") == primer_mes_prediccion)
-    .select([settings.col_id, "CreditCard_Product"])
-    .with_columns(pl.col(settings.col_id).cast(pl.Int64))
-)
-print(producto_x_cliente.shape)
-print("\n")
-print(producto_x_cliente["CreditCard_Product"].value_counts())
+print(f"{data.select('Region').describe()} \n")
+print(f"{clients_region.describe()} \n")
+print(f"{clients_region.shape} \n")
+print(f"{clients_region['Region'].value_counts(sort=True)} \n")
+print(f"{training_data['Region'].value_counts(sort=True)} \n")
+print(f"{training_data.select('Region').describe()} \n")
 ```
 
 ```python
-data_entrenamiento = data_entrenamiento.drop("CreditCard_Product").join(
-    producto_x_cliente, on=settings.col_id, how="left"
+training_data.shape
+```
+
+### Completando 'CreditCard_Product'
+
+Traigo los CreditCard_Product de la ventana de prediccion. 
+
+Hay algunos clientes que tienen un CreditCard_Product en el primer mes de prediccion y otro CreditCard_Product en el segundo mes de prediccion
+
+Por lo tanto se obtiene el valor del primer mes (prediction_months[0]) y, si este es null o no existe, toma el valor del segundo mes (prediction_months[1]) como fallback, incluso si también es null
+
+Luego para llenar los nulos restantes, pongo la CreditCard_Product mas comun cuando el cliente no tiene `CreditCard_Active` en la ventana de prediccion pero si tiene `CreditCard_Active` en la ventana de entrenamiento. en los demas casos lleno los nulls con "0" (cuando no tiene `CreditCard_Active` en la ventana de prediccion ni en la ventana de entrenamiento o cuando no tiene `CreditCard_Active` en la ventana de entrenamiento, por mas que lo tenga en la ventana de prediccion)
+
+```python
+clients_creditcard_product = (
+    data.filter(pl.col("Month").is_in(prediction_months))
+    .join(universe, on=settings.col_id, how="semi")
+    .sort(pl.col("Month") == prediction_months[0], descending=True)
+    .group_by(settings.col_id)
+    .agg(pl.col("CreditCard_Product").drop_nulls().first())
 )
 
-print("\n")
-print(data_entrenamiento["CreditCard_Product"].value_counts())
-
-vc_cc = data_entrenamiento["CreditCard_Product"].value_counts()
-val1 = int(vc_cc.filter(pl.col("CreditCard_Product") == "J55660104XX012")["count"][0])
-
-data_entrenamiento = data_entrenamiento.with_columns(
-    # pongo la mas comun cuando no tiene producto en el futuro
-    # pero si tiene producto activo en el pasado
-    pl.when(
-        pl.col("CreditCard_Product").is_null() & (pl.col("CreditCard_Active") == "Yes")
+training_data = (
+    training_data.drop("CreditCard_Product")
+    .join(
+        clients_creditcard_product,
+        on=settings.col_id,
+        how="left",
     )
-    .then(pl.lit("J55660104XX012"))
-    # pongo 0 cuando no tiene producto en el futuro ni en el pasado
-    # o cuando no tiene producto en el pasado, por mas que lo tenga en el futuro
-    .when(
-        pl.col("CreditCard_Product").is_null() | (pl.col("CreditCard_Active") == "No")
+    .with_columns(
+        pl.when(
+            pl.col("CreditCard_Product").is_null()
+            & (pl.col("CreditCard_Active") == "Yes")
+        )
+        .then(pl.col("CreditCard_Product").fill_null("J55660104XX012"))
+        .otherwise(pl.col("CreditCard_Product").fill_null("0"))
+        .alias("CreditCard_Product")
     )
-    .then(pl.lit("0"))
-    .otherwise(pl.col("CreditCard_Product"))
-    .alias("CreditCard_Product")
 )
 
-print("\n")
-print(data_entrenamiento["CreditCard_Product"].value_counts())
-
-vc_cc = data_entrenamiento["CreditCard_Product"].value_counts()
-val2 = int(vc_cc.filter(pl.col("CreditCard_Product") == "J55660104XX012")["count"][0])
+print(f"{data.select('CreditCard_Product').describe()} \n")
+print(f"{clients_creditcard_product.describe()} \n")
+print(f"{clients_creditcard_product['CreditCard_Product'].value_counts(sort=True)} \n")
+print(f"{training_data['CreditCard_Product'].value_counts(sort=True)} \n")
+print(f"{training_data.select('CreditCard_Product').describe()} \n")
 ```
 
 ```python
-print(
-    "cantidad de clientes que no tienen producto en el futuro",
-    "pero si tienen producto activo en el pasado:",
-    val2 - val1,
-)
+scan_anomalies(training_data)
 ```
 
 ```python
-scan_anomalies(data_entrenamiento)
+training_data.shape
 ```
 
-# Identity Features
+## Identity Features
 
 ```python
-diccionario = {"Yes": 1, "No": 0, "M": 1, "F": 0}
+binary_dict: dict[str, int] = {"Yes": 1, "No": 0, "M": 1, "F": 0}
 
-columnas_if_binarias = [
+binary_identity_features_columns = [
     "CreditCard_Premium",
     "CreditCard_Active",
     "CreditCard_CoBranding",
@@ -433,98 +378,104 @@ columnas_if_binarias = [
     "Email",
 ]
 
-print(data_entrenamiento["CreditCard_Premium"].value_counts())
-print(data_entrenamiento["Sex"].value_counts())
-
-data_entrenamiento = data_entrenamiento.with_columns(
-    [
-        pl.col(c).replace_strict(diccionario, default=None).cast(pl.Int64)
-        for c in columnas_if_binarias
-    ]
-)
-
-print("\n")
-print(data_entrenamiento["CreditCard_Premium"].value_counts())
-print(data_entrenamiento["Sex"].value_counts())
-
-columnas_if = [
+identity_features_columns = [
     settings.col_id,
     "Client_Age_grp",
     "Region",
     "CreditCard_Product",
     "First_product_dt",
     "Last_product_dt",
-    *columnas_if_binarias,
+    *binary_identity_features_columns,
 ]
-print("\n")
-print(columnas_if)
 
-data_if = data_entrenamiento.filter(pl.col("Month") == ultimo_mes_entrenamiento).select(
-    columnas_if
-)
-```
-
-# Variables Categoricas
-
-```python
-data_if = data_if.join(universo_con_target, on=settings.col_id, how="inner")
-
-print_without_trunc(all_value_counts(data_if))
-
-data_if = target_encode_columns(
-    data_if, ["Client_Age_grp", "Region", "CreditCard_Product"]
+training_data = training_data.with_columns(
+    pl.col(binary_identity_features_columns).replace_strict(binary_dict).cast(pl.UInt8)
 )
 
-print_without_trunc(all_value_counts(data_if))
+identity_features = training_data.filter(pl.col("Month") == last_training_month).select(
+    identity_features_columns
+)
+
+print(identity_features.shape)
+print(identity_features["CreditCard_Premium"].value_counts())
+print(f"{identity_features["Sex"].value_counts()} \n")
 ```
 
-# Fechas
+```python
+identity_features.schema
+```
 
 ```python
-ultimo_mes_plus_1m = pl.lit(ultimo_mes_entrenamiento).dt.offset_by("1mo")
+identity_features.describe()
+```
 
-data_if = data_if.with_columns(
+## Variables Categoricas
+
+```python
+identity_features = identity_features.join(
+    universe_with_pred_target, on=settings.col_id, how="inner"
+)
+
+categorical_cols = ["Client_Age_grp", "Region", "CreditCard_Product"]
+
+print_without_trunc(
+    low_cardinality_value_counts(identity_features.select(categorical_cols))
+)
+
+identity_features = target_encode_columns(identity_features, categorical_cols)
+
+print_without_trunc(
+    low_cardinality_value_counts(identity_features.select(categorical_cols))
+)
+
+print(f"identity_features: {identity_features.shape}")
+print(f"training_data: {training_data.shape}")
+training_data = training_data.drop(categorical_cols)
+print(f"training_data: {training_data.shape}")
+```
+
+## Fechas
+
+```python
+identity_features = identity_features.with_columns(
     [
         (pl.col("Last_product_dt") - pl.col("First_product_dt"))
         .dt.total_days()
         .alias("Days_between_first_and_last_product"),
-        (ultimo_mes_plus_1m - pl.col("Last_product_dt"))
+        (pl.lit(last_training_month).dt.offset_by("1mo") - pl.col("Last_product_dt"))
         .dt.total_days()
         .alias("Recency_in_days"),
     ]
 ).drop(["First_product_dt", "Last_product_dt"])
 
-print("\n")
-print(data_if["Days_between_first_and_last_product"].value_counts())
-
-print("\n")
-print(data_if["Recency_in_days"].value_counts())
-
-print("\n")
-print("data_if:", data_if.shape)
+print(f"identity_features: {identity_features.shape} \n")
+print(
+    f"{
+        identity_features.select(
+            'Days_between_first_and_last_product', 'Recency_in_days'
+        ).describe()
+    }"
+)
 ```
 
 ```python
-data_if.describe()
+identity_features.describe()
 ```
 
-# Transform features
+## Transform features
+### Analizando valores minimos y ceros
 
 ```python
-# analizando valores minimos y ceros
-mins_in_range(data_entrenamiento, -1, 1)
-```
-
-```python
-print_without_trunc(columns_with_zeros(data_entrenamiento))
+mins_in_range(training_data, -1, 1)
 ```
 
 ```python
-data_entrenamiento = data_entrenamiento.sort([settings.col_id, "Month"])
+print_without_trunc(columns_with_zeros(training_data))
 ```
 
+### Analizando valores monetarios de CreditCard
+
 ```python
-# analizando valores monetarios de CreditCard
 credit_card_cols = [
     "CreditCard_Balance_ARG",
     "CreditCard_Balance_DOLLAR",
@@ -537,13 +488,15 @@ credit_card_cols = [
     "CreditCard_Revolving",
 ]
 
-filter_nonzero(data_entrenamiento, credit_card_cols)
+filter_nonzero(training_data, credit_card_cols)
 ```
 
-```python
-print(data_entrenamiento.shape)
+### Generando transformaciones
 
-data_entrenamiento = data_entrenamiento.with_columns(
+```python
+print(f"training_data antes de generar transformadas: {training_data.shape}")
+
+training_data = training_data.with_columns(
     [
         # OPERATION
         (
@@ -725,7 +678,7 @@ data_entrenamiento = data_entrenamiento.with_columns(
     ]
 )
 
-data_entrenamiento = data_entrenamiento.with_columns(
+training_data = training_data.with_columns(
     [
         # OPERATION
         compute_percentage("Operations_remote", "Operations_total").alias(
@@ -895,18 +848,27 @@ data_entrenamiento = data_entrenamiento.with_columns(
         ).alias("Quantity_Most_Common_Active_Product"),
     ]
 )
+print(f"training_data despues de generar transformadas: {training_data.shape}")
 ```
 
 ```python
-print(data_entrenamiento.shape)
+training_data.describe()
 ```
 
 ```python
-data_entrenamiento.describe()
+print_without_trunc(scan_anomalies(training_data))
 ```
 
 ```python
-data_entrenamiento.select(
+training_data.schema
+```
+
+```python
+training_data.select(pl.col(pl.String))
+```
+
+```python
+training_data.select(
     [
         settings.col_id,
         "SavingAccount_Transactions_Transactions",
@@ -928,17 +890,23 @@ greater_than_one_hundred_columns = [
 ]
 
 count_row_matches(
-    data_entrenamiento,
+    training_data,
     columns=greater_than_one_hundred_columns,
     threshold=100,
     condition=">",
 )
 ```
 
-# Aggregate Features
+## Aggregate Features
+
+Antes de la agregacion se ordenan los registros de cada cliente por mes para que luego funcionen "first" y "last" correctamente
+
+diff_rel (Diferencia relativa): (último / primero)
+
+pct_var (Variación porcentual): 1 - diferencia relativa
 
 ```python
-columnas_con_valores_monetarios = [
+columns_with_monetary_values = [
     "SavingAccount_Balance_FirstDate",
     "SavingAccount_Balance_LastDate",
     "SavingAccount_Balance_Average",
@@ -963,146 +931,95 @@ columnas_con_valores_monetarios = [
     "CreditCard_Revolving",
 ]
 
-columnas_con_cantidades = [
-    x
-    for x in data_entrenamiento.columns
-    if x
-    not in [
-        *columnas_con_valores_monetarios,
-        *data_if.columns,
+columns_with_quantities = [
+    c
+    for c in training_data.columns
+    if c
+    not in {
+        *columns_with_monetary_values,
+        *identity_features.columns,
         "Month",
         "First_product_dt",
         "Last_product_dt",
         settings.col_id,
         settings.col_target,
-    ]
+    }
 ]
 
-# ordenar los registros de cada cliente por mes
-# para que luego funcionen "first" y "last" correctamente
-data_entrenamiento = data_entrenamiento.sort([settings.col_id, "Month"])
+cols = pl.col([*columns_with_quantities, *columns_with_monetary_values])
 
-agg_exprs = []
+agg_exprs = [
+    cols.min().name.suffix("_min"),
+    cols.max().name.suffix("_max"),
+    cols.mean().name.suffix("_mean"),
+    cols.median().name.suffix("_median"),
+    cols.sum().name.suffix("_sum"),
+    (cols != 0).sum().name.suffix("_count_nonzero"),
+    cols.var().name.suffix("_var"),
+    cols.std().name.suffix("_std"),
+    pl.col(columns_with_quantities).n_unique().name.suffix("_nunique"),
+    (pl.col(columns_with_monetary_values) / 1000.0)
+    .round()
+    .n_unique()
+    .name.suffix("_rounded_nunique"),
+    (cols.max() - cols.min()).name.suffix("_ptp"),
+    (cols.last() - cols.first()).name.suffix("_diff"),
+    compute_percentage(cols.last(), cols.first()).name.suffix("_diff_rel"),
+    (compute_percentage(cols.last(), cols.first()) - 100.0).name.suffix("_pct_var"),
+]
 
-for col in columnas_con_cantidades:
-    agg_exprs.extend(
-        [
-            pl.col(col).min().alias(f"{col}_min"),
-            pl.col(col).max().alias(f"{col}_max"),
-            pl.col(col).mean().alias(f"{col}_mean"),
-            pl.col(col).median().alias(f"{col}_median"),
-            pl.col(col).sum().alias(f"{col}_sum"),
-            (pl.col(col) != 0).sum().alias(f"{col}_count_nonzero"),
-            pl.col(col).var().alias(f"{col}_var"),
-            pl.col(col).std().alias(f"{col}_std"),
-            pl.col(col).n_unique().alias(f"{col}_nunique"),
-            pl.col(col).first().alias(f"{col}_first"),
-            pl.col(col).last().alias(f"{col}_last"),
-        ]
-    )
+data_agg = (
+    training_data.sort([settings.col_id, "Month"])
+    .group_by(settings.col_id)
+    .agg(agg_exprs)
+)
 
-for col in columnas_con_valores_monetarios:
-    agg_exprs.extend(
-        [
-            pl.col(col).min().alias(f"{col}_min"),
-            pl.col(col).max().alias(f"{col}_max"),
-            pl.col(col).mean().alias(f"{col}_mean"),
-            pl.col(col).median().alias(f"{col}_median"),
-            pl.col(col).sum().alias(f"{col}_sum"),
-            (pl.col(col) != 0).sum().alias(f"{col}_count_nonzero"),
-            pl.col(col).var().alias(f"{col}_var"),
-            pl.col(col).std().alias(f"{col}_std"),
-            (pl.col(col) / 1000.0).round().n_unique().alias(f"{col}_rounded_nunique"),
-            pl.col(col).first().alias(f"{col}_first"),
-            pl.col(col).last().alias(f"{col}_last"),
-        ]
-    )
-
-data_agg = data_entrenamiento.group_by(settings.col_id).agg(agg_exprs)
+print(data_agg.shape)
 ```
 
 ```python
-# VECTORIZACIÓN MATRICIAL
-
-cols_base = [*columnas_con_cantidades, *columnas_con_valores_monetarios]
-
-derived_exprs = []
-for col in cols_base:
-    c_max = pl.col(f"{col}_max")
-    c_min = pl.col(f"{col}_min")
-    s_first = f"{col}_first"
-    s_last = f"{col}_last"
-    c_first = pl.col(s_first)
-    c_last = pl.col(s_last)
-
-    derived_exprs.extend(
-        [
-            (c_max - c_min).alias(f"{col}_ptp"),
-            (c_last - c_first).alias(f"{col}_diff"),
-            # Diferencia relativa: (último / primero)
-            compute_percentage(s_last, s_first).alias(f"{col}_diff_rel"),
-            # Variación porcentual: 1 - diferencia relativa
-            (compute_percentage(s_last, s_first) - 100.0).alias(
-                f"{col}_variacion_porc"
-            ),
-        ]
-    )
-
-data_agg = data_agg.with_columns(derived_exprs).drop(
-    *[f"{c}_first" for c in cols_base], *[f"{c}_last" for c in cols_base]
-)
+scan_anomalies(data_agg)
 ```
 
 ```python
 # TODO: SACAR ESTA CELDA SI PODES:
+# Esto restaura el orden original de las columnas del DataFrame
+# para que la matriz de correlación funcione igual
 # sin esto la matriz de correlaciones saca las variables que necesito
 # para sacar esto tendria que agregar manualmente las variables que necesito,
 # o usar otras variables (correlacionadas)
 
-# Restaurar el orden original de las columnas
-orden_original = []
-
-for col in columnas_con_cantidades:
-    for f in [
-        "min",
-        "max",
-        "mean",
-        "median",
-        "sum",
-        "count_nonzero",
-        "var",
-        "std",
-        "nunique",
-    ]:
-        orden_original.append(f"{col}_{f}")
-
-for col in columnas_con_valores_monetarios:
-    for f in ["min", "max", "mean", "median", "sum", "count_nonzero", "var", "std"]:
-        orden_original.append(f"{col}_{f}")
-
-for col in columnas_con_valores_monetarios:
-    orden_original.append(f"{col}_rounded_nunique")
-
-# Agregar las derivadas al final
-cols_derivadas = [
-    c
-    for c in data_agg.columns
-    if c.endswith(("_ptp", "_diff", "_diff_rel", "_variacion_porc"))
+"""
+original_order = [
+    *(
+        f"{col}_{f}"
+        for col in [*columns_with_quantities, *columns_with_monetary_values]
+        for f in ["var", "std"]
+    ),
+    *(f"{col}_nunique" for col in columns_with_quantities),
+    *(f"{col}_rounded_nunique" for col in columns_with_monetary_values),
 ]
 
-# Reordenar el DataFrame para que la matriz de correlación funcione igual
-data_agg = data_agg.select([settings.col_id, *orden_original, *cols_derivadas])
+data_agg = data_agg.select(
+    settings.col_id,
+    pl.col("^.*(_min|_max|_mean|_median|_sum|_count_nonzero)$"),
+    *original_order,
+    pl.col("^.*(_ptp|_diff|_diff_rel|_pct_var)$"),
+)
 
 print(data_agg.shape)
+data_agg.describe()
+"""
 ```
 
 # ABT
 
 ```python
-ABT = data_if.join(data_agg, on=settings.col_id, how="inner")
+ABT = identity_features.join(data_agg, on=settings.col_id, how="inner")
 ```
 
 ```python
+print(ABT.shape)
 scan_anomalies(ABT)
 ```
 
@@ -1122,7 +1039,7 @@ ABT = ABT.with_columns(
         + (pl.col("Operations_in_person_porc_max") > 0).cast(pl.Float64)
         + (pl.col("CreditCard_Payment_Aut_Debit_max") > 0).cast(pl.Float64)
         + (pl.col("CreditCard_Payment_TAS_max") > 0).cast(pl.Float64)
-    ).alias("SUMATORIA_USOS"),
+    ).alias("SUM_OF_USES"),
     min_max_normalize_weighted(
         "SavingAccount_CreditCard_Payment_Amount_max", "Operations_total_count_nonzero"
     ).alias("Amount_operations"),
@@ -1144,424 +1061,232 @@ ABT = ABT.with_columns(
         "CreditCard_Total_Limit_diff_rel", "CreditCard_Payment_total_max"
     ).alias("Limit_payment"),
 )
+print(ABT.shape)
 ```
 
 ```python
-print(ABT["SUMATORIA_USOS"].null_count())
-print(ABT["Amount_operations"].null_count())
-print(ABT["Amount_transactions"].null_count())
-print(ABT["Amount_payment"].null_count())
-print(ABT["Limit_operations"].null_count())
-print(ABT["Limit_transactions"].null_count())
-print(ABT["Limit_payment"].null_count())
-```
-
-```python
+print(ABT.select(pl.col(pl.String)))
 scan_anomalies(ABT)
 ```
 
 ```python
-num_cols_abt = [
-    c
-    for c, dt in ABT.schema.items()
-    if dt.is_numeric() and c not in (settings.col_id, settings.col_target)
-]
-ABT_sin_client_id = ABT.select(num_cols_abt)
-print(ABT_sin_client_id.shape)
+print_without_trunc(mins_in_range(ABT, -1, 1))
 ```
 
-```python
-print(mins_in_range(ABT, -1, 1))
-```
-
-# Reduccion de dimensionalidad
-
-
-## Elimino columnas con valores unicos
+## Reduccion de dimensionalidad
+### Elimino columnas con valores unicos
 
 ```python
-num_cols = [
-    c
-    for c, dt in ABT.schema.items()
-    if dt.is_numeric() and c not in [settings.col_id, settings.col_target]
-]
-min_max_checks = ABT.select(
-    [(pl.col(c).min() == pl.col(c).max()).alias(c) for c in num_cols]
-)
-constant_cols = [c for c in num_cols if min_max_checks[c].item()]
-print(constant_cols)
-print("\n")
+constant_cols = get_constant_columns(ABT)
+reduced_ABT = ABT.drop(constant_cols)
+
+print(f"{constant_cols} \n")
 print("ABT original: ", ABT.shape)
-ABT_reducida = ABT.drop(constant_cols)
-print("ABT sin columnas con valores unicos: ", ABT_reducida.shape)
+print("ABT sin columnas con valores unicos: ", reduced_ABT.shape)
 ```
 
-## Elimino columnas binarias con baja representatividad
+### Elimino columnas binarias con baja representatividad
 
 ```python
-cols_binarias = [
-    col for col in ABT_reducida.columns if ABT_reducida[col].n_unique() == 2
-]
-cols_binarias.remove(settings.col_target)
-print(cols_binarias)
-print("\n")
+imbalanced_binary_columns = get_imbalanced_binary_columns(reduced_ABT)
 
-pocos_representativos = []
+print_without_trunc(
+    low_cardinality_value_counts(reduced_ABT.select(imbalanced_binary_columns))
+)
 
-for x in cols_binarias:
-    poco_representativo = ABT_reducida[x].value_counts(normalize=True)["proportion"]
-    if (poco_representativo < 0.10).any():
-        pocos_representativos.append(x)
-
-for x in pocos_representativos:
-    print(ABT_reducida[x].value_counts(normalize=True))
-    print("\n")
-
-ABT_reducida = ABT_reducida.drop(pocos_representativos)
-print("ABT sin columnas binarias poco representativas:", ABT_reducida.shape)
+reduced_ABT = reduced_ABT.drop(imbalanced_binary_columns)
+print("ABT sin columnas binarias poco representativas:", reduced_ABT.shape)
 ```
 
-## Elimino columnas correlacionadas entre si
+### Elimino columnas correlacionadas entre si
 
 ```python
-# busco columnas correlacionadas con "CreditCard_Product"
-target_col = "CreditCard_Product"
-exclude_cols = [settings.col_id, settings.col_target, target_col]
+correlated_ABT = reduced_ABT.clone()
+ABT_Correlation_analyzer = CorrelationAnalyzer(correlated_ABT)
 
-feature_cols = [c for c in ABT_reducida.columns if c not in exclude_cols]
+to_delete = ABT_Correlation_analyzer.get_redundant_correlated_columns(threshold=0.80)
+uncorrelated_ABT = correlated_ABT.drop(to_delete)
 
-# Calcular la correlación de Pearson de cada columna contra "CreditCard_Product"
-correlaciones = ABT_reducida.select(
-    [pl.corr(col, target_col).alias(col) for col in feature_cols]
-)
-
-# Reorganizar a formato largo (feature, correlacion) y ordenar por valor absoluto
-corr_df = (
-    correlaciones.unpivot(variable_name="feature", value_name="correlacion")
-    .with_columns(corr_abs=pl.col("correlacion").abs())
-    .sort("corr_abs", descending=True)
-)
-
-correlacionadas_80 = corr_df.filter(pl.col("corr_abs") > 0.80)
-cols_a_borrar_80 = correlacionadas_80["feature"].to_list()
-
-print(f"Columnas con correlación > 80% con {target_col}:", len(cols_a_borrar_80))
-print(correlacionadas_80)
+print(f"columnas con correlacion mayor a 80%: {len(to_delete)}")
+print("ABT sin columnas con correlacion mayor a 80%:", uncorrelated_ABT.shape)
 ```
+
+## Estandarizacion (z-score) con Polars
 
 ```python
-features_df = ABT_reducida.drop(
-    [settings.col_id, settings.col_target, "CreditCard_Product"]
-)
-cols = features_df.columns
-
-matriz_corr_df = features_df.corr()
-
-# Convertir solo la matriz de correlación a NumPy y tomar valor absoluto
-matriz_corr_np = np.abs(matriz_corr_df.to_numpy())
-
-# Aplicar el triángulo superior (k=1 elimina la diagonal)
-m = matriz_corr_np.shape[0]
-upper_mask = np.triu(np.ones((m, m), dtype=bool), k=1)
-triangulo_superior = np.where(upper_mask, matriz_corr_np, np.nan)
-
-# Máximo valor por columna (correlación máxima con cualquier columna anterior)
-maximos_por_columna = np.nanmax(triangulo_superior, axis=0)
-
-a_borrar_1 = [cols[i] for i in range(m) if maximos_por_columna[i] > 0.70]
-a_borrar_2 = [cols[i] for i in range(m) if maximos_por_columna[i] > 0.80]
-a_borrar_3 = [cols[i] for i in range(m) if maximos_por_columna[i] > 0.90]
-
-print(f"columnas con correlacion mayor a 70%: {len(a_borrar_1)}")
-print(f"columnas con correlacion mayor a 80%: {len(a_borrar_2)}")
-print(f"columnas con correlacion mayor a 90%: {len(a_borrar_3)}")
-
-ABT_reducida_2 = ABT_reducida.drop(a_borrar_2)
-print("ABT sin columnas con correlacion mayor a 80%:", ABT_reducida_2.shape)
+standardized_ABT = standardize(uncorrelated_ABT)
+print(scan_anomalies(standardized_ABT))
+standardized_ABT.describe()
 ```
 
-## Estandarizacion con z-score
-
-```python
-from sklearn.preprocessing import StandardScaler
-
-columnas_sin_client_id_ni_target = [
-    x
-    for x in ABT_reducida_2.columns
-    if (x != settings.col_id) & (x != settings.col_target)
-]
-scaler = StandardScaler(copy=True)
-scaler.fit(ABT_reducida_2.select(columnas_sin_client_id_ni_target))
-datos_estandarizados = scaler.transform(
-    ABT_reducida_2.select(columnas_sin_client_id_ni_target)
-)
-datos_estandarizados = pl.DataFrame(
-    datos_estandarizados, schema=columnas_sin_client_id_ni_target, orient="row"
-)
-
-ABT_estandarizado = ABT_reducida_2.drop(columnas_sin_client_id_ni_target)
-ABT_estandarizado = pl.concat(
-    [ABT_estandarizado, datos_estandarizados], how="horizontal"
-)
-```
-
-```python
-scan_anomalies(ABT_estandarizado)
-```
-
-### Model training
-
-```python
-columns_by_source = group_columns_by_source(ABT_estandarizado)
-columnas_saving_account_days_transactions = columns_by_source[
-    "saving_account_days_transactions"
-]
-columnas_saving_account_monetarios = columns_by_source["saving_account_monetary"]
-columnas_operation = columns_by_source["operations"]
-columnas_credit_card_payment = columns_by_source["credit_card_payment"]
-columnas_credit_card_monetarios = columns_by_source["credit_card_monetary"]
-columnas_otros = columns_by_source["others"]
-
-print(
-    "columnas_saving_account_days_transactions:",
-    len(columnas_saving_account_days_transactions),
-)
-print("columnas_saving_account_monetarios:", len(columnas_saving_account_monetarios))
-print("columnas_operation:", len(columnas_operation))
-print("columnas_credit_card_payment:", len(columnas_credit_card_payment))
-print("columnas_credit_card_monetarios:", len(columnas_credit_card_monetarios))
-print("columnas_otros:", len(columnas_otros))
-print(
-    "total deberia ser igual a",
-    len(ABT_estandarizado.columns),
-    "- 2:",
-    len(columnas_saving_account_days_transactions)
-    + len(columnas_saving_account_monetarios)
-    + len(columnas_operation)
-    + len(columnas_credit_card_payment)
-    + len(columnas_credit_card_monetarios)
-    + len(columnas_otros),
-)
-print("\n")
-print(columnas_otros)
-```
+# Analizando variables
 
 ## Ordeno las variables por fuente segun importancia usando lightGBM para quedarme con las mas importantes
 
-```python
-X_train, X_test = stratified_train_test_split(ABT_estandarizado)
-```
+- primero entreno con todas las variables, para tener roc de referencia:
+- luego entreno con cada grupo por separado
+- luego entreno con los mejores de cada grupo al mismo tiempo
 
 ```python
-# todas las variables, para tener roc de referencia
-todas_las_columnas = [
-    *columnas_saving_account_days_transactions,
-    *columnas_saving_account_monetarios,
-    *columnas_operation,
-    *columnas_credit_card_payment,
-    *columnas_credit_card_monetarios,
-    *columnas_otros,
+all_cols = [
+    col
+    for col in standardized_ABT.columns
+    if col not in {settings.col_id, settings.col_target}
 ]
 
-searcher_0, variables_mas_importantes_0 = get_feature_importances(
-    X_train, todas_las_columnas
+columns_by_source = group_columns_by_source(all_cols)
+
+print(
+    f"cols_saving_account_days_transactions: "
+    f"{len(columns_by_source['saving_account_days_transactions'])} \n"
+    f"cols_saving_account_monetary: {len(columns_by_source['saving_account_monetary'])} \n"
+    f"cols_operations: {len(columns_by_source['operations'])} \n"
+    f"cols_credit_card_payment: {len(columns_by_source['credit_card_payment'])} \n"
+    f"cols_credit_card_monetary: {len(columns_by_source['credit_card_monetary'])} \n"
+    f"cols_others: {len(columns_by_source['others'])}"
 )
-print_roc(searcher_0)
-searcher_0
+columns_by_source["others"]
 ```
 
 ```python
-# SAVING ACCOUNT DAYS TRANSACTIONS
-searcher_1, variables_mas_importantes_1 = get_feature_importances(
-    X_train, columnas_saving_account_days_transactions
+X_train, X_test = stratified_train_test_split(standardized_ABT)
+```
+
+```python
+all_cols_searcher, all_cols_importances = get_feature_importances(
+    X_train,
+    all_cols,
 )
-print_roc(searcher_1)
-searcher_1
+all_cols_searcher
 ```
 
 ```python
-# SAVING ACCOUNT MONETARIOS
-searcher_2, variables_mas_importantes_2 = get_feature_importances(
-    X_train, columnas_saving_account_monetarios
+(
+    cols_saving_account_days_transactions_searcher,
+    cols_saving_account_days_transactions_importances,
+) = get_feature_importances(
+    X_train, columns_by_source["saving_account_days_transactions"]
 )
-print_roc(searcher_2)
-searcher_2
+cols_saving_account_days_transactions_searcher
 ```
 
 ```python
-# OPERATION
-searcher_3, variables_mas_importantes_3 = get_feature_importances(
-    X_train, columnas_operation
+cols_saving_account_monetary_searcher, cols_saving_account_monetary_importances = (
+    get_feature_importances(X_train, columns_by_source["saving_account_monetary"])
 )
-print_roc(searcher_3)
-searcher_3
+cols_saving_account_monetary_searcher
 ```
 
 ```python
-# CREDIT CARD PAYMENT
-searcher_4, variables_mas_importantes_4 = get_feature_importances(
-    X_train, columnas_credit_card_payment
+cols_operations_searcher, cols_operations_importances = get_feature_importances(
+    X_train, columns_by_source["operations"]
 )
-print_roc(searcher_4)
-searcher_4
+cols_operations_searcher
 ```
 
 ```python
-# CREDIT CARD MONETARIOS
-searcher_5, variables_mas_importantes_5 = get_feature_importances(
-    X_train, columnas_credit_card_monetarios
+cols_credit_card_payment_searcher, cols_credit_card_payment_importances = (
+    get_feature_importances(X_train, columns_by_source["credit_card_payment"])
 )
-print_roc(searcher_5)
-searcher_5
+
+cols_credit_card_payment_searcher
 ```
 
 ```python
-# OTROS
-searcher_6, variables_mas_importantes_6 = get_feature_importances(
-    X_train, columnas_otros
+cols_credit_card_monetary_searcher, cols_credit_card_monetary_importances = (
+    get_feature_importances(X_train, columns_by_source["credit_card_monetary"])
 )
-print_roc(searcher_6)
-searcher_6
+
+cols_credit_card_monetary_searcher
 ```
 
 ```python
-plot_top_features(variables_mas_importantes_0, "most_important_variables_0", 60)
-```
-
-![most_important_variables_0](images/most_important_variables_0.svg)
-
-```python
-variables_mas_importantes_0.head(100)
+cols_others_searcher, cols_others_importances = get_feature_importances(
+    X_train, columns_by_source["others"]
+)
+cols_others_searcher
 ```
 
 ```python
-plot_top_features(variables_mas_importantes_1, "most_important_variables_1", 40)
+plot_top_features(all_cols_importances, "all_cols_importances", all_cols_searcher)
+plot_top_features(
+    cols_saving_account_days_transactions_importances,
+    "cols_saving_account_days_transactions_importances",
+    cols_saving_account_days_transactions_searcher,
+)
+plot_top_features(
+    cols_saving_account_monetary_importances,
+    "cols_saving_account_monetary_importances",
+    cols_saving_account_monetary_searcher,
+    30,
+)
+plot_top_features(
+    cols_operations_importances, "cols_operations_importances", cols_operations_searcher
+)
+plot_top_features(
+    cols_credit_card_payment_importances,
+    "cols_credit_card_payment_importances",
+    cols_credit_card_payment_searcher,
+)
+plot_top_features(
+    cols_credit_card_monetary_importances,
+    "cols_credit_card_monetary_importances",
+    cols_credit_card_monetary_searcher,
+)
+plot_top_features(
+    cols_others_importances, "cols_others_importances", cols_others_searcher
+)
 ```
 
-![most_important_variables_1](images/most_important_variables_1.svg)
+![all_cols_importances](images/plot_top_features/all_cols_importances.svg)
+
+
+![cols_saving_account_days_transactions_importances](images/plot_top_features/cols_saving_account_days_transactions_importances.svg)
+
+
+![cols_saving_account_monetary_importances](images/plot_top_features/cols_saving_account_monetary_importances.svg)
+
+
+![cols_operations_importances](images/plot_top_features/cols_operations_importances.svg)
+
+
+![cols_credit_card_payment_importances](images/plot_top_features/cols_credit_card_payment_importances.svg)
+
+
+![cols_credit_card_monetary_importances](images/plot_top_features/cols_credit_card_monetary_importances.svg)
+
+
+![cols_others_importances](images/plot_top_features/cols_others_importances.svg)
 
 ```python
-variables_mas_importantes_1.head(20)
-```
-
-```python
-plot_top_features(variables_mas_importantes_2, "most_important_variables_2", 60)
-```
-
-![most_important_variables_2](images/most_important_variables_2.svg)
-
-```python
-variables_mas_importantes_2.head(20)
-```
-
-```python
-plot_top_features(variables_mas_importantes_3, "most_important_variables_3", 40)
-```
-
-![most_important_variables_3](images/most_important_variables_3.svg)
-
-```python
-variables_mas_importantes_3.head(20)
-```
-
-```python
-plot_top_features(variables_mas_importantes_4, "most_important_variables_4", 25)
-```
-
-![most_important_variables_4](images/most_important_variables_4.svg)
-
-```python
-variables_mas_importantes_4.head(20)
-```
-
-```python
-plot_top_features(variables_mas_importantes_5, "most_important_variables_5", 60)
-```
-
-![most_important_variables_5](images/most_important_variables_5.svg)
-
-```python
-variables_mas_importantes_5.head(20)
-```
-
-```python
-plot_top_features(variables_mas_importantes_6, "most_important_variables_6", 40)
-```
-
-![most_important_variables_6](images/most_important_variables_6.svg)
-
-```python
-variables_mas_importantes_6.head(20)
-```
-
-# Analisis Bivariado
-
-```python
-columnas_a_graficar = [
-    "SavingAccount_Days_with_use_count_nonzero",
-    "SavingAccount_Transfer_In_Transactions_count_nonzero",
-    "SavingAccount_Transfer_In_Transactions_max",
-    "SavingAccount_Days_with_use_min",
-    "SavingAccount_Days_with_Credits_porc_var",
-    "SavingAccount_CreditCard_Payment_Transactions_max",
-    "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",
-
-    "SavingAccount_Balance_FirstDate_max",
-    "SavingAccount_CreditCard_Payment_Amount_max",
-    "SavingAccount_Transfer_In_Amount_max",
-    "SavingAccount_Total_Amount_min",
-    "SavingAccount_Total_Amount_diff",
-    "SavingAccount_Balance_LastDate_diff_rel",
-
-    "Operations_total_count_nonzero",
-    "Operations_total_min",
-    "Operations_total_var",
-    "Operations_Telemarketer_porc_max",
-    "Operations_in_person_porc_min",
-    "Operations_in_person_porc_max",
-
-    "CreditCard_Payment_total_max",
-    "CreditCard_Payment_Aut_Debit_max",
-    "CreditCard_Payment_total_min",
-    "CreditCard_Payment_TAS_max",
-    "CreditCard_Payment_Cash_max",
-    "CreditCard_Payment_Web_max",
-    "CreditCard_Payment_Aut_Debit_min",
-    "CreditCard_Payment_Aut_Debit_diff",
-    "CreditCard_Payment_ATM_max",
-    "CreditCard_Payment_in_person_porc_diff_rel",
-
-    "CreditCard_Payment_in_person_max",
-
-    "CreditCard_Total_Limit_var",
-    "CreditCard_Total_Limit_diff_rel",
-    "CreditCard_Balance_ARG_SP_porc_max",
-    "CreditCard_Total_Limit_min",
-    "CreditCard_Revolving_min",
-    "CreditCard_Total_Spending_diff_rel",
-    "CreditCard_Spending_Aut_Debits_diff_rel",
-
-    "CreditCard_Product",
-    "Recency_in_days",
-    "Days_between_first_and_last_product",
-    "Client_Age_grp",
-    "Quantity_Active_Products_min",
-    "Quantity_Active_Products_nunique",
-    "SavingAccount_Active_ARG_Salary",
-    "Sex",
-    "SavingAccount_Active_DOLLAR",
-    "Region",
-    "Quantity_Active_Products_var",
-    "Investment_Numbers_max",
-    "Email",
-
-    "Quantity_Common_Active_Product_count_nonzero",
+most_important_features = [
+    *cols_saving_account_days_transactions_importances.head(1)
+    .get_column("Feature")
+    .to_list(),
+    *cols_saving_account_monetary_importances.head(1).get_column("Feature").to_list(),
+    *cols_operations_importances.head(1).get_column("Feature").to_list(),
+    *cols_credit_card_payment_importances.head(1).get_column("Feature").to_list(),
+    *cols_credit_card_monetary_importances.head(2).get_column("Feature").to_list(),
+    *cols_others_importances.head(3).get_column("Feature").to_list(),
 ]
 
-generate_bivariate_charts(
-    ABT_reducida, # dataset con variables sin standarizar
-    columnas_a_graficar,
-    "analysis"
+most_important_features_searcher, most_important_features_importances = (
+    get_feature_importances(X_train, most_important_features)
+)
+plot_top_features(
+    most_important_features_importances, "most_important_features", most_important_features_searcher
+)
+most_important_features_searcher
+```
+
+![most_important_features](images/plot_top_features/most_important_features.svg)
+
+
+## Analisis Bivariado
+
+```python
+tables_analysis = generate_bivariate_charts(
+    correlated_ABT, most_important_features, "analysis"
 )
 ```
 
@@ -1624,9 +1349,9 @@ generate_bivariate_charts(
 
 ![Quantity_Common_Active_Product_count_nonzero](images/analysis/Quantity_Common_Active_Product_count_nonzero.svg)
 
-![Target](images/analysis/Target.svg)
 
 ```python
+"""
 graf = [
     "CreditCard_Payment_total_var",
 
@@ -1658,6 +1383,7 @@ generate_bivariate_charts(
     graf,
     "analysis_2"
 )
+"""
 ```
 
 ![CreditCard_Payment_total_var](images/analysis_2/CreditCard_Payment_total_var.svg)
@@ -1684,13 +1410,12 @@ generate_bivariate_charts(
 ![Quantity_Active_Products_min](images/analysis_2/Quantity_Active_Products_min.svg)
 ![Recency_in_days](images/analysis_2/Recency_in_days.svg)
 
-![Target](images/analysis_2/Target.svg)
 
-
-## Re-entreno con las mejores variables
+### Re-entreno con las mejores variables
 
 ```python
-prueba = [
+"""
+to_test = [
     "SavingAccount_Days_with_use_count_nonzero",
     "SavingAccount_Transfer_In_Transactions_count_nonzero",
     "SavingAccount_Transfer_In_Transactions_max",
@@ -1721,27 +1446,22 @@ prueba = [
     "CreditCard_Payment_in_person_max"
 ]
 
-searcher_7, variables_mas_importantes_7 = get_feature_importances(
-    X_train, prueba
+searcher_7, most_important_variables_7 = get_feature_importances(
+    X_train, to_test
 )
-print_roc(searcher_7)
+plot_top_features(most_important_variables_7, "most_important_variables_7", searcher_7)
 searcher_7
-```
-
-```python
-plot_top_features(variables_mas_importantes_7, "most_important_variables_7", 25)
+"""
 ```
 
 ![most_important_variables_7](images/most_important_variables_7.svg)
 
-```python
-variables_mas_importantes_7.head(25)
-```
 
-## Re-entreno con las mejores variables
+### Re-entreno con las mejores variables
 
 ```python
-prueba_2 = [
+"""
+to_test_2 = [
     "SavingAccount_Days_with_use_count_nonzero",
     "SavingAccount_Days_with_use_min",
     "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",
@@ -1763,134 +1483,118 @@ prueba_2 = [
     "Quantity_Active_Products_min",
 ]
 
-searcher_8, variables_mas_importantes_8 = get_feature_importances(
-    X_train, prueba_2
+searcher_8, most_important_variables_8 = get_feature_importances(
+    X_train, to_test_2
 )
-print_roc(searcher_8)
+plot_top_features(most_important_variables_8, "most_important_variables_8", searcher_8)
 searcher_8
-```
-
-```python
-plot_top_features(variables_mas_importantes_8, "most_important_variables_8", 25)
+"""
 ```
 
 ![most_important_variables_8](images/most_important_variables_8.svg)
 
+
+### Buscando variables correlacionadas eliminadas anteriormente
+Para poder intercambiar las variables mas importantes por variables mas faciles de interpretar, si es que existen.
+
 ```python
-variables_mas_importantes_8.head(25)
+most_important_features_2 = (
+    most_important_features_importances.head(5).get_column("Feature").to_list()
+)
+
+for x in most_important_features_2:
+    print(f"\n Columnas correlacionadas con {x}:")
+    print_without_trunc(ABT_Correlation_analyzer.get_correlations_for(x))
 ```
 
-## Buscando variables correlacionadas eliminadas anteriormente
-
 ```python
-# si estan correlacionadas se pueden intercambiar sin problemas
-# la idea es agarrar variables faciles de explicar a gente no tecnica
-
-for x in [
-    "SavingAccount_CreditCard_Payment_Amount_max",
-    "Operations_total_count_nonzero",
-    "CreditCard_Total_Limit_diff_rel",
-    # "CreditCard_Product",
-    "Days_between_first_and_last_product",
-    "Client_Age_grp",
-    "Quantity_Active_Products_min",
-]:
-    idx = cols.index(x)
-    vals = triangulo_superior[idx]
-    correlated = [cols[i] for i in range(len(cols)) if (vals[i] > 0.50) and (i != idx)]
-    print("Columnas correlacionadas con", x, ":")
-    print(correlated)
-    print("\n")
-```
-
-## Re-entreno con las mejores variables
-
-```python
-prueba_3 = [
-    # "SavingAccount_CreditCard_Payment_Amount_max",
-    # "CreditCard_Total_Limit_diff_rel",
-    # "Days_between_first_and_last_product",
-    # "Quantity_Active_Products_min"
-    "Operations_total_count_nonzero",
-    "CreditCard_Product",
-    "Client_Age_grp",
+most_important_features_correlated = [
+    "Operations_total_mean",
+    "Operations_total_median",
+    "CreditCard_Active",
+    "CreditCard_Balance_ARG_SP_porc_std",
+    "CreditCard_Balance_ARG_SP_porc_mean",
+    "Quantity_Active_Products_median",
+    "Quantity_Active_Products_mean",
 ]
 
-searcher_9, variables_mas_importantes_9 = get_feature_importances(X_train, prueba_3)
-print_roc(searcher_9)
-searcher_9
-```
-
-```python
-plot_top_features(variables_mas_importantes_9, "most_important_variables_9", 25)
-```
-
-![most_important_variables_9](images/most_important_variables_9.svg)
-
-```python
-variables_mas_importantes_9.head(25)
-```
-
-# Transformando mejores variables segun analisis bivariado y LightGBM
-
-```python
-ABT_reducida_3 = ABT_reducida.clone()
-```
-
-```python
-# transformo variables agregando porcentaje de target a cada variable y agrupo valores.
-# y agrupo variables categoricas (ya las transforme anteriormente)
-# hice los calculos en un excel
-
-# CreditCard_Product
-# junto los tipos de tarjetas de bajo porcentaje de target y
-# los tipos de tarjetas poco representativas en un solo bin
-ABT_reducida_3 = ABT_reducida_3.with_columns(
-    binning_by_ranges(
-        "CreditCard_Product",
-        ranges=[
-            (36.890, 36.950),
-            (45.680, 45.690),
-        ],  # tipo tarjeta 202 y 104 respectivamente
-        values=[36.940, 45.686],
-        default=9.005,
-    ).alias("CreditCard_Product_t")
+tables_analysis_2 = generate_bivariate_charts(
+    correlated_ABT, most_important_features_correlated, "analysis_2"
 )
-# default -> agrupo totas las demas tarjetas (sin tarjeta de credito + 102 + 123 + 124 + 702 + 1002)
-print(ABT_reducida_3["CreditCard_Product_t"].value_counts())
-print("\n")
+```
 
-# Client_Age_grp
-ABT_reducida_3 = ABT_reducida_3.with_columns(
-    binning_by_ranges(
+![Operations_total_mean](images/analysis_2/Operations_total_mean.svg)
+![Operations_total_median](images/analysis_2/Operations_total_median.svg)
+![CreditCard_Active](images/analysis_2/CreditCard_Active.svg)
+![CreditCard_Balance_ARG_SP_porc_std](images/analysis_2/CreditCard_Balance_ARG_SP_porc_std.svg)
+![CreditCard_Balance_ARG_SP_porc_mean](images/analysis_2/CreditCard_Balance_ARG_SP_porc_mean.svg)
+![Quantity_Active_Products_median](images/analysis_2/Quantity_Active_Products_median.svg)
+![Quantity_Active_Products_mean](images/analysis_2/Quantity_Active_Products_mean.svg)
+
+
+### Transformando mejores variables segun analisis bivariado y LightGBM
+
+Transformo variables agregandoles el porcentaje de target y agrupo los valores.
+A las variables categoricas solo las agrupo (ya las transforme anteriormente)
+
+variables a modificar:
+- Client_Age_grp
+    - agrupo "Entre 50 y 59 años" + "Entre 60 y 64 años" + "Entre 65 y 69 años" (final: "Entre 50 y 69 años")
+    - default -> junto totas las demas edades ("Entre 18 y 29 años" + "Entre 30 y 39 años" + "Entre 40 y 49 años" + "Mayor a 70 años")
+- Operations_total_mean
+- Operations_total_median
+- CreditCard_Product
+    - mantengo tipo tarjeta 202 y 104 separados
+    - default ->  junto los demas tipos de tarjetas de bajo porcentaje de target y los tipos de tarjetas poco representativas en un solo bin (sin tarjeta de credito + 102 + 123 + 124 + 702 + 1002)
+- CreditCard_Active (no hace falta transformar)
+- Quantity_Active_Products_min
+
+```python
+final_ABT = correlated_ABT.clone()
+```
+
+```python
+final_ABT = final_ABT.with_columns(
+    group_bins_by_ranges(
         "Client_Age_grp",
-        # agrupo "Entre 50 y 59 años" + "Entre 60 y 64 años" +
-        # "Entre 65 y 69 años" (final: "Entre 50 y 69 años")
-        ranges=[(34.880, 39.772)],
-        values=[36.224],
-        default=25.093,
-    ).alias("Client_Age_grp_t")
+        ranges=[(4, 5), (6, 7)],
+        table=tables_analysis["Client_Age_grp"],
+    ).alias("Client_Age_grp_t"),
+    group_bins_by_ranges(
+        "Operations_total_mean",
+        ranges=[(2, 4), (5, 6), (7, 8), (9, 10), (11, 12), (13, 14), (15, 16)],
+        table=tables_analysis_2["Operations_total_mean"],
+    ).alias("Operations_total_mean_t"),
+    group_bins_by_ranges(
+        "Operations_total_median",
+        ranges=[(2, 4), (5, 7), (8, 9), (10, 11)],
+        table=tables_analysis_2["Operations_total_median"],
+    ).alias("Operations_total_median_t"),
+    group_bins_by_ranges(
+        "CreditCard_Product",
+        ranges=[(5, 5), (7, 7)],
+        table=tables_analysis["CreditCard_Product"],
+    ).alias("CreditCard_Product_t"),
+    group_bins_by_ranges(
+        "Quantity_Active_Products_min",
+        ranges=[(1, 4), (6, 9)],
+        table=tables_analysis["Quantity_Active_Products_min"],
+    ).alias("Quantity_Active_Products_min_t"),
 )
-# default -> totas las demas edades
-# ("Entre 18 y 29 años" + "Entre 30 y 39 años" + "Entre 40 y 49 años" + "Mayor a 70 años")
-print(ABT_reducida_3["Client_Age_grp_t"].value_counts())
-print("\n")
 
-# Operations_total_count_nonzero
-ABT_reducida_3 = ABT_reducida_3.with_columns(
-    binning_by_ranges(
-        "Operations_total_count_nonzero",
-        ranges=[(0, 0), (1, 3), (4, 5)],
-        values=[10.148, 18.896, 29.131],
-        default=47.939,
-    ).alias("Operations_total_count_nonzero_t")
-)
-print(ABT_reducida_3["Operations_total_count_nonzero_t"].value_counts())
-print("\n")
+scan_anomalies(final_ABT)
 
+# # Intento agrupar demas variables (calculado en excel)
 
-# # Region
-# ABT_reducida_3 = ABT_reducida_3.with_columns(binning_by_ranges(
+# final_ABT = final_ABT.with_columns(
+#     group_bins_by_ranges(
+#         "Operations_total_count_nonzero",
+#         ranges=[(1, 1), (2, 3), (4, 5), (6, 6)],
+#         table=tables_analysis_2["Operations_total_count_nonzero"],
+#     ).alias("Operations_total_count_nonzero_t")
+# )
+
+# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'Region',
 #     ranges=[(24.370, 24.375)],  # mantengo "REGION CENTRO"
 #     values=[24.372],
@@ -1899,194 +1603,162 @@ print("\n")
 # # default -> totas las demas regiones
 # # (NORTE GRANDE ARGENTINO + CUYO + CABA Centro/Norte + AMBA Resto + BUENOS AIRES
 # # + REGION PATAGONICA)
-# print(ABT_reducida_3['Region_t'].value_counts())
-# print("\n")
 
-# # Intento de agrupar demas variables (comentado, calculado en excel)
-# # Quantity_Active_Products_min
-# ABT_reducida_3 = ABT_reducida_3.with_columns(binning_by_ranges(
-#     'Quantity_Active_Products_min',
-#     ranges=[(0, 3), (5, 8)],
-#     values=[17.664, 61.729],
-#     default=40.000,
-# ).alias("Quantity_Active_Products_min_t"))
-# print(ABT_reducida_3['Quantity_Active_Products_min_t'].value_counts())
-# print("\n")
-
-# # Operations_in_person_max
-# ABT_reducida_3 = ABT_reducida_3.with_columns(binning_by_ranges(
+# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'Operations_in_person_max',
 #     ranges=[(1, 2), (3, 44)],
 #     values=[36.971, 54.786],
 #     default=17.000,
 # ).alias("Operations_in_person_max_t"))
-# print(ABT_reducida_3['Operations_in_person_max_t'].value_counts())
-# print("\n")
 
-# # Days_between_first_and_last_product
-# ABT_reducida_3 = ABT_reducida_3.with_columns(binning_by_ranges(
+# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'Days_between_first_and_last_product',
 #     ranges=[(0, 441), (442, 1142), (1143, 2130)],
 #     values=[21.764, 25.244, 33.003],
 #     default=48.858,
 # ).alias("Days_between_first_and_last_product_t"))
-# print(ABT_reducida_3['Days_between_first_and_last_product_t'].value_counts())
-# print("\n")
 
-# # Recencia_en_dias
-# ABT_reducida_3 = ABT_reducida_3.with_columns(binning_by_ranges(
+# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'Recency_in_days',
 #     ranges=[(1, 408), (409, 650)],
 #     values=[33.822, 29.220],
 #     default=23.845,
 # ).alias("Recency_in_days_t"))
-# print(ABT_reducida_3['Recency_in_days_t'].value_counts())
-# print("\n")
 
-# # CreditCard_Total_Spending_median
-# ABT_reducida_3 = ABT_reducida_3.with_columns(binning_by_ranges(
+# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'CreditCard_Total_Spending_median',
 #     ranges=[(0.5, 1979.9), (1980.2, 4078.7), (4079.0, 117452)],
 #     values=[33.866, 41.667, 46.154],
 #     default=9.000,
 # ).alias("CreditCard_Total_Spending_median_t"))
-# print(ABT_reducida_3['CreditCard_Total_Spending_median_t'].value_counts())
-# print("\n")
 
-# # SavingAccount_Balance_Average_median
-# ABT_reducida_3 = ABT_reducida_3.with_columns(binning_by_ranges(
+# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'SavingAccount_Balance_Average_median',
 #     ranges=[(163.3, 2823.9), (2824.0, 1515662.7)],
 #     values=[30.999, 50.143],
 #     default=22.243,
 # ).alias("SavingAccount_Balance_Average_median_t"))
-# print(ABT_reducida_3['SavingAccount_Balance_Average_median_t'].value_counts())
-# print("\n")
 
-# # SavingAccount_Transactions_Transactions_median
-# ABT_reducida_3 = ABT_reducida_3.with_columns(binning_by_ranges(
+# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'SavingAccount_Transactions_Transactions_median',
 #     ranges=[(0, 3), (3.5, 7)],
 #     values=[21.781, 31.686],
 #     default=54.346,
 # ).alias("SavingAccount_Transactions_Transactions_median_t"))
-# print(ABT_reducida_3['SavingAccount_Transactions_Transactions_median_t'].value_counts())
-# print("\n")
 
-# # SavingAccount_CreditCard_Payment_Amount_median
-# ABT_reducida_3 = ABT_reducida_3.with_columns(binning_by_ranges(
+# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'SavingAccount_CreditCard_Payment_Amount_median',
 #     ranges=[(0, 0)],
 #     values=[21.000],
 #     default=55.253,
 # ).alias("SavingAccount_CreditCard_Payment_Amount_median_t"))
-# print(ABT_reducida_3['SavingAccount_CreditCard_Payment_Amount_median_t'].value_counts())
-# print("\n")
 ```
 
 ```python
-mejores_variables = [
-    "CreditCard_Product_t",
+best_features = [
     "Client_Age_grp_t",
-    "Operations_total_count_nonzero_t",
+    "Operations_total_mean_t",
+    #"Operations_total_median_t",
+    "CreditCard_Product_t",
+    #"CreditCard_Active",  # sin modificar
+    "Quantity_Active_Products_min_t",
 ]
 
-generate_bivariate_charts(
-    ABT_reducida_3,  # dataset con variables sin standarizar
-    mejores_variables,
-    "analysis_t",
-)
+_ = generate_bivariate_charts(final_ABT, best_features, "analysis_t")
 ```
 
 ![CreditCard_Product_t](images/analysis_t/CreditCard_Product_t.svg)
 ![Client_Age_grp_t](images/analysis_t/Client_Age_grp_t.svg)
-![Operations_total_count_nonzero_t](images/analysis_t/Operations_total_count_nonzero_t.svg)
-![Target](images/analysis_t/Target.svg)
+![Operations_total_mean_t](images/analysis_t/Operations_total_mean_t.svg)
+![Quantity_Active_Products_min_t](images/analysis_t/Quantity_Active_Products_min_t.svg)
+
+
+## Comparar importancias de las mejores variables
 
 ```python
-scan_anomalies(ABT_reducida_3)
-```
-
-# Modelado
-
-
-## Vuelvo a correr con las mejores variables y mejores hiperparametros
-
-```python
-# dataframe con variables transformadadas segun analisis bivariado
-X_train_final, X_test_final = stratified_train_test_split(ABT_reducida_3)
+X_train_int, X_test_int = stratified_train_test_split(final_ABT)
 ```
 
 ```python
-buscador_mejores_hiperparametros, variables_mas_importantes = get_feature_importances(
-    X_train_final, mejores_variables, n_iter=20
+best_features_searcher, best_features_importances = get_feature_importances(
+    X_train_int, best_features
 )
-print_roc(buscador_mejores_hiperparametros)
-buscador_mejores_hiperparametros
+plot_top_features(best_features_importances, "best_features", best_features_searcher)
+best_features_searcher
+```
+
+![best_features](images/plot_top_features/best_features.svg)
+
+
+# Model Training
+
+
+## Balancear a 50%/50% aprox (oversampling) <- a modo de ejemplo, esto despues no lo uso
+
+```python
+# TODO: en teoria no deberia hacer esto sobre la ABT, deberia hacerlo sobre X_train
+
+max_id = data.select(pl.col(settings.col_id).max()).item()
+
+balanced_ABT = pl.concat(
+    [
+        final_ABT,
+        final_ABT.filter(pl.col(settings.col_target) == 1).with_columns(
+            (max_id + 1 + pl.int_range(0, pl.len())).alias(settings.col_id)
+        ),
+    ],
+    how="vertical",
+)
+
+print(f"max_id: {max_id} \n")
+
+print(f"{final_ABT.shape} \n")
+print(f"{balanced_ABT.shape} \n")
+
+print(f"{final_ABT[settings.col_target].value_counts()} \n")
+print(f"{balanced_ABT[settings.col_target].value_counts()} \n")
+```
+
+## Entreno con las mejores variables y mejores hiperparametros
+
+```python
+X_train_final, X_test_final = stratified_train_test_split(final_ABT)
 ```
 
 ```python
-plot_top_features(variables_mas_importantes, "most_important_variables", 20)
-```
+best_hyperparameters_searcher, best_importances = get_feature_importances(
+    X_train_final, best_features, n_iter=20
+)
 
-![most_important_variables](images/most_important_variables.svg)
-
-
-## Hiperparametros optimos
-
-```python
-buscador_mejores_hiperparametros.best_estimator_
-```
-
-```python
-dic = {
+renames_dict = {
+    "Client_Age_grp_t": "Age range",
+    "Operations_total_mean_t": "Average quantity of operations",
     "CreditCard_Product_t": "Credit Card Type",
-    "Client_Age_grp_t": "Between 50 and 69 years old",
-    "Operations_total_count_nonzero_t": "Number of months with at least one operation",
+    "Quantity_Active_Products_min_t": "Minimum quantity of active products",
 }
-
-variables_mas_importantes_renombradas = variables_mas_importantes.with_columns(
+best_importances_renamed = best_importances.with_columns(
     pl.col(settings.col_feature)
-    .replace_strict(dic, default=pl.col(settings.col_feature))
+    .replace_strict(renames_dict, default=pl.col(settings.col_feature))
     .alias(settings.col_feature)
 )
+plot_top_features(best_importances_renamed, "best_features_final", best_hyperparameters_searcher)
 
-plot_top_features(variables_mas_importantes_renombradas, "Final")
+best_hyperparameters_searcher
 ```
 
-![Final_top_features](images/plot_top_features/Final.svg)
+![best_features_final](images/plot_top_features/best_features_final.svg)
 
 
 # Performance del modelo
 
 ```python
-import lightgbm as lgb
-
-modelo_LightGBM_clasificador_final: lgb.LGBMClassifier = (
-    buscador_mejores_hiperparametros.best_estimator_
+y_pred, probabilities_train, probabilities_test = get_scoring(
+    best_hyperparameters_searcher, X_train_final, X_test_final, best_features
 )
 
-# Predice si es 0 o 1, si la probabilidad es > 0.5 lo pone como 1
-y_pred = modelo_LightGBM_clasificador_final.predict(
-    X_test_final.select(mejores_variables)
-)
-
-probabilities_train = modelo_LightGBM_clasificador_final.predict_proba(
-    X_train_final.select(mejores_variables)
-)
-probabilities_test = modelo_LightGBM_clasificador_final.predict_proba(
-    X_test_final.select(mejores_variables)
-)
-```
-
-```python
-print_train_deciles(compute_prediction_deciles(X_train_final, probabilities_train))
-```
-
-```python
 # Cotas fijas....
 # basado en los porcentajes de training
-cotas = [
+bins = [
     0.035669,
     0.054470,
     0.204116,
@@ -2098,14 +1770,14 @@ cotas = [
     0.548265,
 ]
 
-test_deciles = compute_prediction_deciles(X_test_final, probabilities_test, cotas)
+print_train_deciles(compute_prediction_deciles(X_train_final, probabilities_train))
 
-print_test_deciles(test_deciles, X_test_final, probabilities_test)
-```
+print_test_deciles(
+    compute_prediction_deciles(X_test_final, probabilities_test, bins),
+    X_test_final,
+    probabilities_test,
+)
 
-# ROC
-
-```python
 plot_roc_and_metrics(
     X_test_final[settings.col_target],
     probabilities_test,
@@ -2114,58 +1786,47 @@ plot_roc_and_metrics(
 )
 ```
 
+## ROC
+
+
 ![roc_lightgbm](images/plot_roc_and_metrics/lightgbm.svg)
 
 
-# Resultados del excel
+## Resultados del excel
 
-
-## Training
-
-
-- ordena casi todos los deciles bien
+### Training
+- ordena todos los deciles bien
 - deciles masomenos parejos
-- lift del primer decil = 2,1
-- KS = 43,1 en el 4to decil
+- lift del primer decil = 2,4
+- KS = 46,6 en el 4to decil
 
+### Testing
+- ~~ordena casi todos los deciles bien~~
+- ~~deciles masomenos parejos~~
+- lift del primer decil = 2
+- KS = 46,4 en el 4to decil
 
-## Testing
-
-
-- ordena casi todos los deciles bien
-- deciles masomenos parejos
-- lift del primer decil = 2,1
-- KS = 46,7 en el 4to decil 
-
-
-## Diferencias 
-
-
-- lift -> 0
-- KS -> 3,6
+### Diferencias
+- lift -> 0,4
+- KS -> 0,2
 
 
 # Verificando si el problema se puede resolver con una regresion logistica
 
 ```python
+"""
 from sklearn.linear_model import LogisticRegression
 
 modelo = LogisticRegression()
-modelo.fit(X_train_final.select(mejores_variables), X_train_final[settings.col_target])
+modelo.fit(X_train_final.select(best_features), X_train_final[settings.col_target])
 
-y_pred_log = modelo.predict(X_test_final.select(mejores_variables))
-probabilities_train_log = modelo.predict_proba(X_train_final.select(mejores_variables))
-probabilities_test_log = modelo.predict_proba(X_test_final.select(mejores_variables))
-```
+y_pred_log = modelo.predict(X_test_final.select(best_features))
+probabilities_train_log = modelo.predict_proba(X_train_final.select(best_features))
+probabilities_test_log = modelo.predict_proba(X_test_final.select(best_features))
 
-```python
-print_train_deciles(compute_prediction_deciles(X_train_final, probabilities_train_log))
-```
-
-```python
 # Cotas fijas....
 # basado en los porcentajes de training
-cotas = [
+bins = [
     0.051719,
     0.079377,
     0.170491,
@@ -2177,20 +1838,21 @@ cotas = [
     0.580742,
 ]
 
-test_deciles_log = compute_prediction_deciles(
-    X_test_final, probabilities_test_log, cotas
+print_train_deciles(compute_prediction_deciles(X_train_final, probabilities_train_log))
+
+print_test_deciles(
+    compute_prediction_deciles(X_test_final, probabilities_test_log, bins),
+    X_test_final,
+    probabilities_test_log,
 )
 
-print_test_deciles(test_deciles_log, X_test_final, probabilities_test_log)
-```
-
-```python
 plot_roc_and_metrics(
     X_test_final[settings.col_target],
     probabilities_test_log,
     y_pred_log,
     graphic_name="logistic_regression",
 )
+"""
 ```
 
 ![roc_logistic_regression](images/plot_roc_and_metrics/logistic_regression.svg)
