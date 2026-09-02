@@ -183,10 +183,6 @@ def compute_prediction_deciles(
     )
 
 
-def print_roc(searcher: RandomizedSearchCV):
-    print(f"\nBest score (ROC AUC): {searcher.best_score_:.6f}")
-
-
 def print_train_deciles(train_deciles: pl.DataFrame):
     """imprime metricas de los deciles del set de entrenamiento.
 
