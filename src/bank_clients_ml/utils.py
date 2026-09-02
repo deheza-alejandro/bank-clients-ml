@@ -108,7 +108,7 @@ def count_row_matches(
     )
 
 
-def n_unique_matches(
+def filter_columns_by_cardinality(
     df: pl.DataFrame, condition: ConditionSymbol = ">", threshold: int = 10
 ) -> pl.DataFrame:
     """Devuelve un DataFrame con las columnas con una cantidad de valores unicos
@@ -122,11 +122,11 @@ def n_unique_matches(
     )
 
 
-def all_value_counts(df: pl.DataFrame, max_n_unique: int = 10) -> pl.DataFrame:
+def low_cardinality_value_counts(df: pl.DataFrame, max_n_unique: int = 10) -> pl.DataFrame:
     """Calcula el value_counts de las columnas con una cantidad de valores únicos <= max_n_unique
     y devuelve un único DataFrame en formato largo (column, value, count).
     """
-    cols_to_keep = n_unique_matches(df, "<=", max_n_unique)["column"].to_list()
+    cols_to_keep = filter_columns_by_cardinality(df, "<=", max_n_unique)["column"].to_list()
 
     if not cols_to_keep:
         return pl.DataFrame(
