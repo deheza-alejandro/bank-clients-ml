@@ -190,6 +190,7 @@ def _save_fig_as_svg(
 def plot_top_features(
     variables_to_graph: pl.DataFrame,
     graphic_name: str,
+    searcher: RandomizedSearchCV | None = None,
     top_n: int = 20,
     images_dir: str = IMAGES_DIR,
     settings: Settings | None = None,
@@ -232,7 +233,11 @@ def plot_top_features(
     ax.set_facecolor("#f9f9f9")
     ax.grid(axis="x", linestyle="--", alpha=0.7)
 
-    ax.set_title(f"{graphic_name}: top {top_n} Features", fontsize=label_fontsize)
+    roc = ""
+    if searcher is not None:
+        roc = f"\nROC AUC: {searcher.best_score_:.6f}"
+
+    ax.set_title(f"{graphic_name}: top {top_n} Features" + roc, fontsize=label_fontsize)
 
     _save_fig_as_svg(fig, graphic_name, images_dir, "plot_top_features")
 
