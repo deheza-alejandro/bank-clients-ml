@@ -163,42 +163,34 @@ month_count_by_client = data.group_by(settings.col_id).len(name="month_count")
 print(month_count_by_client['month_count'].value_counts())
 ```
 
-Mantengo los clientes que:
+Mantengo en el universo los clientes que:
 - tienen 9 meses de historia
 - no tienen 'Package_Active' y 'CreditCard_CoBranding' en el ultimo mes de la ventana de entrenamiento
 
+y para cada cliente del universo mantengo la columna de target de la ventana de prediccion
+
 ```python
-universe = (
-    data.group_by(settings.col_id)
-    .agg(
-        month_count=pl.len(),
-        is_valid_client=(
-            (pl.col("Month") == last_training_month)
-            & (pl.col("Package_Active") == "No")
-            & (pl.col("CreditCard_CoBranding") == "No")
-        ).any(),
-    )
-    .filter((pl.col("month_count") == 9) & pl.col("is_valid_client"))
-    .select(settings.col_id)
+is_valid_client = (
+    (pl.col("Month") == last_training_month)
+    & (pl.col("Package_Active") == "No")
+    & (pl.col("CreditCard_CoBranding") == "No")
 )
 
-universe_with_pred_target = (
-    data.filter(pl.col("Month").is_in(prediction_months))
-    .select([settings.col_id, settings.col_target])
-    .unique()
-    .join(
-        universe,
-        on=settings.col_id,
-        how="semi",
+universe_and_target = (
+    data.filter(
+        (pl.len().over(settings.col_id) == 9)
+        & is_valid_client.any().over(settings.col_id)
+        & pl.col("Month").is_in(prediction_months)
     )
+    .select(settings.col_id, settings.col_target)
+    .unique()
 )
 
 training_data = data.filter(pl.col("Month").is_in(training_months)).join(
-    universe, on=settings.col_id, how="semi"
+    universe_and_target, on=settings.col_id, how="semi"
 )
 
-print(f"universe.shape: {universe.shape} \n")
-print(f"universe_with_pred_target.shape: {universe_with_pred_target.shape} \n")
+print(f"universe_and_target.shape: {universe_and_target.shape} \n")
 print(f"training_data.shape: {training_data.shape} \n")
 print(f"training_data['Month'].value_counts(): {training_data['Month'].value_counts()}")
 ```
@@ -277,7 +269,7 @@ clients_region = (
     data.filter(pl.col("Month").is_in(prediction_months))
     .select([settings.col_id, "Region"])
     .unique()
-    .join(universe, on=settings.col_id, how="semi")
+    .join(universe_and_target, on=settings.col_id, how="semi")
 )
 
 training_data = training_data.drop("Region").join(
@@ -311,7 +303,7 @@ Luego para llenar los nulos restantes, pongo la CreditCard_Product mas comun cua
 ```python
 clients_creditcard_product = (
     data.filter(pl.col("Month").is_in(prediction_months))
-    .join(universe, on=settings.col_id, how="semi")
+    .join(universe_and_target, on=settings.col_id, how="semi")
     .sort(pl.col("Month") == prediction_months[0], descending=True)
     .group_by(settings.col_id)
     .agg(pl.col("CreditCard_Product").drop_nulls().first())
@@ -413,7 +405,7 @@ identity_features.describe()
 
 ```python
 identity_features = identity_features.join(
-    universe_with_pred_target, on=settings.col_id, how="inner"
+    universe_and_target, on=settings.col_id, how="inner"
 )
 
 categorical_cols = ["Client_Age_grp", "Region", "CreditCard_Product"]
