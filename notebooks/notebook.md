@@ -36,7 +36,6 @@ from bank_clients_ml.features import (
     min_max_normalize,
     min_max_normalize_weighted,
     safe_denominator,
-    standardize,
     target_encode_columns,
 )
 from bank_clients_ml.graphs import (
@@ -1100,9 +1099,11 @@ print("ABT sin columnas con correlacion mayor a 80%:", uncorrelated_ABT.shape)
 ## Estandarizacion (z-score) con Polars
 
 ```python
+"""
 standardized_ABT = standardize(uncorrelated_ABT)
 print(scan_anomalies(standardized_ABT))
 standardized_ABT.describe()
+"""
 ```
 
 # Analizando variables
@@ -1116,7 +1117,7 @@ standardized_ABT.describe()
 ```python
 all_cols = [
     col
-    for col in standardized_ABT.columns
+    for col in uncorrelated_ABT.columns
     if col not in {settings.col_id, settings.col_target}
 ]
 
@@ -1135,7 +1136,7 @@ columns_by_source["others"]
 ```
 
 ```python
-X_train, X_test = stratified_train_test_split(standardized_ABT)
+X_train, X_test = stratified_train_test_split(uncorrelated_ABT)
 ```
 
 ```python
