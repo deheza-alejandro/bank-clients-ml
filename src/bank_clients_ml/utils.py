@@ -159,10 +159,6 @@ def filter_nonzero(
     if settings is None:
         settings = get_settings()
 
-    keep = (
-        [settings.col_id, *columns]
-        if settings.col_id in df.columns and settings.col_id not in columns
-        else columns
-    )
+    keep = [settings.col_id, *columns] if settings.col_id in df.columns else columns
 
     return df.filter(pl.all_horizontal(pl.col(columns) != 0)).select(keep)
