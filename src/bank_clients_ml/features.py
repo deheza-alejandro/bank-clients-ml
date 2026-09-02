@@ -34,7 +34,10 @@ def compute_percentage(numerator: str | pl.Expr, denominator: str | pl.Expr) -> 
     Returns:
         Expresión de Polars con el porcentaje calculado.
     """
-    return 100.0 * pl.col(numerator) / safe_denominator(denominator)
+    numerator_exp = (
+        pl.col(numerator) if isinstance(numerator, str) else numerator
+    )
+    return numerator_exp / safe_denominator(denominator) * 100.0
 
 
 def target_encode_columns(
