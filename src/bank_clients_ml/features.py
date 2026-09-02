@@ -1,10 +1,40 @@
+from datetime import date
+
+import numpy as np
 import polars as pl
-import polars.selectors as cs
 
 from bank_clients_ml.config import Settings, get_settings
 
 
+def get_date_windows(
+    df: pl.DataFrame, date_column: str, prediction_window_size: int
+) -> tuple[list[date], list[date]]:
+    """ el parametro prediction_window_size se usa para determinar que "offset_by(...)" usar.
+    si prediction_window_size es 2, se usa offset_by("-1mo") para el prediction_months,
+    si prediction_window_size es 3, se usa offset_by("-2mo") para el prediction_months, y asi.
 
+    la separacion entre la ventana de prediccion y entrenamiento (Lead Windows
+) es siempre de 1 mes
+    """
+    pred_offset = f"-{prediction_window_size - 1}mo"
+    train_offset = f"-{prediction_window_size + 1}mo"
+
+    last_month = pl.col(date_column).max()
+    first_month = pl.col(date_column).min()
+
+    windows = df.select(
+        prediction_months=pl.date_range(
+            last_month.dt.offset_by(pred_offset), last_month, interval="1mo"
+        ).implode(),
+        training_months=pl.date_range(
+            first_month, last_month.dt.offset_by(train_offset), interval="1mo"
+        ).implode(),
+    )
+
+    prediction_months = windows["prediction_months"][0].to_list()
+    training_months = windows["training_months"][0].to_list()
+
+    return training_months, prediction_months
 
 
 def safe_denominator(
@@ -76,20 +106,98 @@ def target_encode_columns(
     return df.with_columns(expressions)
 
 
-def group_columns_by_source(
-    df: pl.DataFrame, settings: Settings | None = None
-) -> dict[str, list[str]]:
+def get_constant_columns(df: pl.DataFrame) -> list[str]:
+    return _get_true_column_names(
+        df.select(pl.all().n_unique() == 1)
+    )
+
+
+def get_imbalanced_binary_columns(
+    df: pl.DataFrame,
+    threshold: float = 0.10,
+    settings: Settings | None = None,
+) -> list[str]:
+    if settings is None:
+        settings = get_settings()
+
+    c_threshold = 1.0 - threshold
+    is_binary = pl.all().n_unique() == 2
+    first_val_ratio = (pl.all() == pl.all().first()).mean()
+    is_imbalanced = (first_val_ratio < threshold) | (first_val_ratio > c_threshold)
+
+    return _get_true_column_names(
+        df.drop(settings.col_target).select(is_binary & is_imbalanced)
+    )
+
+
+def _get_true_column_names(df: pl.DataFrame) -> list[str]:
+    """Retorna los nombres de las columnas que contienen valores verdaderos"""
+    return df.unpivot().filter(pl.col("value")).get_column("variable").to_list()
+
+
+class CorrelationAnalyzer:
+    def __init__(self, df: pl.DataFrame, settings: Settings | None = None):
+        if settings is None:
+            settings = get_settings()
+
+        self.corr_df = df.drop(settings.col_id, settings.col_target).corr()
+        self.columns = self.corr_df.columns
+
+    def get_redundant_correlated_columns(self, threshold: float = 0.80) -> list[str]:
+        """Deja siempre la primera columna fuera de la lista.
+        Si N columnas están correlacionadas entre sí, devolverá N-1 en la lista.
+
+        El triángulo inferior y la diagonal quedan en 0.0,
+        lo que no afecta al max() ya que |r| >= 0"""
+        abs_corr_np = np.abs(self.corr_df.to_numpy())
+        upper_triangle = np.triu(abs_corr_np, k=1)
+
+        maximums_per_column = upper_triangle.max(axis=0)
+        correlated_columns = [
+            col
+            for col, max_val in zip(self.columns, maximums_per_column, strict=True)
+            if max_val > threshold
+        ]
+        return correlated_columns
+
+    def get_correlations_for(self, column: str, threshold: float = 0.80) -> pl.DataFrame:
+        return (
+            self.corr_df.select(
+                pl.Series("feature", self.columns),
+                pl.col(column).alias("correlation"),
+            )
+            .filter(
+                (pl.col("feature") != column) &
+                (pl.col("correlation").abs() > threshold)
+            )
+            .sort(pl.col("correlation").abs(), descending=True)
+        )
+
+
+def standardize(
+    df: pl.DataFrame, ddof: int = 0, settings: Settings | None = None
+) -> pl.DataFrame:
+    if settings is None:
+        settings = get_settings()
+
+    cols_to_standardize = pl.exclude(settings.col_id, settings.col_target)
+
+    standardized_ABT = df.with_columns(
+        (cols_to_standardize - cols_to_standardize.mean())
+        / cols_to_standardize.std(ddof=ddof)
+    )
+    return standardized_ABT
+
+
+def group_columns_by_source(columns: list[str]) -> dict[str, list[str]]:
     """Agrupa las columnas de un DataFrame de Polars según su fuente de negocio.
 
     Args:
-        df: DataFrame estandarizado.
+        columns: columnas de un DataFrame estandarizado.
 
     Returns:
         Diccionario con los grupos de columnas clasificados.
     """
-    if settings is None:
-        settings = get_settings()
-
     groups: dict[str, list[str]] = {
         "saving_account_days_transactions": [],
         "saving_account_monetary": [],
@@ -99,18 +207,14 @@ def group_columns_by_source(
         "others": [],
     }
 
-    CreditCard_excluded = {
+    credit_card_excluded = {
         "CreditCard_Premium",
         "CreditCard_Active",
         "CreditCard_CoBranding",
         "CreditCard_Product",
     }
-    ignored = {settings.col_id, settings.col_target}
 
-    for col in df.columns:
-        if col in ignored:
-            continue
-
+    for col in columns:
         if col.startswith("SavingAccount_Days_with_") or (
             col.startswith("SavingAccount_") and "Transactions" in col
         ):
@@ -123,10 +227,36 @@ def group_columns_by_source(
             groups["operations"].append(col)
         elif col.startswith("CreditCard_Payment_"):
             groups["credit_card_payment"].append(col)
-        elif col.startswith("CreditCard_") and col not in CreditCard_excluded:
+        elif col.startswith("CreditCard_") and col not in credit_card_excluded:
             groups["credit_card_monetary"].append(col)
         else:
             groups["others"].append(col)
+
+    all_grouped_cols = set().union(*groups.values())
+    expected_cols = set(columns)
+
+    missing = expected_cols - all_grouped_cols
+    extra = all_grouped_cols - expected_cols
+
+    if missing or extra:
+        msg = []
+        total_columns = len(columns)
+        total_grouped = sum(map(len, groups.values()))
+        if missing:
+            msg.append(
+                f"Columnas faltantes en los grupos (len = {len(missing)}): {missing} \n"
+            )
+        if extra:
+            msg.append(
+                f"Columnas extra/duplicadas en los grupos (len = {len(extra)}): {extra} \n"
+            )
+
+        raise ValueError(
+            f"La lista original (len = {total_columns}) "
+            f"no coincide con los grupos generados (len = {total_grouped}).\n"
+            f"Es probable que no estes teniendo en cuenta alguna columna "
+            f"y tengas que revisar esta funcion \n" + " | ".join(msg)
+        )
 
     return groups
 
@@ -161,31 +291,71 @@ def min_max_normalize_weighted(column: str, weight: str) -> pl.Expr:
     return min_max_normalize(column) * pl.col(weight)
 
 
-def binning_by_ranges(
+def group_bins_by_ranges(
     column: str,
-    ranges: list[tuple[float, float]],
-    values: list[float],
-    default: float,
+    ranges: list[tuple[int, int]],
+    table: pl.DataFrame,
+    settings: Settings | None = None,
 ) -> pl.Expr:
     """Construye una cadena de expresiones de Polars para agrupar
-    valores en bins definidos por rangos numéricos.
+    valores en bins definidos por rangos de Bins (bin_min, bin_max),
+    calculando dinámicamente los valores por rango y el valor por defecto desde la tabla resumen.
 
     Args:
-        column: Columna a agrupar.
-        ranges: Lista de tuplas con los límites de los rangos (low, high).
-        values: Lista de valores correspondientes a cada rango.
-        debe tener la misma longitud que ``ranges``.
-        default: Valor por defecto si una fila no cae en ningún rango.
+        column: Nombre de la columna a agrupar.
+        ranges: Lista de tuplas con los límites de los rangos (bin_min, bin_max).
+        table: DataFrame de Polars con las columnas 'Bin', 'Min', 'Max', 'Clients'
+        y 'settings.col_target'.
 
     Returns:
         pl.Expr: Expresión de Polars con el agrupamiento aplicado.
     """
-    expr_column = pl.col(column)
+    if settings is None:
+        settings = get_settings()
 
-    first_low, first_high = ranges[0]
-    expr = pl.when(expr_column.is_between(first_low, first_high)).then(values[0])
+    range_conds = [(pl.col("Bin") >= b_min) & (pl.col("Bin") <= b_max) for b_min, b_max in ranges]
 
-    for (low, high), val in zip(ranges[1:], values[1:], strict=True):
-        expr = expr.when(expr_column.is_between(low, high)).then(val)
+    aggs = []
+    for i, cond in enumerate(range_conds):
+        aggs.extend([
+            pl.col("Min").filter(cond).min().alias(f"min_{i}"),
+            pl.col("Max").filter(cond).max().alias(f"max_{i}"),
+            pl.col("Clients").filter(cond).sum().alias(f"cli_{i}"),
+            pl.col(settings.col_target).filter(cond).sum().alias(f"tgt_{i}"),
+        ])
 
-    return expr.otherwise(default)
+    unranged_cond = ~pl.any_horizontal(range_conds)
+    aggs.extend([
+        pl.col("Clients").filter(unranged_cond).sum().alias("cli_def"),
+        pl.col(settings.col_target).filter(unranged_cond).sum().alias("tgt_def"),
+    ])
+
+    stats = table.select(aggs).row(0, named=True)
+    cli_def = stats["cli_def"] or 0
+    tgt_def = stats["tgt_def"] or 0
+    default_val = (float(tgt_def) / float(cli_def) * 100.0) if cli_def > 0 else 0.0
+
+    expr_col = pl.col(column)
+
+    low, high, val = _get_range_data(0, stats)
+    expr = pl.when(expr_col.is_between(low, high)).then(val)
+
+    # Encadenar el resto de los rangos (de i = 1 en adelante)
+    for i in range(1, len(ranges)):
+        low, high, val = _get_range_data(i, stats)
+        expr = expr.when(expr_col.is_between(low, high)).then(val)
+
+    return expr.otherwise(default_val)
+
+
+def _get_range_data(i: int, stats) -> tuple[float, float, float]:
+    """Función auxiliar para extraer bounds y valor por índice"""
+    min_val = stats[f"min_{i}"]
+    max_val = stats[f"max_{i}"]
+    cli_sum = stats[f"cli_{i}"] or 0
+    tgt_sum = stats[f"tgt_{i}"] or 0
+
+    low = (float(min_val) - 0.01) if isinstance(min_val, (int, float)) else 0.0
+    high = (float(max_val) + 0.01) if isinstance(max_val, (int, float)) else 0.0
+    val = (float(tgt_sum) / float(cli_sum) * 100.0) if cli_sum > 0 else 0.0
+    return low, high, val
