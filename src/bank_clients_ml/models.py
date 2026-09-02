@@ -130,6 +130,27 @@ def get_feature_importances(
     return searcher, importances
 
 
+def get_scoring(
+    searcher: RandomizedSearchCV,
+    train: pl.DataFrame,
+    test: pl.DataFrame,
+    features: list[str],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """y_pred predice si es 0 o 1, si la probabilidad es > 0.5 lo pone como 1"""
+    final_model: lgb.LGBMClassifier = searcher.best_estimator_
+
+    y_pred = final_model.predict(test.select(features))
+
+    probabilities_train = final_model.predict_proba(train.select(features))
+    probabilities_test = final_model.predict_proba(test.select(features))
+
+    return (
+        np.asarray(y_pred),
+        np.asarray(probabilities_train),
+        np.asarray(probabilities_test),
+    )
+
+
 DECILE_LABELS = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
 DECILE_DTYPE = pl.Enum(DECILE_LABELS)
 
