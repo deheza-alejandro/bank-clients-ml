@@ -67,6 +67,7 @@ def get_feature_importances(
         X_train : Datos de entrenamiento; debe contener
             ``columns`` y la columna target.
         columns : Columnas de features usadas para entrenar el modelo.
+        No debe tener la columna target.
         n_iter : Cantidad de combinaciones de hiperparámetros a probar al azar con
             ``RandomizedSearchCV``.
         target : Nombre de la columna target.
