@@ -55,7 +55,7 @@ def scan_anomalies(df: pl.DataFrame) -> pl.DataFrame:
                 "Columns with NaN",
                 "Columns with inf",
                 "Columns ended with _x (pandas join)",
-                "Columns ended with _y (pandas join) or o _right (polars join)",
+                "Columns ended with _y (pandas join) or _right (polars join)",
             ],
             "total": [
                 len(null_cols),
