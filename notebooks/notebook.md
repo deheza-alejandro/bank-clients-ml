@@ -125,16 +125,16 @@ print(data.filter(pl.col(settings.col_target).is_null()).select(settings.col_id)
 
 ```python
 print(data.shape)
-data = data.filter(pl.col(settings.col_target).is_not_null())
-print(data.shape)
+clean_data = data.filter(pl.col(settings.col_target).is_not_null())
+print(clean_data.shape)
 ```
 
 ```python
-print_without_trunc(scan_anomalies(data))
+print_without_trunc(scan_anomalies(clean_data))
 ```
 
 ```python
-data = data.with_columns(
+clean_data = clean_data.with_columns(
     pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date(),
     pl.col(settings.col_id).cast(pl.Int64)
 )
@@ -144,7 +144,7 @@ data = data.with_columns(
 
 ```python
 training_months, prediction_months = get_date_windows(
-    data, "Month", prediction_window_size=2
+    clean_data, "Month", prediction_window_size=2
 )
 
 last_training_month = training_months[-1]
@@ -159,7 +159,7 @@ print("first_prediction_month:", first_prediction_month)
 ## Definir Universo y Target
 
 ```python
-month_count_by_client = data.group_by(settings.col_id).len(name="month_count")
+month_count_by_client = clean_data.group_by(settings.col_id).len(name="month_count")
 print(month_count_by_client['month_count'].value_counts())
 ```
 
@@ -177,7 +177,7 @@ is_valid_client = (
 )
 
 universe_and_target = (
-    data.filter(
+    clean_data.filter(
         (pl.len().over(settings.col_id) == 9)
         & is_valid_client.any().over(settings.col_id)
         & pl.col("Month").is_in(prediction_months)
@@ -186,13 +186,17 @@ universe_and_target = (
     .unique()
 )
 
-training_data = data.filter(pl.col("Month").is_in(training_months)).join(
-    universe_and_target, on=settings.col_id, how="semi"
+clean_data = clean_data.drop(settings.col_target).join(
+    universe_and_target, on=settings.col_id, how="inner"
 )
+
+training_data = clean_data.filter(pl.col("Month").is_in(training_months))
+prediction_data = clean_data.filter(pl.col("Month").is_in(prediction_months))
 
 print(f"universe_and_target.shape: {universe_and_target.shape} \n")
 print(f"training_data.shape: {training_data.shape} \n")
 print(f"training_data['Month'].value_counts(): {training_data['Month'].value_counts()}")
+print(f"prediction_data.shape: {prediction_data.shape} \n")
 ```
 
 ```python
@@ -265,12 +269,7 @@ training_data.shape
 Traigo las regiones de  los clientes desde la ventana de prediccion y pongo la Region mas comun para llenar los nulos restantes
 
 ```python
-clients_region = (
-    data.filter(pl.col("Month").is_in(prediction_months))
-    .select([settings.col_id, "Region"])
-    .unique()
-    .join(universe_and_target, on=settings.col_id, how="semi")
-)
+clients_region = prediction_data.select(settings.col_id, "Region").unique()
 
 training_data = training_data.drop("Region").join(
     clients_region.with_columns(pl.col("Region").fill_null("BUENOS AIRES")),
@@ -278,7 +277,7 @@ training_data = training_data.drop("Region").join(
     how="left",
 )
 
-print(f"{data.select('Region').describe()} \n")
+print(f"{clean_data.select('Region').describe()} \n")
 print(f"{clients_region.describe()} \n")
 print(f"{clients_region.shape} \n")
 print(f"{clients_region['Region'].value_counts(sort=True)} \n")
@@ -302,9 +301,7 @@ Luego para llenar los nulos restantes, pongo la CreditCard_Product mas comun cua
 
 ```python
 clients_creditcard_product = (
-    data.filter(pl.col("Month").is_in(prediction_months))
-    .join(universe_and_target, on=settings.col_id, how="semi")
-    .sort(pl.col("Month") == prediction_months[0], descending=True)
+    prediction_data.sort(pl.col("Month") == prediction_months[0], descending=True)
     .group_by(settings.col_id)
     .agg(pl.col("CreditCard_Product").drop_nulls().first())
 )
@@ -327,7 +324,7 @@ training_data = (
     )
 )
 
-print(f"{data.select('CreditCard_Product').describe()} \n")
+print(f"{clean_data.select('CreditCard_Product').describe()} \n")
 print(f"{clients_creditcard_product.describe()} \n")
 print(f"{clients_creditcard_product['CreditCard_Product'].value_counts(sort=True)} \n")
 print(f"{training_data['CreditCard_Product'].value_counts(sort=True)} \n")
@@ -372,6 +369,7 @@ binary_identity_features_columns = [
 
 identity_features_columns = [
     settings.col_id,
+    settings.col_target,
     "Client_Age_grp",
     "Region",
     "CreditCard_Product",
@@ -404,10 +402,6 @@ identity_features.describe()
 ## Variables Categoricas
 
 ```python
-identity_features = identity_features.join(
-    universe_and_target, on=settings.col_id, how="inner"
-)
-
 categorical_cols = ["Client_Age_grp", "Region", "CreditCard_Product"]
 
 print_without_trunc(
@@ -1690,7 +1684,7 @@ best_features_searcher
 ```python
 # TODO: en teoria no deberia hacer esto sobre la ABT, deberia hacerlo sobre X_train
 
-max_id = data.select(pl.col(settings.col_id).max()).item()
+max_id = clean_data.select(pl.col(settings.col_id).max()).item()
 
 balanced_ABT = pl.concat(
     [
