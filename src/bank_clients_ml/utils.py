@@ -27,6 +27,43 @@ def print_without_trunc(df: pl.DataFrame) -> None:
         print(df)
 
 
+def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.DataFrame:
+    """Calcula las columnas numéricas cuyos valores mínimos se encuentran entre un rango dado.
+
+    Args:
+        df: DataFrame de Polars a analizar.
+        low: Límite inferior del rango (exclusivo).
+        high: Límite superior del rango (exclusivo).
+
+    Returns:
+        DataFrame de Polars con las columnas 'columna' y 'minimo'.
+    """
+    return (
+        df.select(cs.numeric().min())
+        .unpivot(variable_name="column", value_name="minimum")
+        .filter(
+            pl.col("minimum").is_between(low, high, closed="none")
+            & (pl.col("minimum") != 0)
+        )
+    )
+
+
+def columns_with_zeros(df: pl.DataFrame) -> pl.DataFrame:
+    """Devuelve un DataFrame con las columnas numéricas que contienen ceros y su cantidad.
+
+    Args:
+        df: DataFrame de Polars a inspeccionar.
+
+    Returns:
+        DataFrame con columnas 'column' y 'zeros_quantity'.
+    """
+    return (
+        df.select((cs.numeric() == 0).sum())
+        .unpivot(variable_name="column", value_name="zeros_quantity")
+        .filter(pl.col("zeros_quantity") > 0)
+    )
+
+
 def scan_anomalies(df: pl.DataFrame) -> pl.DataFrame:
     """
     Devuelve un DataFrame de diagnóstico con las columnas que presentan
