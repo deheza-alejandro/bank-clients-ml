@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
+from sklearn.model_selection import RandomizedSearchCV
 
 from bank_clients_ml.config import Settings, get_settings
 
@@ -18,11 +19,53 @@ matplotlib.rcParams["svg.hashsalt"] = "fixed_seed_for_this_project"
 matplotlib.rcParams["svg.fonttype"] = "path"
 
 
-def _generate_single_bivariate_chart(
+def _get_bivariate_tables(
     df: pl.DataFrame,
+    columns_to_graph: list[str],
+    max_bins_quantity: int = 20,
+    settings: Settings | None = None,
+) -> dict[str, pl.DataFrame]:
+    if settings is None:
+        settings = get_settings()
+
+    target_pct_col = f"{settings.col_target}_pct"
+    tables: dict[str, pl.DataFrame] = {}
+
+    for variable_to_graph in columns_to_graph:
+        if df[variable_to_graph].n_unique() > max_bins_quantity:
+            group_expr = pl.col(variable_to_graph).qcut(
+                quantiles=max_bins_quantity, allow_duplicates=True
+            )
+        else:
+            group_expr = pl.col(variable_to_graph)
+
+        tables[variable_to_graph] = (
+            df.select(settings.col_target, variable_to_graph)
+            .group_by(group_expr.alias("_bin"))
+            .agg(
+                pl.col(variable_to_graph).min().round(2).alias("Min"),
+                pl.col(variable_to_graph).max().round(2).alias("Max"),
+                pl.len().alias("Clients"),
+                pl.col(settings.col_target).sum().alias(settings.col_target),
+            )
+            .sort(by="Min", descending=False, nulls_last=True)
+            .with_columns(
+                pl.int_range(1, pl.len() + 1).alias("Bin"),
+                ((pl.col(settings.col_target) / pl.col("Clients")) * 100)
+                .round()
+                .cast(pl.Int64)
+                .alias(target_pct_col),
+            )
+            .select("Bin", "Min", "Max", "Clients", settings.col_target, target_pct_col)
+        )
+
+    return tables
+
+
+def _generate_single_bivariate_chart(
+    table: pl.DataFrame,
     variable_to_graph: str,
     output_path: Path,
-    max_bins_quantity: int = 20,
     settings: Settings | None = None,
 ):
     """Función auxiliar (worker) que corre en un proceso independiente.
@@ -43,36 +86,6 @@ def _generate_single_bivariate_chart(
     if settings is None:
         settings = get_settings()
 
-    target_pct_col = f"{settings.col_target}_pct"
-
-    if df[variable_to_graph].n_unique() > max_bins_quantity:
-        group_expr = pl.col(variable_to_graph).qcut(
-            quantiles=max_bins_quantity, allow_duplicates=True
-        )
-    else:
-        group_expr = pl.col(variable_to_graph)
-
-    table = (
-        df.select(settings.col_target, variable_to_graph)
-        .group_by(group_expr.alias("_bin"))
-        .agg(
-            pl.col(variable_to_graph).min().round(2).alias("Min"),
-            pl.col(variable_to_graph).max().round(2).alias("Max"),
-            pl.len().alias("Clients"),
-            pl.col(settings.col_target).sum().alias(settings.col_target),
-        )
-        .sort(by="Min", descending=False, nulls_last=True)
-        .with_columns(
-            pl.int_range(1, pl.len() + 1).alias("Bin"),
-            ((pl.col(settings.col_target) / pl.col("Clients")) * 100)
-            .round()
-            .cast(pl.Int64)
-            .alias(target_pct_col),
-        )
-    )
-
-    columns = ["Bin", "Min", "Max", "Clients", settings.col_target, target_pct_col]
-
     fig, (ax_table, ax_graph) = plt.subplots(
         2, 1, figsize=(9, 8), gridspec_kw={"height_ratios": [1, 1]}
     )
@@ -80,8 +93,8 @@ def _generate_single_bivariate_chart(
     ax_table.axis("off")
     ax_table.set_title(f"Variable analysis: {variable_to_graph}", pad=1)
     ax_table.table(
-        cellText=table.select(columns).rows(),
-        colLabels=columns,
+        cellText=table.rows(),
+        colLabels=table.columns,
         loc="center",
         cellLoc="center",
         bbox=[0, 0, 1, 0.99],
@@ -89,14 +102,14 @@ def _generate_single_bivariate_chart(
 
     x_indices = range(len(table))
 
-    ax_graph.bar(x_indices, table["Clients"], width=0.35)
+    ax_graph.bar(x_indices, table.to_series(3), width=0.35)
     ax_graph.set_ylabel("Clients")
     ax_graph.set_xticks(x_indices)
-    ax_graph.set_xticklabels(table["Bin"], rotation=0, ha="center")
+    ax_graph.set_xticklabels(table.to_series(0), rotation=0, ha="center")
 
     ax_graph_target_pct = ax_graph.twinx()
     ax_graph_target_pct.plot(
-        x_indices, table[target_pct_col], marker="o", color="green"
+        x_indices, table.to_series(-1), marker="o", color="green"
     )
     ax_graph_target_pct.set_ylabel(f"{settings.col_target} pct (%)")
 
@@ -115,7 +128,7 @@ def generate_bivariate_charts(
     images_dir: str = IMAGES_DIR,
     max_workers: int | None = None,
     settings: Settings | None = None,
-):
+) -> dict[str, pl.DataFrame]:
     """Grafica las variables y guarda cada figura como SVG.
 
     Por cada columna del DataFrame arma el análisis
@@ -137,13 +150,14 @@ def generate_bivariate_charts(
     output_folder = Path(images_dir) / analysis_name
     output_folder.mkdir(parents=True, exist_ok=True)
 
+    tables = _get_bivariate_tables(df, columns_to_graph, max_bins_quantity, settings)
+
     if max_workers == 1 or len(columns_to_graph) < 20:
         for variable_to_graph in columns_to_graph:
             _generate_single_bivariate_chart(
-                df.select(settings.col_target, variable_to_graph),
+                tables[variable_to_graph],
                 variable_to_graph,
                 output_folder / f"{variable_to_graph}.svg",
-                max_bins_quantity,
                 settings,
             )
     else:
@@ -151,10 +165,9 @@ def generate_bivariate_charts(
             futures = [
                 executor.submit(
                     _generate_single_bivariate_chart,
-                    df=df.select(settings.col_target, variable_to_graph),
+                    table=tables[variable_to_graph],
                     variable_to_graph=variable_to_graph,
                     output_path=output_folder / f"{variable_to_graph}.svg",
-                    max_bins_quantity=max_bins_quantity,
                     settings=settings,
                 )
                 for variable_to_graph in columns_to_graph
@@ -162,6 +175,8 @@ def generate_bivariate_charts(
 
             for future in as_completed(futures):
                 future.result()
+
+    return tables
 
 
 def _save_fig_as_svg(
