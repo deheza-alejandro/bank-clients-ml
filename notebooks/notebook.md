@@ -1062,47 +1062,56 @@ print_without_trunc(mins_in_range(ABT, -1, 1))
 ### Elimino columnas con valores unicos
 
 ```python
-constant_cols = get_constant_columns(ABT)
-reduced_ABT = ABT.drop(constant_cols)
+X_train, X_test = stratified_train_test_split(ABT)
+print(X_train.shape)
+X_train.describe()
+```
 
-print(f"{constant_cols} \n")
-print("ABT original: ", ABT.shape)
-print("ABT sin columnas con valores unicos: ", reduced_ABT.shape)
+```python
+constant_cols = get_constant_columns(X_train)
+reduced_X_train = X_train.drop(constant_cols)
+reduced_X_test = X_test.drop(constant_cols)
+
+print(f"reduced_X_train sin columnas con valores unicos: {reduced_X_train.shape} \n")
+constant_cols
 ```
 
 ### Elimino columnas binarias con baja representatividad
 
 ```python
-imbalanced_binary_columns = get_imbalanced_binary_columns(reduced_ABT)
+imbalanced_binary_columns = get_imbalanced_binary_columns(reduced_X_train)
 
 print_without_trunc(
-    low_cardinality_value_counts(reduced_ABT.select(imbalanced_binary_columns))
+    low_cardinality_value_counts(reduced_X_train.select(imbalanced_binary_columns))
 )
 
-reduced_ABT = reduced_ABT.drop(imbalanced_binary_columns)
-print("ABT sin columnas binarias poco representativas:", reduced_ABT.shape)
+reduced_X_train = reduced_X_train.drop(imbalanced_binary_columns)
+reduced_X_test = reduced_X_test.drop(imbalanced_binary_columns)
+print("X_train sin columnas binarias poco representativas:", reduced_X_train.shape)
 ```
 
 ### Elimino columnas correlacionadas entre si
 
 ```python
-correlated_ABT = reduced_ABT.clone()
-ABT_Correlation_analyzer = CorrelationAnalyzer(correlated_ABT)
+correlated_X_train = reduced_X_train.clone()
+correlated_X_test = reduced_X_test.clone()
+correlation_analyzer = CorrelationAnalyzer(correlated_X_train)
 
-to_delete = ABT_Correlation_analyzer.get_redundant_correlated_columns(threshold=0.80)
-uncorrelated_ABT = correlated_ABT.drop(to_delete)
+to_delete = correlation_analyzer.get_redundant_correlated_columns(threshold=0.80)
+uncorrelated_X_train = correlated_X_train.drop(to_delete)
+uncorrelated_X_test = correlated_X_test.drop(to_delete)
 
 print(f"columnas con correlacion mayor a 80%: {len(to_delete)}")
-print("ABT sin columnas con correlacion mayor a 80%:", uncorrelated_ABT.shape)
+print("X_train sin columnas con correlacion mayor a 80%:", uncorrelated_X_train.shape)
 ```
 
 ## Estandarizacion (z-score) con Polars
 
 ```python
 """
-standardized_ABT = standardize(uncorrelated_ABT)
-print(scan_anomalies(standardized_ABT))
-standardized_ABT.describe()
+standardized_X_train = standardize(uncorrelated_X_train)
+print(scan_anomalies(standardized_X_train))
+standardized_X_train.describe()
 """
 ```
 
@@ -1117,7 +1126,7 @@ standardized_ABT.describe()
 ```python
 all_cols = [
     col
-    for col in uncorrelated_ABT.columns
+    for col in uncorrelated_X_train.columns
     if col not in {settings.col_id, settings.col_target}
 ]
 
@@ -1136,12 +1145,8 @@ columns_by_source["others"]
 ```
 
 ```python
-X_train, X_test = stratified_train_test_split(uncorrelated_ABT)
-```
-
-```python
 all_cols_searcher, all_cols_importances = get_feature_importances(
-    X_train,
+    uncorrelated_X_train,
     all_cols,
 )
 all_cols_searcher
@@ -1152,28 +1157,28 @@ all_cols_searcher
     cols_saving_account_days_transactions_searcher,
     cols_saving_account_days_transactions_importances,
 ) = get_feature_importances(
-    X_train, columns_by_source["saving_account_days_transactions"]
+    uncorrelated_X_train, columns_by_source["saving_account_days_transactions"]
 )
 cols_saving_account_days_transactions_searcher
 ```
 
 ```python
 cols_saving_account_monetary_searcher, cols_saving_account_monetary_importances = (
-    get_feature_importances(X_train, columns_by_source["saving_account_monetary"])
+    get_feature_importances(uncorrelated_X_train, columns_by_source["saving_account_monetary"])
 )
 cols_saving_account_monetary_searcher
 ```
 
 ```python
 cols_operations_searcher, cols_operations_importances = get_feature_importances(
-    X_train, columns_by_source["operations"]
+    uncorrelated_X_train, columns_by_source["operations"]
 )
 cols_operations_searcher
 ```
 
 ```python
 cols_credit_card_payment_searcher, cols_credit_card_payment_importances = (
-    get_feature_importances(X_train, columns_by_source["credit_card_payment"])
+    get_feature_importances(uncorrelated_X_train, columns_by_source["credit_card_payment"])
 )
 
 cols_credit_card_payment_searcher
@@ -1181,7 +1186,7 @@ cols_credit_card_payment_searcher
 
 ```python
 cols_credit_card_monetary_searcher, cols_credit_card_monetary_importances = (
-    get_feature_importances(X_train, columns_by_source["credit_card_monetary"])
+    get_feature_importances(uncorrelated_X_train, columns_by_source["credit_card_monetary"])
 )
 
 cols_credit_card_monetary_searcher
@@ -1189,7 +1194,7 @@ cols_credit_card_monetary_searcher
 
 ```python
 cols_others_searcher, cols_others_importances = get_feature_importances(
-    X_train, columns_by_source["others"]
+    uncorrelated_X_train, columns_by_source["others"]
 )
 cols_others_searcher
 ```
@@ -1258,7 +1263,7 @@ most_important_features = [
 ]
 
 most_important_features_searcher, most_important_features_importances = (
-    get_feature_importances(X_train, most_important_features)
+    get_feature_importances(uncorrelated_X_train, most_important_features)
 )
 plot_top_features(
     most_important_features_importances, "most_important_features", most_important_features_searcher
@@ -1273,7 +1278,7 @@ most_important_features_searcher
 
 ```python
 tables_analysis = generate_bivariate_charts(
-    correlated_ABT, most_important_features, "analysis"
+    uncorrelated_X_train, most_important_features, "analysis"
 )
 ```
 
@@ -1491,7 +1496,7 @@ most_important_features_2 = (
 
 for x in most_important_features_2:
     print(f"\n Columnas correlacionadas con {x}:")
-    print_without_trunc(ABT_Correlation_analyzer.get_correlations_for(x))
+    print_without_trunc(correlation_analyzer.get_correlations_for(x))
 ```
 
 ```python
@@ -1506,7 +1511,7 @@ most_important_features_correlated = [
 ]
 
 tables_analysis_2 = generate_bivariate_charts(
-    correlated_ABT, most_important_features_correlated, "analysis_2"
+    correlated_X_train, most_important_features_correlated, "analysis_2"
 )
 ```
 
@@ -1537,11 +1542,12 @@ variables a modificar:
 - Quantity_Active_Products_min
 
 ```python
-final_ABT = correlated_ABT.clone()
+final_X_train = correlated_X_train.clone()
+final_X_test = correlated_X_test.clone()
 ```
 
 ```python
-final_ABT = final_ABT.with_columns(
+bins_transformations = [
     group_bins_by_ranges(
         "Client_Age_grp",
         ranges=[(4, 5), (6, 7)],
@@ -1567,13 +1573,16 @@ final_ABT = final_ABT.with_columns(
         ranges=[(1, 4), (6, 9)],
         table=tables_analysis["Quantity_Active_Products_min"],
     ).alias("Quantity_Active_Products_min"),
-)
+]
 
-scan_anomalies(final_ABT)
+final_X_train = final_X_train.with_columns(bins_transformations)
+final_X_test = final_X_test.with_columns(bins_transformations)
+
+scan_anomalies(final_X_train)
 
 # # Intento agrupar demas variables (calculado en excel)
 
-# final_ABT = final_ABT.with_columns(
+# final_X_train = final_X_train.with_columns(
 #     group_bins_by_ranges(
 #         "Operations_total_count_nonzero",
 #         ranges=[(1, 1), (2, 3), (4, 5), (6, 6)],
@@ -1581,7 +1590,7 @@ scan_anomalies(final_ABT)
 #     ).alias("Operations_total_count_nonzero")
 # )
 
-# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
+# final_X_train = final_X_train.with_columns(group_bins_by_ranges(
 #     'Region',
 #     ranges=[(24.370, 24.375)],  # mantengo "REGION CENTRO"
 #     values=[24.372],
@@ -1591,49 +1600,49 @@ scan_anomalies(final_ABT)
 # # (NORTE GRANDE ARGENTINO + CUYO + CABA Centro/Norte + AMBA Resto + BUENOS AIRES
 # # + REGION PATAGONICA)
 
-# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
+# final_X_train = final_X_train.with_columns(group_bins_by_ranges(
 #     'Operations_in_person_max',
 #     ranges=[(1, 2), (3, 44)],
 #     values=[36.971, 54.786],
 #     default=17.000,
 # ).alias("Operations_in_person_max"))
 
-# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
+# final_X_train = final_X_train.with_columns(group_bins_by_ranges(
 #     'Days_between_first_and_last_product',
 #     ranges=[(0, 441), (442, 1142), (1143, 2130)],
 #     values=[21.764, 25.244, 33.003],
 #     default=48.858,
 # ).alias("Days_between_first_and_last_product"))
 
-# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
+# final_X_train = final_X_train.with_columns(group_bins_by_ranges(
 #     'Recency_in_days',
 #     ranges=[(1, 408), (409, 650)],
 #     values=[33.822, 29.220],
 #     default=23.845,
 # ).alias("Recency_in_days"))
 
-# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
+# final_X_train = final_X_train.with_columns(group_bins_by_ranges(
 #     'CreditCard_Total_Spending_median',
 #     ranges=[(0.5, 1979.9), (1980.2, 4078.7), (4079.0, 117452)],
 #     values=[33.866, 41.667, 46.154],
 #     default=9.000,
 # ).alias("CreditCard_Total_Spending_median"))
 
-# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
+# final_X_train = final_X_train.with_columns(group_bins_by_ranges(
 #     'SavingAccount_Balance_Average_median',
 #     ranges=[(163.3, 2823.9), (2824.0, 1515662.7)],
 #     values=[30.999, 50.143],
 #     default=22.243,
 # ).alias("SavingAccount_Balance_Average_median"))
 
-# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
+# final_X_train = final_X_train.with_columns(group_bins_by_ranges(
 #     'SavingAccount_Transactions_Transactions_median',
 #     ranges=[(0, 3), (3.5, 7)],
 #     values=[21.781, 31.686],
 #     default=54.346,
 # ).alias("SavingAccount_Transactions_Transactions_median"))
 
-# final_ABT = final_ABT.with_columns(group_bins_by_ranges(
+# final_X_train = final_X_train.with_columns(group_bins_by_ranges(
 #     'SavingAccount_CreditCard_Payment_Amount_median',
 #     ranges=[(0, 0)],
 #     values=[21.000],
@@ -1651,7 +1660,7 @@ best_features = [
     "Quantity_Active_Products_min",
 ]
 
-_ = generate_bivariate_charts(final_ABT, best_features, "analysis_t")
+_ = generate_bivariate_charts(final_X_train, best_features, "analysis_t")
 ```
 
 ![CreditCard_Product](images/analysis_t/CreditCard_Product.svg)
@@ -1663,18 +1672,16 @@ _ = generate_bivariate_charts(final_ABT, best_features, "analysis_t")
 ## Comparar importancias de las mejores variables
 
 ```python
-final_ABT = final_ABT.select([settings.col_id, settings.col_target, *best_features])
-print(final_ABT.shape)
-final_ABT.describe()
-```
-
-```python
-X_train_int, X_test_int = stratified_train_test_split(final_ABT)
+final_cols = [settings.col_id, settings.col_target, *best_features]
+final_X_train = final_X_train.select(final_cols)
+final_X_test = final_X_test.select(final_cols)
+print(final_X_train.shape)
+final_X_train.describe()
 ```
 
 ```python
 best_features_searcher, best_features_importances = get_feature_importances(
-    X_train_int, best_features
+    final_X_train, best_features
 )
 plot_top_features(best_features_importances, "best_features", best_features_searcher)
 best_features_searcher
@@ -1689,14 +1696,12 @@ best_features_searcher
 ## Balancear a 50%/50% aprox (oversampling) <- a modo de ejemplo, esto despues no lo uso
 
 ```python
-# TODO: en teoria no deberia hacer esto sobre la ABT, deberia hacerlo sobre X_train
-
 max_id = clean_data.select(pl.col(settings.col_id).max()).item()
 
-balanced_ABT = pl.concat(
+balanced_X_train = pl.concat(
     [
-        final_ABT,
-        final_ABT.filter(pl.col(settings.col_target) == 1).with_columns(
+        final_X_train,
+        final_X_train.filter(pl.col(settings.col_target) == 1).with_columns(
             (max_id + 1 + pl.int_range(0, pl.len())).alias(settings.col_id)
         ),
     ],
@@ -1705,22 +1710,18 @@ balanced_ABT = pl.concat(
 
 print(f"max_id: {max_id} \n")
 
-print(f"{final_ABT.shape} \n")
-print(f"{balanced_ABT.shape} \n")
+print(f"{final_X_train.shape} \n")
+print(f"{balanced_X_train.shape} \n")
 
-print(f"{final_ABT[settings.col_target].value_counts()} \n")
-print(f"{balanced_ABT[settings.col_target].value_counts()} \n")
+print(f"{final_X_train[settings.col_target].value_counts()} \n")
+print(f"{balanced_X_train[settings.col_target].value_counts()} \n")
 ```
 
 ## Entreno con las mejores variables y mejores hiperparametros
 
 ```python
-X_train_final, X_test_final = stratified_train_test_split(final_ABT)
-```
-
-```python
 best_hyperparameters_searcher, best_importances = get_feature_importances(
-    X_train_final, best_features, n_iter=20
+    final_X_train, best_features, n_iter=20
 )
 
 renames_dict = {
@@ -1746,7 +1747,7 @@ best_hyperparameters_searcher
 
 ```python
 y_pred, probabilities_train, probabilities_test = get_scoring(
-    best_hyperparameters_searcher, X_train_final, X_test_final, best_features
+    best_hyperparameters_searcher, final_X_train, final_X_test, best_features
 )
 
 # Cotas fijas....
@@ -1763,16 +1764,16 @@ bins = [
     0.548265,
 ]
 
-print_train_deciles(compute_prediction_deciles(X_train_final, probabilities_train))
+print_train_deciles(compute_prediction_deciles(final_X_train, probabilities_train))
 
 print_test_deciles(
-    compute_prediction_deciles(X_test_final, probabilities_test, bins),
-    X_test_final,
+    compute_prediction_deciles(final_X_test, probabilities_test, bins),
+    final_X_test,
     probabilities_test,
 )
 
 plot_roc_and_metrics(
-    X_test_final[settings.col_target],
+    final_X_test[settings.col_target],
     probabilities_test,
     y_pred,
     graphic_name="lightgbm",
