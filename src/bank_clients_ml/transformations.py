@@ -43,7 +43,8 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
                 + pl.col("CreditCard_Payment_TAS")
             ).alias("CreditCard_Payment_total"),
             (
-                pl.col("CreditCard_Payment_Aut_Debit") + pl.col("CreditCard_Payment_Web")
+                pl.col("CreditCard_Payment_Aut_Debit")
+                + pl.col("CreditCard_Payment_Web")
             ).alias("CreditCard_Payment_remote"),
             (
                 pl.col("CreditCard_Payment_External")
@@ -181,7 +182,8 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
                 "SavingAccount_Service_Payment_Amount", "SavingAccount_Debits_Amounts"
             ).alias("SavingAccount_Service_Payment_Amount_DE_porc"),
             compute_percentage(
-                "SavingAccount_CreditCard_Payment_Amount", "SavingAccount_Debits_Amounts"
+                "SavingAccount_CreditCard_Payment_Amount",
+                "SavingAccount_Debits_Amounts",
             ).alias("SavingAccount_CreditCard_Payment_Amount_DE_porc"),
             compute_percentage(
                 "SavingAccount_Transfer_Out_Amount", "SavingAccount_Debits_Amounts"
@@ -256,18 +258,18 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
             compute_percentage(
                 "CreditCard_Payment_External", "CreditCard_Payment_total"
             ).alias("CreditCard_Payment_External_porc"),
-            compute_percentage("CreditCard_Payment_Cash", "CreditCard_Payment_total").alias(
-                "CreditCard_Payment_Cash_porc"
-            ),
-            compute_percentage("CreditCard_Payment_Web", "CreditCard_Payment_total").alias(
-                "CreditCard_Payment_Web_porc"
-            ),
-            compute_percentage("CreditCard_Payment_ATM", "CreditCard_Payment_total").alias(
-                "CreditCard_Payment_ATM_porc"
-            ),
-            compute_percentage("CreditCard_Payment_TAS", "CreditCard_Payment_total").alias(
-                "CreditCard_Payment_TAS_porc"
-            ),
+            compute_percentage(
+                "CreditCard_Payment_Cash", "CreditCard_Payment_total"
+            ).alias("CreditCard_Payment_Cash_porc"),
+            compute_percentage(
+                "CreditCard_Payment_Web", "CreditCard_Payment_total"
+            ).alias("CreditCard_Payment_Web_porc"),
+            compute_percentage(
+                "CreditCard_Payment_ATM", "CreditCard_Payment_total"
+            ).alias("CreditCard_Payment_ATM_porc"),
+            compute_percentage(
+                "CreditCard_Payment_TAS", "CreditCard_Payment_total"
+            ).alias("CreditCard_Payment_TAS_porc"),
             compute_percentage(
                 "CreditCard_Payment_Aut_Debit", "CreditCard_Payment_remote"
             ).alias("CreditCard_Payment_Aut_Debit_R_porc"),
@@ -277,24 +279,24 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
             compute_percentage(
                 "CreditCard_Payment_Cash", "CreditCard_Payment_in_person"
             ).alias("CreditCard_Payment_Cash_IP_porc"),
-            compute_percentage("CreditCard_Payment_Web", "CreditCard_Payment_remote").alias(
-                "CreditCard_Payment_Web_R_porc"
-            ),
+            compute_percentage(
+                "CreditCard_Payment_Web", "CreditCard_Payment_remote"
+            ).alias("CreditCard_Payment_Web_R_porc"),
             compute_percentage(
                 "CreditCard_Payment_ATM", "CreditCard_Payment_in_person"
             ).alias("CreditCard_Payment_ATM_IP_porc"),
             compute_percentage(
                 "CreditCard_Payment_TAS", "CreditCard_Payment_in_person"
             ).alias("CreditCard_Payment_TAS_IP_porc"),
-            compute_percentage("CreditCard_Balance_ARG", "CreditCard_Total_Limit").alias(
-                "CreditCard_Balance_ARG_limit_porc"
-            ),
-            compute_percentage("CreditCard_Balance_DOLLAR", "CreditCard_Total_Limit").alias(
-                "CreditCard_Balance_DOLLAR_limit_porc"
-            ),
-            compute_percentage("CreditCard_Total_Spending", "CreditCard_Total_Limit").alias(
-                "CreditCard_Total_Spending_limit_porc"
-            ),
+            compute_percentage(
+                "CreditCard_Balance_ARG", "CreditCard_Total_Limit"
+            ).alias("CreditCard_Balance_ARG_limit_porc"),
+            compute_percentage(
+                "CreditCard_Balance_DOLLAR", "CreditCard_Total_Limit"
+            ).alias("CreditCard_Balance_DOLLAR_limit_porc"),
+            compute_percentage(
+                "CreditCard_Total_Spending", "CreditCard_Total_Limit"
+            ).alias("CreditCard_Total_Spending_limit_porc"),
             compute_percentage(
                 "CreditCard_Spending_1_Installment", "CreditCard_Total_Limit"
             ).alias("CreditCard_Spending_1_Installment_limit_porc"),
@@ -310,9 +312,9 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
             compute_percentage("CreditCard_Revolving", "CreditCard_Total_Limit").alias(
                 "CreditCard_Revolving_limit_porc"
             ),
-            compute_percentage("CreditCard_Balance_ARG", "CreditCard_Total_Spending").alias(
-                "CreditCard_Balance_ARG_SP_porc"
-            ),
+            compute_percentage(
+                "CreditCard_Balance_ARG", "CreditCard_Total_Spending"
+            ).alias("CreditCard_Balance_ARG_SP_porc"),
             compute_percentage(
                 "CreditCard_Balance_DOLLAR", "CreditCard_Total_Spending"
             ).alias("CreditCard_Balance_DOLLAR_SP_porc"),
@@ -328,9 +330,9 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
             compute_percentage(
                 "CreditCard_Spending_Aut_Debits", "CreditCard_Total_Spending"
             ).alias("CreditCard_Spending_Aut_Debits_SP_porc"),
-            compute_percentage("CreditCard_Revolving", "CreditCard_Total_Spending").alias(
-                "CreditCard_Revolving_SP_porc"
-            ),
+            compute_percentage(
+                "CreditCard_Revolving", "CreditCard_Total_Spending"
+            ).alias("CreditCard_Revolving_SP_porc"),
             # OTHERS
             (
                 pl.col("CreditCard_Premium")
@@ -382,14 +384,16 @@ def add_extra_transformations(df: pl.DataFrame) -> pl.DataFrame:
             + (pl.col("CreditCard_Payment_TAS_max") > 0).cast(pl.Float64)
         ).alias("SUM_OF_USES"),
         min_max_normalize_weighted(
-            "SavingAccount_CreditCard_Payment_Amount_max", "Operations_total_count_nonzero"
+            "SavingAccount_CreditCard_Payment_Amount_max",
+            "Operations_total_count_nonzero",
         ).alias("Amount_operations"),
         min_max_normalize_weighted(
             "SavingAccount_CreditCard_Payment_Amount_max",
             "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",
         ).alias("Amount_transactions"),
         min_max_normalize_weighted(
-            "SavingAccount_CreditCard_Payment_Amount_max", "CreditCard_Payment_total_max"
+            "SavingAccount_CreditCard_Payment_Amount_max",
+            "CreditCard_Payment_total_max",
         ).alias("Amount_payment"),
         min_max_normalize_weighted(
             "CreditCard_Total_Limit_diff_rel", "Operations_total_count_nonzero"
