@@ -1693,31 +1693,22 @@ best_features_searcher
 # Model Training
 
 
-## Balancear a 50%/50% aprox (oversampling) <- a modo de ejemplo, esto despues no lo uso
+## Balancear a 50%/50% (oversampling) <- a modo de ejemplo, esto despues no lo uso
 
 ```python
-max_id = clean_data.select(pl.col(settings.col_id).max()).item()
+"""
+balanced_train = oversample_with_unique_ids(final_train, target_proportion=0.5)
 
-balanced_X_train = pl.concat(
-    [
-        final_X_train,
-        final_X_train.filter(pl.col(settings.col_target) == 1).with_columns(
-            (max_id + 1 + pl.int_range(0, pl.len())).alias(settings.col_id)
-        ),
-    ],
-    how="vertical",
-)
+print(f"{final_train.shape} \n")
+print(f"{balanced_train.shape} \n")
 
-print(f"max_id: {max_id} \n")
-
-print(f"{final_X_train.shape} \n")
-print(f"{balanced_X_train.shape} \n")
-
-print(f"{final_X_train[settings.col_target].value_counts()} \n")
-print(f"{balanced_X_train[settings.col_target].value_counts()} \n")
+print(f"{final_train[settings.col_target].value_counts()} \n")
+print(f"{balanced_train[settings.col_target].value_counts()} \n")
+"""
 ```
 
 ## Entreno con las mejores variables y mejores hiperparametros
+No realizo ningun balanceo porque la proporcion del target ya es del 30%
 
 ```python
 best_hyperparameters_searcher, best_importances = get_feature_importances(

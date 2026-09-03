@@ -130,6 +130,42 @@ def get_feature_importances(
     return searcher, importances
 
 
+def oversample_with_unique_ids(
+    train: pl.DataFrame,
+    target_proportion: float = 0.5,
+    random_state: int = RANDOM_STATE,
+    settings: Settings | None = None,
+) -> pl.DataFrame:
+    """Asigna IDs únicos a las filas sobremuestreadas
+
+    No deberias usar esta funcion si usas LightGBM + RandomizedSearchCV + StratifiedKFold.
+    En ese caso deberias usar algo como imbalanced-learn para hacer oversampling
+    solo sobre los datos de entrenamiento de cada fold de StratifiedKFold,
+    dejando intactos los datos de validacion de cada fold"""
+    if not (0 < target_proportion < 1):
+        raise ValueError("El parámetro 'target_proportion' debe estar entre 0 y 1 (excluyentes).")
+
+    if settings is None:
+        settings = get_settings()
+
+    df_majority = train.filter(pl.col(settings.col_target) == 0)
+    df_minority = train.filter(pl.col(settings.col_target) == 1)
+
+    max_id = train.select(pl.col(settings.col_id).max()).item()
+
+    count_majority = len(df_majority)
+    count_minority_target = round(count_majority * (target_proportion / (1 - target_proportion)))
+
+    df_minority_oversampled = df_minority.sample(
+        n=count_minority_target, with_replacement=True, seed=random_state
+    ).with_columns((max_id + 1 + pl.int_range(0, pl.len())).alias(settings.col_id))
+
+    balanced_train = pl.concat([df_majority, df_minority_oversampled]).sample(
+        fraction=1.0, shuffle=True, seed=random_state
+    )
+    return balanced_train
+
+
 def get_scoring(
     searcher: RandomizedSearchCV,
     train: pl.DataFrame,
