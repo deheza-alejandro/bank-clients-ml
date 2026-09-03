@@ -1663,6 +1663,12 @@ _ = generate_bivariate_charts(final_ABT, best_features, "analysis_t")
 ## Comparar importancias de las mejores variables
 
 ```python
+final_ABT = final_ABT.select([settings.col_id, settings.col_target, *best_features])
+print(final_ABT.shape)
+final_ABT.describe()
+```
+
+```python
 X_train_int, X_test_int = stratified_train_test_split(final_ABT)
 ```
 
