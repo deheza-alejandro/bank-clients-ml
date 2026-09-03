@@ -1546,27 +1546,27 @@ final_ABT = final_ABT.with_columns(
         "Client_Age_grp",
         ranges=[(4, 5), (6, 7)],
         table=tables_analysis["Client_Age_grp"],
-    ).alias("Client_Age_grp_t"),
+    ).alias("Client_Age_grp"),
     group_bins_by_ranges(
         "Operations_total_mean",
         ranges=[(2, 4), (5, 6), (7, 8), (9, 10), (11, 12), (13, 14), (15, 16)],
         table=tables_analysis_2["Operations_total_mean"],
-    ).alias("Operations_total_mean_t"),
+    ).alias("Operations_total_mean"),
     group_bins_by_ranges(
         "Operations_total_median",
         ranges=[(2, 4), (5, 7), (8, 9), (10, 11)],
         table=tables_analysis_2["Operations_total_median"],
-    ).alias("Operations_total_median_t"),
+    ).alias("Operations_total_median"),
     group_bins_by_ranges(
         "CreditCard_Product",
         ranges=[(5, 5), (7, 7)],
         table=tables_analysis["CreditCard_Product"],
-    ).alias("CreditCard_Product_t"),
+    ).alias("CreditCard_Product"),
     group_bins_by_ranges(
         "Quantity_Active_Products_min",
         ranges=[(1, 4), (6, 9)],
         table=tables_analysis["Quantity_Active_Products_min"],
-    ).alias("Quantity_Active_Products_min_t"),
+    ).alias("Quantity_Active_Products_min"),
 )
 
 scan_anomalies(final_ABT)
@@ -1578,7 +1578,7 @@ scan_anomalies(final_ABT)
 #         "Operations_total_count_nonzero",
 #         ranges=[(1, 1), (2, 3), (4, 5), (6, 6)],
 #         table=tables_analysis_2["Operations_total_count_nonzero"],
-#     ).alias("Operations_total_count_nonzero_t")
+#     ).alias("Operations_total_count_nonzero")
 # )
 
 # final_ABT = final_ABT.with_columns(group_bins_by_ranges(
@@ -1586,7 +1586,7 @@ scan_anomalies(final_ABT)
 #     ranges=[(24.370, 24.375)],  # mantengo "REGION CENTRO"
 #     values=[24.372],
 #     default=30.663,
-# ).alias("Region_t"))
+# ).alias("Region"))
 # # default -> totas las demas regiones
 # # (NORTE GRANDE ARGENTINO + CUYO + CABA Centro/Norte + AMBA Resto + BUENOS AIRES
 # # + REGION PATAGONICA)
@@ -1596,68 +1596,68 @@ scan_anomalies(final_ABT)
 #     ranges=[(1, 2), (3, 44)],
 #     values=[36.971, 54.786],
 #     default=17.000,
-# ).alias("Operations_in_person_max_t"))
+# ).alias("Operations_in_person_max"))
 
 # final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'Days_between_first_and_last_product',
 #     ranges=[(0, 441), (442, 1142), (1143, 2130)],
 #     values=[21.764, 25.244, 33.003],
 #     default=48.858,
-# ).alias("Days_between_first_and_last_product_t"))
+# ).alias("Days_between_first_and_last_product"))
 
 # final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'Recency_in_days',
 #     ranges=[(1, 408), (409, 650)],
 #     values=[33.822, 29.220],
 #     default=23.845,
-# ).alias("Recency_in_days_t"))
+# ).alias("Recency_in_days"))
 
 # final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'CreditCard_Total_Spending_median',
 #     ranges=[(0.5, 1979.9), (1980.2, 4078.7), (4079.0, 117452)],
 #     values=[33.866, 41.667, 46.154],
 #     default=9.000,
-# ).alias("CreditCard_Total_Spending_median_t"))
+# ).alias("CreditCard_Total_Spending_median"))
 
 # final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'SavingAccount_Balance_Average_median',
 #     ranges=[(163.3, 2823.9), (2824.0, 1515662.7)],
 #     values=[30.999, 50.143],
 #     default=22.243,
-# ).alias("SavingAccount_Balance_Average_median_t"))
+# ).alias("SavingAccount_Balance_Average_median"))
 
 # final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'SavingAccount_Transactions_Transactions_median',
 #     ranges=[(0, 3), (3.5, 7)],
 #     values=[21.781, 31.686],
 #     default=54.346,
-# ).alias("SavingAccount_Transactions_Transactions_median_t"))
+# ).alias("SavingAccount_Transactions_Transactions_median"))
 
 # final_ABT = final_ABT.with_columns(group_bins_by_ranges(
 #     'SavingAccount_CreditCard_Payment_Amount_median',
 #     ranges=[(0, 0)],
 #     values=[21.000],
 #     default=55.253,
-# ).alias("SavingAccount_CreditCard_Payment_Amount_median_t"))
+# ).alias("SavingAccount_CreditCard_Payment_Amount_median"))
 ```
 
 ```python
 best_features = [
-    "Client_Age_grp_t",
-    "Operations_total_mean_t",
-    #"Operations_total_median_t",
-    "CreditCard_Product_t",
+    "Client_Age_grp",
+    "Operations_total_mean",
+    #"Operations_total_median",
+    "CreditCard_Product",
     #"CreditCard_Active",  # sin modificar
-    "Quantity_Active_Products_min_t",
+    "Quantity_Active_Products_min",
 ]
 
 _ = generate_bivariate_charts(final_ABT, best_features, "analysis_t")
 ```
 
-![CreditCard_Product_t](images/analysis_t/CreditCard_Product_t.svg)
-![Client_Age_grp_t](images/analysis_t/Client_Age_grp_t.svg)
-![Operations_total_mean_t](images/analysis_t/Operations_total_mean_t.svg)
-![Quantity_Active_Products_min_t](images/analysis_t/Quantity_Active_Products_min_t.svg)
+![CreditCard_Product](images/analysis_t/CreditCard_Product.svg)
+![Client_Age_grp](images/analysis_t/Client_Age_grp.svg)
+![Operations_total_mean](images/analysis_t/Operations_total_mean.svg)
+![Quantity_Active_Products_min](images/analysis_t/Quantity_Active_Products_min.svg)
 
 
 ## Comparar importancias de las mejores variables
@@ -1724,10 +1724,10 @@ best_hyperparameters_searcher, best_importances = get_feature_importances(
 )
 
 renames_dict = {
-    "Client_Age_grp_t": "Age range",
-    "Operations_total_mean_t": "Average quantity of operations",
-    "CreditCard_Product_t": "Credit Card Type",
-    "Quantity_Active_Products_min_t": "Minimum quantity of active products",
+    "Client_Age_grp": "Age range",
+    "Operations_total_mean": "Average quantity of operations",
+    "CreditCard_Product": "Credit Card Type",
+    "Quantity_Active_Products_min": "Minimum quantity of active products",
 }
 best_importances_renamed = best_importances.with_columns(
     pl.col(settings.col_feature)
