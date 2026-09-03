@@ -53,7 +53,7 @@ def stratified_train_test_split(
 
 
 def get_feature_importances(
-    X_train: pl.DataFrame,
+    train: pl.DataFrame,
     columns: list[str],
     n_iter: int = 2,
     splits_cross_validation: int = 3,
@@ -64,7 +64,7 @@ def get_feature_importances(
     importancias de features en un DataFrame de Polars.
 
     Args:
-        X_train : Datos de entrenamiento; debe contener
+        train : Datos de entrenamiento; debe contener
             ``columns`` y la columna target.
         columns : Columnas de features usadas para entrenar el modelo.
         No debe tener la columna target.
@@ -119,7 +119,10 @@ def get_feature_importances(
         random_state=random_state,
     )
 
-    searcher.fit(X_train.select(columns), X_train[settings.col_target])
+    X_train = train.select(columns)
+    y_train = train[settings.col_target]
+    searcher.fit(X_train, y_train)
+
     best_estimator: lgb.LGBMClassifier = searcher.best_estimator_
     importances = pl.DataFrame(
         {
@@ -250,7 +253,7 @@ def print_train_deciles(train_deciles: pl.DataFrame):
 
 
 def print_test_deciles(
-    test_deciles: pl.DataFrame, df: pl.DataFrame, probabilities: np.ndarray
+    test_deciles: pl.DataFrame, test: pl.DataFrame, probabilities_test: np.ndarray
 ):
     """imprime metricas de los deciles del set de test
     e imprime metricas de los deciles recalculados ("trampa").
@@ -261,5 +264,5 @@ def print_test_deciles(
     print(f"test:\n{test_deciles}")
 
     print("test trampa: recalculo las cotas...")  # TODO
-    test_deciles = compute_prediction_deciles(df, probabilities)
+    test_deciles = compute_prediction_deciles(test, probabilities_test)
     print(test_deciles)
