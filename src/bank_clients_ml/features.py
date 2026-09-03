@@ -92,7 +92,6 @@ def target_encode_columns(
         count_1 = (pl.col(settings.col_target) == 1.0).sum().over(column)
         total = pl.col(settings.col_target).is_in([0.0, 1.0]).sum().over(column)
 
-        # el pl.col("total") nunca deberia ser 0. si da 0 es porque estoy haciendo algo mal
         if df.select((total == 0).any()).item():
             categories_with_issue = (
                 df.filter(total == 0).get_column(column).unique().to_list()
@@ -340,7 +339,6 @@ def group_bins_by_ranges(
     low, high, val = _get_range_data(0, stats)
     expr = pl.when(expr_col.is_between(low, high)).then(val)
 
-    # Encadenar el resto de los rangos (de i = 1 en adelante)
     for i in range(1, len(ranges)):
         low, high, val = _get_range_data(i, stats)
         expr = expr.when(expr_col.is_between(low, high)).then(val)

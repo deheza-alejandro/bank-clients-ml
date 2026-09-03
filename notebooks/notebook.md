@@ -966,37 +966,6 @@ print(data_agg.shape)
 scan_anomalies(data_agg)
 ```
 
-```python
-# TODO: SACAR ESTA CELDA SI PODES:
-# Esto restaura el orden original de las columnas del DataFrame
-# para que la matriz de correlación funcione igual
-# sin esto la matriz de correlaciones saca las variables que necesito
-# para sacar esto tendria que agregar manualmente las variables que necesito,
-# o usar otras variables (correlacionadas)
-
-"""
-original_order = [
-    *(
-        f"{col}_{f}"
-        for col in [*columns_with_quantities, *columns_with_monetary_values]
-        for f in ["var", "std"]
-    ),
-    *(f"{col}_nunique" for col in columns_with_quantities),
-    *(f"{col}_rounded_nunique" for col in columns_with_monetary_values),
-]
-
-data_agg = data_agg.select(
-    settings.col_id,
-    pl.col("^.*(_min|_max|_mean|_median|_sum|_count_nonzero)$"),
-    *original_order,
-    pl.col("^.*(_ptp|_diff|_diff_rel|_pct_var)$"),
-)
-
-print(data_agg.shape)
-data_agg.describe()
-"""
-```
-
 # ABT
 
 ```python
@@ -1105,19 +1074,11 @@ print(f"columnas con correlacion mayor a 80%: {len(to_delete)}")
 print("train sin columnas con correlacion mayor a 80%:", uncorrelated_train.shape)
 ```
 
-## Estandarizacion (z-score) con Polars
-
-```python
-"""
-standardized_train = standardize(uncorrelated_train)
-print(scan_anomalies(standardized_train))
-standardized_train.describe()
-"""
-```
-
 # Feature Selection
 
 ## Ordeno las variables por fuente segun importancia usando lightGBM para quedarme con las mas importantes
+
+No estandarizo el dataframe por que lightGBM no lo necesita
 
 - primero entreno con todas las variables, para tener roc de referencia:
 - luego entreno con cada grupo por separado
@@ -1230,23 +1191,11 @@ plot_top_features(
 ```
 
 ![all_cols_importances](images/plot_top_features/all_cols_importances.svg)
-
-
 ![cols_saving_account_days_transactions_importances](images/plot_top_features/cols_saving_account_days_transactions_importances.svg)
-
-
 ![cols_saving_account_monetary_importances](images/plot_top_features/cols_saving_account_monetary_importances.svg)
-
-
 ![cols_operations_importances](images/plot_top_features/cols_operations_importances.svg)
-
-
 ![cols_credit_card_payment_importances](images/plot_top_features/cols_credit_card_payment_importances.svg)
-
-
 ![cols_credit_card_monetary_importances](images/plot_top_features/cols_credit_card_monetary_importances.svg)
-
-
 ![cols_others_importances](images/plot_top_features/cols_others_importances.svg)
 
 ```python
@@ -1281,208 +1230,15 @@ tables_analysis = generate_bivariate_charts(
 )
 ```
 
-![SavingAccount_Days_with_use_count_nonzero](images/analysis/SavingAccount_Days_with_use_count_nonzero.svg)
-![SavingAccount_Transfer_In_Transactions_count_nonzero](images/analysis/SavingAccount_Transfer_In_Transactions_count_nonzero.svg)
-![SavingAccount_Transfer_In_Transactions_max](images/analysis/SavingAccount_Transfer_In_Transactions_max.svg)
-![SavingAccount_Days_with_use_min](images/analysis/SavingAccount_Days_with_use_min.svg)
-![SavingAccount_Days_with_Credits_porc_var](images/analysis/SavingAccount_Days_with_Credits_porc_var.svg)
-![SavingAccount_CreditCard_Payment_Transactions_max](images/analysis/SavingAccount_CreditCard_Payment_Transactions_max.svg)
-![SavingAccount_CreditCard_Payment_Transactions_count_nonzero](images/analysis/SavingAccount_CreditCard_Payment_Transactions_count_nonzero.svg)
-
-![SavingAccount_Balance_FirstDate_max](images/analysis/SavingAccount_Balance_FirstDate_max.svg)
-![SavingAccount_CreditCard_Payment_Amount_max](images/analysis/SavingAccount_CreditCard_Payment_Amount_max.svg)
-![SavingAccount_Transfer_In_Amount_max](images/analysis/SavingAccount_Transfer_In_Amount_max.svg)
-![SavingAccount_Total_Amount_min](images/analysis/SavingAccount_Total_Amount_min.svg)
-![SavingAccount_Total_Amount_diff](images/analysis/SavingAccount_Total_Amount_diff.svg)
-![SavingAccount_Balance_LastDate_diff_rel](images/analysis/SavingAccount_Balance_LastDate_diff_rel.svg)
-
-![Operations_total_count_nonzero](images/analysis/Operations_total_count_nonzero.svg)
-![Operations_total_min](images/analysis/Operations_total_min.svg)
-![Operations_total_var](images/analysis/Operations_total_var.svg)
-![Operations_Telemarketer_porc_max](images/analysis/Operations_Telemarketer_porc_max.svg)
-![Operations_in_person_porc_min](images/analysis/Operations_in_person_porc_min.svg)
-![Operations_in_person_porc_max](images/analysis/Operations_in_person_porc_max.svg)
-
-![CreditCard_Payment_total_max](images/analysis/CreditCard_Payment_total_max.svg)
-![CreditCard_Payment_Aut_Debit_max](images/analysis/CreditCard_Payment_Aut_Debit_max.svg)
-![CreditCard_Payment_total_min](images/analysis/CreditCard_Payment_total_min.svg)
-![CreditCard_Payment_TAS_max](images/analysis/CreditCard_Payment_TAS_max.svg)
-![CreditCard_Payment_Cash_max](images/analysis/CreditCard_Payment_Cash_max.svg)
-![CreditCard_Payment_Web_max](images/analysis/CreditCard_Payment_Web_max.svg)
-![CreditCard_Payment_Aut_Debit_min](images/analysis/CreditCard_Payment_Aut_Debit_min.svg)
-![CreditCard_Payment_Aut_Debit_diff](images/analysis/CreditCard_Payment_Aut_Debit_diff.svg)
-![CreditCard_Payment_ATM_max](images/analysis/CreditCard_Payment_ATM_max.svg)
-![CreditCard_Payment_in_person_porc_diff_rel](images/analysis/CreditCard_Payment_in_person_porc_diff_rel.svg)
-
-![CreditCard_Payment_in_person_max](images/analysis/CreditCard_Payment_in_person_max.svg)
-
-![CreditCard_Total_Limit_var](images/analysis/CreditCard_Total_Limit_var.svg)
-![CreditCard_Total_Limit_diff_rel](images/analysis/CreditCard_Total_Limit_diff_rel.svg)
-![CreditCard_Balance_ARG_SP_porc_max](images/analysis/CreditCard_Balance_ARG_SP_porc_max.svg)
-![CreditCard_Total_Limit_min](images/analysis/CreditCard_Total_Limit_min.svg)
-![CreditCard_Revolving_min](images/analysis/CreditCard_Revolving_min.svg)
-![CreditCard_Total_Spending_diff_rel](images/analysis/CreditCard_Total_Spending_diff_rel.svg)
-![CreditCard_Spending_Aut_Debits_diff_rel](images/analysis/CreditCard_Spending_Aut_Debits_diff_rel.svg)
-
-![CreditCard_Product](images/analysis/CreditCard_Product.svg)
-![Recency_in_days](images/analysis/Recency_in_days.svg)
-![Days_between_first_and_last_product](images/analysis/Days_between_first_and_last_product.svg)
 ![Client_Age_grp](images/analysis/Client_Age_grp.svg)
+![CreditCard_Balance_ARG_SP_porc_max](images/analysis/CreditCard_Balance_ARG_SP_porc_max.svg)
+![CreditCard_Payment_total_max](images/analysis/CreditCard_Payment_total_max.svg)
+![CreditCard_Product](images/analysis/CreditCard_Product.svg)
+![CreditCard_Total_Limit_diff_rel](images/analysis/CreditCard_Total_Limit_diff_rel.svg)
+![Operations_total_min](images/analysis/Operations_total_min.svg)
 ![Quantity_Active_Products_min](images/analysis/Quantity_Active_Products_min.svg)
-![Quantity_Active_Products_nunique](images/analysis/Quantity_Active_Products_nunique.svg)
-![SavingAccount_Active_ARG_Salary](images/analysis/SavingAccount_Active_ARG_Salary.svg)
-![Sex](images/analysis/Sex.svg)
-![SavingAccount_Active_DOLLAR](images/analysis/SavingAccount_Active_DOLLAR.svg)
-![Region](images/analysis/Region.svg)
-![Quantity_Active_Products_var](images/analysis/Quantity_Active_Products_var.svg)
-![Investment_Numbers_max](images/analysis/Investment_Numbers_max.svg)
-![Email](images/analysis/Email.svg)
-
-![Quantity_Common_Active_Product_count_nonzero](images/analysis/Quantity_Common_Active_Product_count_nonzero.svg)
-
-
-```python
-"""
-graf = [
-    "CreditCard_Payment_total_var",
-
-    "Limit_operations",
-
-    "SavingAccount_CreditCard_Payment_Amount_max",
-    "CreditCard_Total_Limit_diff_rel",
-
-    "SavingAccount_Days_with_use_count_nonzero",
-    "SavingAccount_Days_with_use_min",
-    "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",
-
-    "Operations_total_count_nonzero",
-    "Operations_in_person_porc_max",
-
-    "CreditCard_Payment_total_max",
-    "CreditCard_Payment_Aut_Debit_max",
-    "CreditCard_Payment_in_person_max",
-
-    "CreditCard_Product",
-    "Days_between_first_and_last_product",
-    "Client_Age_grp",
-    "Quantity_Active_Products_min",
-    "Recency_in_days",
-]
-
-generate_bivariate_charts(
-    ABT, # dataset con variables sin standarizar
-    graf,
-    "analysis_2"
-)
-"""
-```
-
-![CreditCard_Payment_total_var](images/analysis_2/CreditCard_Payment_total_var.svg)
-
-![Limit_operations](images/analysis_2/Limit_operations.svg)
-
-![SavingAccount_CreditCard_Payment_Amount_max](images/analysis_2/SavingAccount_CreditCard_Payment_Amount_max.svg)
-![CreditCard_Total_Limit_diff_rel](images/analysis_2/CreditCard_Total_Limit_diff_rel.svg)
-
-![SavingAccount_Days_with_use_count_nonzero](images/analysis_2/SavingAccount_Days_with_use_count_nonzero.svg)
-![SavingAccount_Days_with_use_min](images/analysis_2/SavingAccount_Days_with_use_min.svg)
-![SavingAccount_CreditCard_Payment_Transactions_count_nonzero](images/analysis_2/SavingAccount_CreditCard_Payment_Transactions_count_nonzero.svg)
-
-![Operations_total_count_nonzero](images/analysis_2/Operations_total_count_nonzero.svg)
-![Operations_in_person_porc_max](images/analysis_2/Operations_in_person_porc_max.svg)
-
-![CreditCard_Payment_total_max](images/analysis_2/CreditCard_Payment_total_max.svg)
-![CreditCard_Payment_Aut_Debit_max](images/analysis_2/CreditCard_Payment_Aut_Debit_max.svg)
-![CreditCard_Payment_in_person_max](images/analysis_2/CreditCard_Payment_in_person_max.svg)
-
-![CreditCard_Product](images/analysis_2/CreditCard_Product.svg)
-![Days_between_first_and_last_product](images/analysis_2/Days_between_first_and_last_product.svg)
-![Client_Age_grp](images/analysis_2/Client_Age_grp.svg)
-![Quantity_Active_Products_min](images/analysis_2/Quantity_Active_Products_min.svg)
-![Recency_in_days](images/analysis_2/Recency_in_days.svg)
-
-
-### Re-entreno con las mejores variables
-
-```python
-"""
-to_test = [
-    "SavingAccount_Days_with_use_count_nonzero",
-    "SavingAccount_Transfer_In_Transactions_count_nonzero",
-    "SavingAccount_Transfer_In_Transactions_max",
-    "SavingAccount_Days_with_use_min",
-    "SavingAccount_Days_with_Credits_porc_var",
-    "SavingAccount_CreditCard_Payment_Transactions_max",
-    "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",
-
-    "Operations_total_count_nonzero",
-    "Operations_total_min",
-    "Operations_total_var",
-    "Operations_Telemarketer_porc_max",
-    "Operations_in_person_porc_min",
-    "Operations_in_person_porc_max",
-
-    "CreditCard_Payment_total_var",
-    "CreditCard_Payment_total_max",
-    "CreditCard_Payment_Aut_Debit_max",
-    "CreditCard_Payment_total_min",
-    "CreditCard_Payment_TAS_max",
-    "CreditCard_Payment_Cash_max",
-    "CreditCard_Payment_Web_max",
-    "CreditCard_Payment_Aut_Debit_min",
-    "CreditCard_Payment_Aut_Debit_diff",
-    "CreditCard_Payment_ATM_max",
-    "CreditCard_Payment_in_person_porc_diff_rel",
-
-    "CreditCard_Payment_in_person_max"
-]
-
-searcher_7, most_important_variables_7 = get_feature_importances(
-    train, to_test
-)
-plot_top_features(most_important_variables_7, "most_important_variables_7", searcher_7)
-searcher_7
-"""
-```
-
-![most_important_variables_7](images/most_important_variables_7.svg)
-
-
-### Re-entreno con las mejores variables
-
-```python
-"""
-to_test_2 = [
-    "SavingAccount_Days_with_use_count_nonzero",
-    "SavingAccount_Days_with_use_min",
-    "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",
-
-    "SavingAccount_CreditCard_Payment_Amount_max",
-
-    "Operations_total_count_nonzero",
-    "Operations_in_person_porc_max",
-
-    "CreditCard_Payment_total_max",
-    "CreditCard_Payment_Aut_Debit_max",
-    "CreditCard_Payment_in_person_max",
-
-    "CreditCard_Total_Limit_diff_rel",
-
-    "CreditCard_Product",
-    "Days_between_first_and_last_product",
-    "Client_Age_grp",
-    "Quantity_Active_Products_min",
-]
-
-searcher_8, most_important_variables_8 = get_feature_importances(
-    train, to_test_2
-)
-plot_top_features(most_important_variables_8, "most_important_variables_8", searcher_8)
-searcher_8
-"""
-```
-
-![most_important_variables_8](images/most_important_variables_8.svg)
+![SavingAccount_Transfer_In_Amount_max](images/analysis/SavingAccount_Transfer_In_Amount_max.svg)
+![SavingAccount_Transfer_In_Transactions_porc_max](images/analysis/SavingAccount_Transfer_In_Transactions_porc_max.svg)
 
 
 ### Buscando variables correlacionadas eliminadas anteriormente
@@ -1578,75 +1334,6 @@ final_train = final_train.with_columns(bins_transformations)
 final_test = final_test.with_columns(bins_transformations)
 
 scan_anomalies(final_train)
-
-# # Intento agrupar demas variables (calculado en excel)
-
-# final_train = final_train.with_columns(
-#     group_bins_by_ranges(
-#         "Operations_total_count_nonzero",
-#         ranges=[(1, 1), (2, 3), (4, 5), (6, 6)],
-#         table=tables_analysis_2["Operations_total_count_nonzero"],
-#     ).alias("Operations_total_count_nonzero")
-# )
-
-# final_train = final_train.with_columns(group_bins_by_ranges(
-#     'Region',
-#     ranges=[(24.370, 24.375)],  # mantengo "REGION CENTRO"
-#     values=[24.372],
-#     default=30.663,
-# ).alias("Region"))
-# # default -> totas las demas regiones
-# # (NORTE GRANDE ARGENTINO + CUYO + CABA Centro/Norte + AMBA Resto + BUENOS AIRES
-# # + REGION PATAGONICA)
-
-# final_train = final_train.with_columns(group_bins_by_ranges(
-#     'Operations_in_person_max',
-#     ranges=[(1, 2), (3, 44)],
-#     values=[36.971, 54.786],
-#     default=17.000,
-# ).alias("Operations_in_person_max"))
-
-# final_train = final_train.with_columns(group_bins_by_ranges(
-#     'Days_between_first_and_last_product',
-#     ranges=[(0, 441), (442, 1142), (1143, 2130)],
-#     values=[21.764, 25.244, 33.003],
-#     default=48.858,
-# ).alias("Days_between_first_and_last_product"))
-
-# final_train = final_train.with_columns(group_bins_by_ranges(
-#     'Recency_in_days',
-#     ranges=[(1, 408), (409, 650)],
-#     values=[33.822, 29.220],
-#     default=23.845,
-# ).alias("Recency_in_days"))
-
-# final_train = final_train.with_columns(group_bins_by_ranges(
-#     'CreditCard_Total_Spending_median',
-#     ranges=[(0.5, 1979.9), (1980.2, 4078.7), (4079.0, 117452)],
-#     values=[33.866, 41.667, 46.154],
-#     default=9.000,
-# ).alias("CreditCard_Total_Spending_median"))
-
-# final_train = final_train.with_columns(group_bins_by_ranges(
-#     'SavingAccount_Balance_Average_median',
-#     ranges=[(163.3, 2823.9), (2824.0, 1515662.7)],
-#     values=[30.999, 50.143],
-#     default=22.243,
-# ).alias("SavingAccount_Balance_Average_median"))
-
-# final_train = final_train.with_columns(group_bins_by_ranges(
-#     'SavingAccount_Transactions_Transactions_median',
-#     ranges=[(0, 3), (3.5, 7)],
-#     values=[21.781, 31.686],
-#     default=54.346,
-# ).alias("SavingAccount_Transactions_Transactions_median"))
-
-# final_train = final_train.with_columns(group_bins_by_ranges(
-#     'SavingAccount_CreditCard_Payment_Amount_median',
-#     ranges=[(0, 0)],
-#     values=[21.000],
-#     default=55.253,
-# ).alias("SavingAccount_CreditCard_Payment_Amount_median"))
 ```
 
 ```python
@@ -1667,9 +1354,6 @@ _ = generate_bivariate_charts(final_train, best_features, "analysis_t")
 ![Operations_total_mean](images/analysis_t/Operations_total_mean.svg)
 ![Quantity_Active_Products_min](images/analysis_t/Quantity_Active_Products_min.svg)
 
-
-## Comparar importancias de las mejores variables
-
 ```python
 final_cols = [settings.col_id, settings.col_target, *best_features]
 final_train = final_train.select(final_cols)
@@ -1678,35 +1362,10 @@ print(final_train.shape)
 final_train.describe()
 ```
 
-```python
-best_features_searcher, best_features_importances = get_feature_importances(
-    final_train, best_features
-)
-plot_top_features(best_features_importances, "best_features", best_features_searcher)
-best_features_searcher
-```
-
-![best_features](images/plot_top_features/best_features.svg)
-
-
 # Model Training
 
 
-## Balancear a 50%/50% (oversampling) <- a modo de ejemplo, esto despues no lo uso
-
-```python
-"""
-balanced_train = oversample_with_unique_ids(final_train, target_proportion=0.5)
-
-print(f"{final_train.shape} \n")
-print(f"{balanced_train.shape} \n")
-
-print(f"{final_train[settings.col_target].value_counts()} \n")
-print(f"{balanced_train[settings.col_target].value_counts()} \n")
-"""
-```
-
-## Entreno con las mejores variables y mejores hiperparametros
+## Entreno con las mejores features y mejores hiperparametros
 No realizo ningun balanceo porque la proporcion del target ya es del 30%
 
 ```python
@@ -1725,12 +1384,12 @@ best_importances_renamed = best_importances.with_columns(
     .replace_strict(renames_dict, default=pl.col(settings.col_feature))
     .alias(settings.col_feature)
 )
-plot_top_features(best_importances_renamed, "best_features_final", best_hyperparameters_searcher)
+plot_top_features(best_importances_renamed, "best_features", best_hyperparameters_searcher)
 
 best_hyperparameters_searcher
 ```
 
-![best_features_final](images/plot_top_features/best_features_final.svg)
+![best_features_final](images/plot_top_features/best_features.svg)
 
 
 # Performance del modelo
@@ -1793,54 +1452,3 @@ plot_roc_and_metrics(
 ### Diferencias
 - lift -> 0,4
 - KS -> 0,2
-
-
-# Verificando si el problema se puede resolver con una regresion logistica
-
-```python
-"""
-from sklearn.linear_model import LogisticRegression
-
-modelo = LogisticRegression()
-modelo.fit(train_final.select(best_features), train_final[settings.col_target])
-
-y_pred_log = modelo.predict(test_final.select(best_features))
-probabilities_train_log = modelo.predict_proba(train_final.select(best_features))
-probabilities_test_log = modelo.predict_proba(test_final.select(best_features))
-
-# Cotas fijas....
-# basado en los porcentajes de training
-bins = [
-    0.051719,
-    0.079377,
-    0.170491,
-    0.197105,
-    0.267983,
-    0.366586,
-    0.467006,
-    0.579763,
-    0.580742,
-]
-
-print_train_deciles(compute_prediction_deciles(train_final, probabilities_train_log))
-
-print_test_deciles(
-    compute_prediction_deciles(test_final, probabilities_test_log, bins),
-    test_final,
-    probabilities_test_log,
-)
-
-plot_roc_and_metrics(
-    test_final[settings.col_target],
-    probabilities_test_log,
-    y_pred_log,
-    graphic_name="logistic_regression",
-)
-"""
-```
-
-![roc_logistic_regression](images/plot_roc_and_metrics/logistic_regression.svg)
-
-```python
-
-```
