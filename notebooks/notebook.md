@@ -1115,7 +1115,7 @@ standardized_X_train.describe()
 """
 ```
 
-# Analizando variables
+# Feature Selection
 
 ## Ordeno las variables por fuente segun importancia usando lightGBM para quedarme con las mas importantes
 
