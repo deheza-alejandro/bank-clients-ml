@@ -64,46 +64,54 @@ def columns_with_zeros(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def scan_anomalies(df: pl.DataFrame) -> pl.DataFrame:
+def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
     """
-    Devuelve un DataFrame de diagnóstico con las columnas que presentan
-    nulos, NaNs, Infs o sufijos de joins de pandas (_x, _y)
-    o sufijos de joins de polars (_right).
+    Devuelve un DataFrame de diagnóstico con el "shape" del dataframe
+    y las columnas que presentan nulos, NaNs, Infs, valores no numericos
+    o sufijos de joins de pandas (_x, _y) o sufijos de joins de polars (_right).
     """
-    null_counts = df.null_count()
-    null_cols = [c for c in df.columns if null_counts[c][0] > 0]
+    rows_count, columns_count = df.shape
+    df_shape = [f"{rows_count} rows", f"{columns_count} columns"]
 
-    float_df = df.select(cs.float())
-    if float_df.width > 0:
-        nan_flags = float_df.select(pl.all().is_nan().any())
-        inf_flags = float_df.select(pl.all().is_infinite().any())
-        nan_cols = [c for c in float_df.columns if nan_flags[c][0]]
-        inf_cols = [c for c in float_df.columns if inf_flags[c][0]]
+    schema = df.schema
+    all_cols = list(schema.keys())
+    float_cols = [col for col, dt in schema.items() if dt.is_float()]
+    non_numeric_cols = [
+        col for col, dt in schema.items()
+        if not (dt.is_numeric() or dt == pl.Null)
+    ]
+
+    cols_x = [c for c in all_cols if c.endswith("_x")]
+    cols_y_right = [c for c in all_cols if c.endswith(("_y", "_right"))]
+
+    exprs = [pl.col(c).is_null().any().alias(f"null_{c}") for c in all_cols]
+    for c in float_cols:
+        exprs.append(pl.col(c).is_nan().any().alias(f"nan_{c}"))
+        exprs.append(pl.col(c).is_infinite().any().alias(f"inf_{c}"))
+
+    if exprs:
+        results = df.select(exprs).row(0, named=True)
+        null_cols = [c for c in all_cols if results[f"null_{c}"]]
+        nan_cols = [c for c in float_cols if results[f"nan_{c}"]]
+        inf_cols = [c for c in float_cols if results[f"inf_{c}"]]
     else:
-        nan_cols, inf_cols = [], []
+        null_cols, nan_cols, inf_cols = [], [], []
 
-    cols_x = [c for c in df.columns if c.endswith("_x")]
-    cols_y_right = [c for c in df.columns if c.endswith(("_y", "_right"))]
+    metrics = [
+        ("Shape of the DataFrame", df_shape),
+        ("Columns with null, None or NaT", null_cols),
+        ("Columns with NaN", nan_cols),
+        ("Columns with inf", inf_cols),
+        ("Columns with non-numeric values", non_numeric_cols),
+        ("Columns ended with _x (pandas join)", cols_x),
+        ("Columns ended with _y (pandas join) or _right (polars join)", cols_y_right),
+    ]
 
-    return pl.DataFrame(
-        {
-            "metric": [
-                "Columns with null, None or NaT",
-                "Columns with NaN",
-                "Columns with inf",
-                "Columns ended with _x (pandas join)",
-                "Columns ended with _y (pandas join) or _right (polars join)",
-            ],
-            "total": [
-                len(null_cols),
-                len(nan_cols),
-                len(inf_cols),
-                len(cols_x),
-                len(cols_y_right),
-            ],
-            "columns": [null_cols, nan_cols, inf_cols, cols_x, cols_y_right],
-        }
-    )
+    return pl.DataFrame({
+        "metric": [m[0] for m in metrics],
+        "total": [len(m[1]) for m in metrics],
+        "values": [m[1] for m in metrics],
+    })
 
 
 def get_operator(condition: ConditionSymbol):
