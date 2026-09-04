@@ -56,10 +56,10 @@ from bank_clients_ml.utils import (
     count_row_matches,
     filter_columns_by_cardinality,
     filter_nonzero,
+    inspect_dataframe,
     low_cardinality_value_counts,
     mins_in_range,
     print_without_trunc,
-    scan_anomalies,
 )
 
 settings = get_settings()
@@ -104,11 +104,11 @@ print_without_trunc(low_cardinality_value_counts(data))
 ```
 
 ```python
-print_without_trunc(filter_columns_by_cardinality(data))
+print_without_trunc(filter_columns_by_cardinality(data, condition=">", threshold=10))
 ```
 
 ```python
-print_without_trunc(scan_anomalies(data))
+print_without_trunc(inspect_dataframe(data))
 ```
 
 ```python
@@ -122,8 +122,7 @@ print(data.filter(pl.col(settings.col_target).is_null()).select(settings.col_id)
 ```python
 print(data.shape)
 clean_data = data.filter(pl.col(settings.col_target).is_not_null())
-print(clean_data.shape)
-print_without_trunc(scan_anomalies(clean_data))
+print_without_trunc(inspect_dataframe(clean_data))
 clean_data = clean_data.with_columns(
     pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date(),
     pl.col(settings.col_id).cast(pl.Int64)
@@ -184,13 +183,12 @@ training_data = clean_data.filter(pl.col("Month").is_in(training_months))
 prediction_data = clean_data.filter(pl.col("Month").is_in(prediction_months))
 
 print(f"universe_and_target.shape: {universe_and_target.shape} \n")
-print(f"training_data.shape: {training_data.shape} \n")
-print(f"training_data['Month'].value_counts(): {training_data['Month'].value_counts()}")
 print(f"prediction_data.shape: {prediction_data.shape} \n")
+print(f"training_data['Month'].value_counts(): {training_data['Month'].value_counts()}")
 ```
 
 ```python
-scan_anomalies(training_data)
+inspect_dataframe(training_data)
 ```
 
 # Feature Engineering
@@ -200,7 +198,7 @@ scan_anomalies(training_data)
 null_cols = ["SavingAccount_Balance_Average", "Region", "CreditCard_Product"]
 print(f"{training_data.select(null_cols).describe()} \n")
 print(
-    f"SavingAccount_Balance_Average n_unique: "
+    f"SavingAccount_Balance_Average unique values: "
     f"{training_data.select('SavingAccount_Balance_Average').n_unique()} \n"
 )
 ```
@@ -249,7 +247,7 @@ training_data = training_data.with_columns(
 )
 
 print(f"{training_data.select('SavingAccount_Balance_Average').describe()} \n")
-training_data.shape
+inspect_dataframe(training_data)
 ```
 
 ### Completando 'Region'
@@ -279,13 +277,13 @@ Traigo los CreditCard_Product de la ventana de prediccion.
 
 Hay algunos clientes que tienen un CreditCard_Product en el primer mes de prediccion y otro CreditCard_Product en el segundo mes de prediccion
 
-Por lo tanto se obtiene el valor del primer mes (prediction_months[0]) y, si este es null o no existe, toma el valor del segundo mes (prediction_months[1]) como fallback, incluso si también es null
+Por lo tanto se obtiene el valor del primer mes de la ventana de prediccion y, si este es null o no existe, toma el valor del segundo mes como fallback, incluso si también es null
 
 Luego para llenar los nulos restantes, pongo la CreditCard_Product mas comun cuando el cliente no tiene `CreditCard_Active` en la ventana de prediccion pero si tiene `CreditCard_Active` en la ventana de entrenamiento. en los demas casos lleno los nulls con "0" (cuando no tiene `CreditCard_Active` en la ventana de prediccion ni en la ventana de entrenamiento o cuando no tiene `CreditCard_Active` en la ventana de entrenamiento, por mas que lo tenga en la ventana de prediccion)
 
 ```python
 clients_creditcard_product = (
-    prediction_data.sort(pl.col("Month") == prediction_months[0], descending=True)
+    prediction_data.sort(pl.col("Month") == first_prediction_month, descending=True)
     .group_by(settings.col_id)
     .agg(pl.col("CreditCard_Product").drop_nulls().first())
 )
@@ -316,8 +314,7 @@ print(f"{training_data.select('CreditCard_Product').describe()} \n")
 ```
 
 ```python
-print(training_data.shape)
-scan_anomalies(training_data)
+inspect_dataframe(training_data)
 ```
 
 ## Identity Features
@@ -348,12 +345,12 @@ binary_identity_features_columns = [
     "Email",
 ]
 
+categorical_cols = ["Client_Age_grp", "Region", "CreditCard_Product"]
+
 identity_features_columns = [
     settings.col_id,
     settings.col_target,
-    "Client_Age_grp",
-    "Region",
-    "CreditCard_Product",
+    *categorical_cols,
     "First_product_dt",
     "Last_product_dt",
     *binary_identity_features_columns,
@@ -367,21 +364,17 @@ identity_features = training_data.filter(pl.col("Month") == last_training_month)
     identity_features_columns
 )
 
-print(identity_features.shape)
-print(identity_features["CreditCard_Premium"].value_counts())
-print(f"{identity_features["Sex"].value_counts()} \n")
-identity_features.describe()
+print_without_trunc(low_cardinality_value_counts(identity_features.drop(categorical_cols)))
 ```
 
 ```python
-identity_features.schema
+print_without_trunc(inspect_dataframe(identity_features))
+identity_features.describe()
 ```
 
 ## Variables Categoricas
 
 ```python
-categorical_cols = ["Client_Age_grp", "Region", "CreditCard_Product"]
-
 print_without_trunc(
     low_cardinality_value_counts(identity_features.select(categorical_cols))
 )
@@ -391,11 +384,12 @@ identity_features = target_encode_columns(identity_features, categorical_cols)
 print_without_trunc(
     low_cardinality_value_counts(identity_features.select(categorical_cols))
 )
+```
 
-print(f"identity_features: {identity_features.shape}")
+```python
 print(f"training_data: {training_data.shape}")
 training_data = training_data.drop(categorical_cols)
-print(f"training_data: {training_data.shape}")
+print_without_trunc(inspect_dataframe(training_data))
 ```
 
 ## Fechas
@@ -412,8 +406,8 @@ identity_features = identity_features.with_columns(
     ]
 ).drop(["First_product_dt", "Last_product_dt"])
 
-print(f"identity_features: {identity_features.shape} \n")
-print(identity_features.describe())
+print_without_trunc(inspect_dataframe(identity_features))
+identity_features.describe()
 ```
 
 ## Transform features
@@ -447,15 +441,9 @@ filter_nonzero(training_data, credit_card_cols)
 ```python
 print(training_data.shape)
 training_data = add_transformations(training_data)
-print(training_data.shape)
 
-print_without_trunc(scan_anomalies(training_data))
-print(training_data.select(pl.col(pl.String)))
+print_without_trunc(inspect_dataframe(training_data))
 training_data.describe()
-```
-
-```python
-training_data.schema
 ```
 
 ```python
@@ -565,26 +553,22 @@ data_agg = (
     .agg(agg_exprs)
 )
 
-print(data_agg.shape)
-scan_anomalies(data_agg)
+inspect_dataframe(data_agg)
 ```
 
 # ABT
 
 ```python
 ABT = identity_features.join(data_agg, on=settings.col_id, how="inner")
-print(ABT.shape)
-scan_anomalies(ABT)
+inspect_dataframe(ABT)
 ```
 
 ## Agrego transformadas extras luego de las operaciones de agregacion
 
 ```python
 ABT = add_extra_transformations(ABT)
-print(ABT.shape)
-print(ABT.select(pl.col(pl.String)))
 print_without_trunc(mins_in_range(ABT, -1, 1))
-scan_anomalies(ABT)
+inspect_dataframe(ABT)
 ```
 
 ```python
@@ -630,7 +614,7 @@ to_delete = correlation_analyzer.get_redundant_correlated_columns(threshold=0.80
 uncorrelated_train = correlated_train.drop(to_delete)
 uncorrelated_test = correlated_test.drop(to_delete)
 
-print(f"columnas con correlacion mayor a 80%: {len(to_delete)}")
+print(f"cantidad de columnas con correlacion mayor a 80%: {len(to_delete)}")
 print("train sin columnas con correlacion mayor a 80%:", uncorrelated_train.shape)
 ```
 
@@ -885,7 +869,7 @@ bins_transformations = [
 
 final_train = correlated_train.with_columns(bins_transformations)
 final_test = correlated_test.with_columns(bins_transformations)
-scan_anomalies(final_train)
+inspect_dataframe(final_train)
 ```
 
 ```python
@@ -910,7 +894,7 @@ _ = generate_bivariate_charts(final_train, best_features, "analysis_t")
 final_cols = [settings.col_id, settings.col_target, *best_features]
 final_train = final_train.select(final_cols)
 final_test = final_test.select(final_cols)
-print(final_train.shape)
+print_without_trunc(inspect_dataframe(final_train))
 final_train.describe()
 ```
 
@@ -974,7 +958,7 @@ plot_deciles(
 ![deciles](images/plot_evaluation_metrics/deciles.svg)
 
 
-## Resultados del excel
+## Resultados
 
 ### Training
 - ordena todos los deciles bien

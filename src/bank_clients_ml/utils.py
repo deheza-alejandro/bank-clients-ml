@@ -162,16 +162,17 @@ def filter_columns_by_cardinality(
 
     return (
         df.select(pl.all().n_unique())
-        .unpivot(variable_name="column", value_name="n_unique")
-        .filter(op_func(pl.col("n_unique"), threshold))
+        .unpivot(variable_name="column", value_name="unique_values")
+        .filter(op_func(pl.col("unique_values"), threshold))
     )
 
 
-def low_cardinality_value_counts(df: pl.DataFrame, max_n_unique: int = 10) -> pl.DataFrame:
-    """Calcula el value_counts de las columnas con una cantidad de valores únicos <= max_n_unique
+def low_cardinality_value_counts(df: pl.DataFrame, max_unique_values: int = 10) -> pl.DataFrame:
+    """Calcula el value_counts de las columnas con una cantidad de
+    valores únicos <= max_unique_values
     y devuelve un único DataFrame en formato largo (column, value, count).
     """
-    cols_to_keep = filter_columns_by_cardinality(df, "<=", max_n_unique)["column"].to_list()
+    cols_to_keep = filter_columns_by_cardinality(df, "<=", max_unique_values)["column"].to_list()
 
     if not cols_to_keep:
         return pl.DataFrame(
