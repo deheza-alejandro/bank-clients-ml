@@ -77,8 +77,7 @@ def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
     all_cols = list(schema.keys())
     float_cols = [col for col, dt in schema.items() if dt.is_float()]
     non_numeric_cols = [
-        col for col, dt in schema.items()
-        if not (dt.is_numeric() or dt == pl.Null)
+        col for col, dt in schema.items() if not (dt.is_numeric() or dt == pl.Null)
     ]
 
     cols_x = [c for c in all_cols if c.endswith("_x")]
@@ -107,11 +106,13 @@ def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
         ("Columns ended with _y (pandas join) or _right (polars join)", cols_y_right),
     ]
 
-    return pl.DataFrame({
-        "metric": [m[0] for m in metrics],
-        "total": [len(m[1]) for m in metrics],
-        "values": [m[1] for m in metrics],
-    })
+    return pl.DataFrame(
+        {
+            "metric": [m[0] for m in metrics],
+            "total": [len(m[1]) for m in metrics],
+            "values": [m[1] for m in metrics],
+        }
+    )
 
 
 def get_operator(condition: ConditionSymbol):
@@ -167,12 +168,16 @@ def filter_columns_by_cardinality(
     )
 
 
-def low_cardinality_value_counts(df: pl.DataFrame, max_unique_values: int = 10) -> pl.DataFrame:
+def low_cardinality_value_counts(
+    df: pl.DataFrame, max_unique_values: int = 10
+) -> pl.DataFrame:
     """Calcula el value_counts de las columnas con una cantidad de
     valores únicos <= max_unique_values
     y devuelve un único DataFrame en formato largo (column, value, count).
     """
-    cols_to_keep = filter_columns_by_cardinality(df, "<=", max_unique_values)["column"].to_list()
+    cols_to_keep = filter_columns_by_cardinality(df, "<=", max_unique_values)[
+        "column"
+    ].to_list()
 
     if not cols_to_keep:
         return pl.DataFrame(

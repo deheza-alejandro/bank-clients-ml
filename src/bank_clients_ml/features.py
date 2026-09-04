@@ -9,12 +9,12 @@ from bank_clients_ml.config import Settings, get_settings
 def get_date_windows(
     df: pl.DataFrame, date_column: str, prediction_window_size: int
 ) -> tuple[list[date], list[date]]:
-    """ el parametro prediction_window_size se usa para determinar que "offset_by(...)" usar.
-    si prediction_window_size es 2, se usa offset_by("-1mo") para el prediction_months,
-    si prediction_window_size es 3, se usa offset_by("-2mo") para el prediction_months, y asi.
+    """el parametro prediction_window_size se usa para determinar que "offset_by(...)" usar.
+        si prediction_window_size es 2, se usa offset_by("-1mo") para el prediction_months,
+        si prediction_window_size es 3, se usa offset_by("-2mo") para el prediction_months, y asi.
 
-    la separacion entre la ventana de prediccion y entrenamiento (Lead Windows
-) es siempre de 1 mes
+        la separacion entre la ventana de prediccion y entrenamiento (Lead Windows
+    ) es siempre de 1 mes
     """
     pred_offset = f"-{prediction_window_size - 1}mo"
     train_offset = f"-{prediction_window_size + 1}mo"
@@ -64,9 +64,7 @@ def compute_percentage(numerator: str | pl.Expr, denominator: str | pl.Expr) -> 
     Returns:
         Expresión de Polars con el porcentaje calculado.
     """
-    numerator_exp = (
-        pl.col(numerator) if isinstance(numerator, str) else numerator
-    )
+    numerator_exp = pl.col(numerator) if isinstance(numerator, str) else numerator
     return numerator_exp / safe_denominator(denominator) * 100.0
 
 
@@ -106,9 +104,7 @@ def target_encode_columns(
 
 
 def get_constant_columns(df: pl.DataFrame) -> list[str]:
-    return _get_true_column_names(
-        df.select(pl.all().n_unique() == 1)
-    )
+    return _get_true_column_names(df.select(pl.all().n_unique() == 1))
 
 
 def get_imbalanced_binary_columns(
@@ -159,15 +155,17 @@ class CorrelationAnalyzer:
         ]
         return correlated_columns
 
-    def get_correlations_for(self, column: str, threshold: float = 0.80) -> pl.DataFrame:
+    def get_correlations_for(
+        self, column: str, threshold: float = 0.80
+    ) -> pl.DataFrame:
         return (
             self.corr_df.select(
                 pl.Series("feature", self.columns),
                 pl.col(column).alias("correlation"),
             )
             .filter(
-                (pl.col("feature") != column) &
-                (pl.col("correlation").abs() > threshold)
+                (pl.col("feature") != column)
+                & (pl.col("correlation").abs() > threshold)
             )
             .sort(pl.col("correlation").abs(), descending=True)
         )
@@ -312,22 +310,28 @@ def group_bins_by_ranges(
     if settings is None:
         settings = get_settings()
 
-    range_conds = [(pl.col("Bin") >= b_min) & (pl.col("Bin") <= b_max) for b_min, b_max in ranges]
+    range_conds = [
+        (pl.col("Bin") >= b_min) & (pl.col("Bin") <= b_max) for b_min, b_max in ranges
+    ]
 
     aggs = []
     for i, cond in enumerate(range_conds):
-        aggs.extend([
-            pl.col("Min").filter(cond).min().alias(f"min_{i}"),
-            pl.col("Max").filter(cond).max().alias(f"max_{i}"),
-            pl.col("Clients").filter(cond).sum().alias(f"cli_{i}"),
-            pl.col(settings.col_target).filter(cond).sum().alias(f"tgt_{i}"),
-        ])
+        aggs.extend(
+            [
+                pl.col("Min").filter(cond).min().alias(f"min_{i}"),
+                pl.col("Max").filter(cond).max().alias(f"max_{i}"),
+                pl.col("Clients").filter(cond).sum().alias(f"cli_{i}"),
+                pl.col(settings.col_target).filter(cond).sum().alias(f"tgt_{i}"),
+            ]
+        )
 
     unranged_cond = ~pl.any_horizontal(range_conds)
-    aggs.extend([
-        pl.col("Clients").filter(unranged_cond).sum().alias("cli_def"),
-        pl.col(settings.col_target).filter(unranged_cond).sum().alias("tgt_def"),
-    ])
+    aggs.extend(
+        [
+            pl.col("Clients").filter(unranged_cond).sum().alias("cli_def"),
+            pl.col(settings.col_target).filter(unranged_cond).sum().alias("tgt_def"),
+        ]
+    )
 
     stats = table.select(aggs).row(0, named=True)
     cli_def = stats["cli_def"] or 0

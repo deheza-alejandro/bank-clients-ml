@@ -109,9 +109,7 @@ def _generate_single_bivariate_chart(
     ax_graph.set_xticklabels(table.to_series(0), rotation=0, ha="center")
 
     ax_graph_target_pct = ax_graph.twinx()
-    ax_graph_target_pct.plot(
-        x_indices, table.to_series(-1), marker="o", color="green"
-    )
+    ax_graph_target_pct.plot(x_indices, table.to_series(-1), marker="o", color="green")
     ax_graph_target_pct.set_ylabel(f"{settings.col_target} pct (%)")
 
     fig.tight_layout()
@@ -315,7 +313,7 @@ def _optimize_and_save_svg(fig: Figure, output_path: Path):
 
     try:
         with Path.open(output_path, "wb") as out_file:
-            subprocess.run( # noqa: S603
+            subprocess.run(  # noqa: S603
                 cmd,
                 input=buffer.getvalue(),
                 stdout=out_file,
@@ -328,18 +326,18 @@ def _optimize_and_save_svg(fig: Figure, output_path: Path):
 
 
 def _generate_single_deciles_table(ax, df: pl.DataFrame, title: str) -> None:
-    ax.axis('tight')
-    ax.axis('off')
+    ax.axis("tight")
+    ax.axis("off")
 
-    formatted_df = df.with_columns(
-        cs.float().round(2).cast(pl.String)
-    ).select(pl.all().cast(pl.String))
+    formatted_df = df.with_columns(cs.float().round(2).cast(pl.String)).select(
+        pl.all().cast(pl.String)
+    )
 
     table = ax.table(
         cellText=formatted_df.rows(),
         colLabels=df.columns,
-        loc='center',
-        cellLoc='center'
+        loc="center",
+        cellLoc="center",
     )
 
     table.auto_set_font_size(False)
@@ -358,7 +356,7 @@ def _generate_single_deciles_table(ax, df: pl.DataFrame, title: str) -> None:
         for col in range(num_cols):
             table[row, col].set_facecolor("#DCE0E8" if row % 2 == 0 else "#FFFFFF")
 
-    ax.set_title(title, fontsize=12, fontweight='bold', pad=10, loc='left')
+    ax.set_title(title, fontsize=12, fontweight="bold", pad=10, loc="left")
 
 
 def plot_deciles(

@@ -144,7 +144,9 @@ def oversample_with_unique_ids(
     solo sobre los datos de entrenamiento de cada fold de StratifiedKFold,
     dejando intactos los datos de validacion de cada fold"""
     if not (0 < target_proportion < 1):
-        raise ValueError("El parámetro 'target_proportion' debe estar entre 0 y 1 (excluyentes).")
+        raise ValueError(
+            "El parámetro 'target_proportion' debe estar entre 0 y 1 (excluyentes)."
+        )
 
     if settings is None:
         settings = get_settings()
@@ -155,7 +157,9 @@ def oversample_with_unique_ids(
     max_id = train.select(pl.col(settings.col_id).max()).item()
 
     count_majority = len(df_majority)
-    count_minority_target = round(count_majority * (target_proportion / (1 - target_proportion)))
+    count_minority_target = round(
+        count_majority * (target_proportion / (1 - target_proportion))
+    )
 
     df_minority_oversampled = df_minority.sample(
         n=count_minority_target, with_replacement=True, seed=random_state

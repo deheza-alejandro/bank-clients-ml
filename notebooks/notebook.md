@@ -125,7 +125,7 @@ clean_data = data.filter(pl.col(settings.col_target).is_not_null())
 print_without_trunc(inspect_dataframe(clean_data))
 clean_data = clean_data.with_columns(
     pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date(),
-    pl.col(settings.col_id).cast(pl.Int64)
+    pl.col(settings.col_id).cast(pl.Int64),
 )
 ```
 
@@ -149,7 +149,7 @@ print("first_prediction_month:", first_prediction_month)
 
 ```python
 month_count_by_client = clean_data.group_by(settings.col_id).len(name="month_count")
-print(month_count_by_client['month_count'].value_counts())
+print(month_count_by_client["month_count"].value_counts())
 ```
 
 Mantengo en el universo los clientes que:
@@ -364,7 +364,9 @@ identity_features = training_data.filter(pl.col("Month") == last_training_month)
     identity_features_columns
 )
 
-print_without_trunc(low_cardinality_value_counts(identity_features.drop(categorical_cols)))
+print_without_trunc(
+    low_cardinality_value_counts(identity_features.drop(categorical_cols))
+)
 ```
 
 ```python
@@ -668,7 +670,9 @@ cols_saving_account_days_transactions_searcher
 
 ```python
 cols_saving_account_monetary_searcher, cols_saving_account_monetary_importances = (
-    get_feature_importances(uncorrelated_train, columns_by_source["saving_account_monetary"])
+    get_feature_importances(
+        uncorrelated_train, columns_by_source["saving_account_monetary"]
+    )
 )
 cols_saving_account_monetary_searcher
 ```
@@ -682,7 +686,9 @@ cols_operations_searcher
 
 ```python
 cols_credit_card_payment_searcher, cols_credit_card_payment_importances = (
-    get_feature_importances(uncorrelated_train, columns_by_source["credit_card_payment"])
+    get_feature_importances(
+        uncorrelated_train, columns_by_source["credit_card_payment"]
+    )
 )
 
 cols_credit_card_payment_searcher
@@ -690,7 +696,9 @@ cols_credit_card_payment_searcher
 
 ```python
 cols_credit_card_monetary_searcher, cols_credit_card_monetary_importances = (
-    get_feature_importances(uncorrelated_train, columns_by_source["credit_card_monetary"])
+    get_feature_importances(
+        uncorrelated_train, columns_by_source["credit_card_monetary"]
+    )
 )
 
 cols_credit_card_monetary_searcher
@@ -758,7 +766,9 @@ most_important_features_searcher, most_important_features_importances = (
     get_feature_importances(uncorrelated_train, most_important_features)
 )
 plot_top_features(
-    most_important_features_importances, "most_important_features", most_important_features_searcher
+    most_important_features_importances,
+    "most_important_features",
+    most_important_features_searcher,
 )
 most_important_features_searcher
 ```
@@ -876,9 +886,9 @@ inspect_dataframe(final_train)
 best_features = [
     "Client_Age_grp",
     "Operations_total_mean",
-    #"Operations_total_median",
+    # "Operations_total_median",
     "CreditCard_Product",
-    #"CreditCard_Active",  # sin modificar
+    # "CreditCard_Active",  # sin modificar
     "Quantity_Active_Products_min",
 ]
 
@@ -920,7 +930,9 @@ best_importances_renamed = best_importances.with_columns(
     .replace_strict(renames_dict, default=pl.col(settings.col_feature))
     .alias(settings.col_feature)
 )
-plot_top_features(best_importances_renamed, "best_features", best_hyperparameters_searcher)
+plot_top_features(
+    best_importances_renamed, "best_features", best_hyperparameters_searcher
+)
 
 best_hyperparameters_searcher
 ```
