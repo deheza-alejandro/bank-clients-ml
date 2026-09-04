@@ -69,9 +69,6 @@ settings = get_settings()
 
 ```python
 data = pl.read_parquet("../data/data.parquet")
-```
-
-```python
 print(data.shape)
 data.describe()
 ```
@@ -126,13 +123,7 @@ print(data.filter(pl.col(settings.col_target).is_null()).select(settings.col_id)
 print(data.shape)
 clean_data = data.filter(pl.col(settings.col_target).is_not_null())
 print(clean_data.shape)
-```
-
-```python
 print_without_trunc(scan_anomalies(clean_data))
-```
-
-```python
 clean_data = clean_data.with_columns(
     pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date(),
     pl.col(settings.col_id).cast(pl.Int64)
@@ -258,9 +249,6 @@ training_data = training_data.with_columns(
 )
 
 print(f"{training_data.select('SavingAccount_Balance_Average').describe()} \n")
-```
-
-```python
 training_data.shape
 ```
 
@@ -282,9 +270,6 @@ print(f"{clients_region.shape} \n")
 print(f"{clients_region['Region'].value_counts(sort=True)} \n")
 print(f"{training_data['Region'].value_counts(sort=True)} \n")
 print(f"{training_data.select('Region').describe()} \n")
-```
-
-```python
 training_data.shape
 ```
 
@@ -331,11 +316,8 @@ print(f"{training_data.select('CreditCard_Product').describe()} \n")
 ```
 
 ```python
+print(training_data.shape)
 scan_anomalies(training_data)
-```
-
-```python
-training_data.shape
 ```
 
 ## Identity Features
@@ -388,14 +370,11 @@ identity_features = training_data.filter(pl.col("Month") == last_training_month)
 print(identity_features.shape)
 print(identity_features["CreditCard_Premium"].value_counts())
 print(f"{identity_features["Sex"].value_counts()} \n")
+identity_features.describe()
 ```
 
 ```python
 identity_features.schema
-```
-
-```python
-identity_features.describe()
 ```
 
 ## Variables Categoricas
@@ -434,27 +413,14 @@ identity_features = identity_features.with_columns(
 ).drop(["First_product_dt", "Last_product_dt"])
 
 print(f"identity_features: {identity_features.shape} \n")
-print(
-    f"{
-        identity_features.select(
-            'Days_between_first_and_last_product', 'Recency_in_days'
-        ).describe()
-    }"
-)
-```
-
-```python
-identity_features.describe()
+print(identity_features.describe())
 ```
 
 ## Transform features
 ### Analizando valores minimos y ceros
 
 ```python
-mins_in_range(training_data, -1, 1)
-```
-
-```python
+print(mins_in_range(training_data, -1, 1))
 print_without_trunc(columns_with_zeros(training_data))
 ```
 
@@ -482,22 +448,14 @@ filter_nonzero(training_data, credit_card_cols)
 print(training_data.shape)
 training_data = add_transformations(training_data)
 print(training_data.shape)
-```
 
-```python
+print_without_trunc(scan_anomalies(training_data))
+print(training_data.select(pl.col(pl.String)))
 training_data.describe()
 ```
 
 ```python
-print_without_trunc(scan_anomalies(training_data))
-```
-
-```python
 training_data.schema
-```
-
-```python
-training_data.select(pl.col(pl.String))
 ```
 
 ```python
@@ -608,9 +566,6 @@ data_agg = (
 )
 
 print(data_agg.shape)
-```
-
-```python
 scan_anomalies(data_agg)
 ```
 
@@ -618,9 +573,6 @@ scan_anomalies(data_agg)
 
 ```python
 ABT = identity_features.join(data_agg, on=settings.col_id, how="inner")
-```
-
-```python
 print(ABT.shape)
 scan_anomalies(ABT)
 ```
@@ -630,25 +582,19 @@ scan_anomalies(ABT)
 ```python
 ABT = add_extra_transformations(ABT)
 print(ABT.shape)
-```
-
-```python
 print(ABT.select(pl.col(pl.String)))
+print_without_trunc(mins_in_range(ABT, -1, 1))
 scan_anomalies(ABT)
 ```
-
-```python
-print_without_trunc(mins_in_range(ABT, -1, 1))
-```
-
-## Reduccion de dimensionalidad
-### Elimino columnas con valores unicos
 
 ```python
 train, test = stratified_train_test_split(ABT)
 print(train.shape)
 train.describe()
 ```
+
+## Reduccion de dimensionalidad
+### Elimino columnas con valores unicos
 
 ```python
 constant_cols = get_constant_columns(train)
@@ -909,11 +855,6 @@ variables a modificar:
 - Quantity_Active_Products_min
 
 ```python
-final_train = correlated_train.clone()
-final_test = correlated_test.clone()
-```
-
-```python
 bins_transformations = [
     group_bins_by_ranges(
         "Client_Age_grp",
@@ -942,9 +883,8 @@ bins_transformations = [
     ).alias("Quantity_Active_Products_min"),
 ]
 
-final_train = final_train.with_columns(bins_transformations)
-final_test = final_test.with_columns(bins_transformations)
-
+final_train = correlated_train.with_columns(bins_transformations)
+final_test = correlated_test.with_columns(bins_transformations)
 scan_anomalies(final_train)
 ```
 
