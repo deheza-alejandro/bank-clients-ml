@@ -37,6 +37,7 @@ from bank_clients_ml.features import (
 )
 from bank_clients_ml.graphs import (
     generate_bivariate_charts,
+    plot_deciles,
     plot_evaluation_metrics,
     plot_top_features,
 )
@@ -44,7 +45,6 @@ from bank_clients_ml.models import (
     compute_prediction_deciles,
     get_feature_importances,
     get_scoring,
-    print_deciles,
     stratified_train_test_split,
 )
 from bank_clients_ml.transformations import (
@@ -1013,20 +1013,27 @@ y_pred, probabilities_train, probabilities_test, train_based_bins = get_scoring(
     best_hyperparameters_searcher, final_train, final_test, best_features
 )
 
-print_deciles(
-    compute_prediction_deciles(final_train, probabilities_train),
-    compute_prediction_deciles(final_test, probabilities_test, train_based_bins),
+train_deciles = compute_prediction_deciles(final_train, probabilities_train)
+test_deciles = compute_prediction_deciles(
+    final_test, probabilities_test, train_based_bins
 )
 
 plot_evaluation_metrics(
     final_test[settings.col_target], probabilities_test, y_pred, graphic_name="lightgbm"
 )
+
+plot_deciles(
+    train_deciles.drop("min_prob", "max_prob"),
+    test_deciles.drop("min_prob", "max_prob"),
+    "deciles",
+)
 ```
 
-## ROC
+## Metrics
 
 
 ![evaluation_lightgbm](images/plot_evaluation_metrics/lightgbm.svg)
+![deciles](images/plot_evaluation_metrics/deciles.svg)
 
 
 ## Resultados del excel

@@ -4,6 +4,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import matplotlib
+import polars.selectors as cs
 from matplotlib.figure import Figure
 
 matplotlib.use("Agg")
@@ -324,3 +325,58 @@ def _optimize_and_save_svg(fig: Figure, output_path: Path):
         raise RuntimeError(
             "Bun no se encuentra en el PATH del sistema. Asegúrate de tener Bun instalado."
         ) from err
+
+
+def _generate_single_deciles_table(ax, df: pl.DataFrame, title: str) -> None:
+    ax.axis('tight')
+    ax.axis('off')
+
+    formatted_df = df.with_columns(
+        cs.float().round(2).cast(pl.String)
+    ).select(pl.all().cast(pl.String))
+
+    table = ax.table(
+        cellText=formatted_df.rows(),
+        colLabels=df.columns,
+        loc='center',
+        cellLoc='center'
+    )
+
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1, 1.4)
+
+    num_rows = len(formatted_df) + 1
+    num_cols = len(df.columns)
+
+    for col in range(num_cols):
+        cell = table[0, col]
+        cell.set_facecolor("#1F4E78")
+        cell.set_text_props(color="white", weight="bold")
+
+    for row in range(1, num_rows):
+        for col in range(num_cols):
+            table[row, col].set_facecolor("#DCE0E8" if row % 2 == 0 else "#FFFFFF")
+
+    ax.set_title(title, fontsize=12, fontweight='bold', pad=10, loc='left')
+
+
+def plot_deciles(
+    train_deciles: pl.DataFrame,
+    test_deciles: pl.DataFrame,
+    graphic_name: str,
+    title_train_deciles: str = "Train Deciles",
+    title_test_deciles: str = "Test Deciles",
+    images_dir: str = IMAGES_DIR,
+) -> None:
+    """
+    Recibe dos DataFrames de Polars y genera un svg con ambas
+    tablas organizadas verticalmente.
+    """
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8), dpi=300)
+
+    _generate_single_deciles_table(ax1, train_deciles, title_train_deciles)
+    _generate_single_deciles_table(ax2, test_deciles, title_test_deciles)
+
+    plt.tight_layout()
+    _save_fig_as_svg(fig, graphic_name, images_dir, "plot_evaluation_metrics")

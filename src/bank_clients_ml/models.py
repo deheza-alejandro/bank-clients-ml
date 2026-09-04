@@ -247,7 +247,7 @@ def compute_prediction_deciles(
         .group_by("decile")
         .agg(
             count=pl.len(),
-            target_1_count=pl.col(settings.col_target).sum(),
+            target_1_count=pl.col(settings.col_target).sum().cast(pl.UInt32),
             min_prob=(pl.col("probabilities").min() * 100).round(2),
             max_prob=(pl.col("probabilities").max() * 100).round(2),
         )
@@ -269,14 +269,3 @@ def compute_prediction_deciles(
         lift=(target_1_rate / total_target_1_rate).round(2),
         ks=cum_gain - cum_target_0_rate,
     )
-
-
-def print_deciles(train_deciles: pl.DataFrame, test_deciles: pl.DataFrame):
-    """imprime metricas de los deciles del set de entrenamiento y del set de test.
-
-    Args:
-        train_deciles: deciles del set de entrenamiento
-        test_deciles: deciles del set de test
-    """
-    print(f"train:\n{train_deciles.drop("min_prob", "max_prob")}")
-    print(f"test:\n{test_deciles.drop("min_prob", "max_prob")}")
