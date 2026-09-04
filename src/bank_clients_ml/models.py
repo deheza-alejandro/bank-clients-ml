@@ -230,7 +230,7 @@ def compute_prediction_deciles(
     if settings is None:
         settings = get_settings()
 
-    decil_expr = (
+    decile_expr = (
         pl.col("probabilities").cut(breaks=bins, labels=DECILE_LABELS)
         if bins
         else pl.col("probabilities").qcut(
@@ -243,15 +243,15 @@ def compute_prediction_deciles(
             settings.col_target,
             probabilities=probabilities,
         )
-        .with_columns(decil=decil_expr.cast(DECILE_DTYPE))
-        .group_by("decil")
+        .with_columns(decile=decile_expr.cast(DECILE_DTYPE))
+        .group_by("decile")
         .agg(
             count=pl.len(),
             target_1_count=pl.col(settings.col_target).sum(),
             min_prob=(pl.col("probabilities").min() * 100).round(2),
             max_prob=(pl.col("probabilities").max() * 100).round(2),
         )
-        .sort("decil", descending=True)
+        .sort("decile", descending=True)
     )
 
     target_1_count = pl.col("target_1_count")
