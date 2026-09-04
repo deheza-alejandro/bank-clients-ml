@@ -37,19 +37,15 @@ def stratified_train_test_split(
     if settings is None:
         settings = get_settings()
 
-    df_shuffled = df.sample(fraction=1.0, shuffle=True, seed=random_state)
-
-    test_indices = (
-        df_shuffled.select(pl.col(settings.col_target))
-        .with_row_index("_idx")
-        .group_by(settings.col_target)
-        .agg(pl.col("_idx").head((pl.len() * test_ratio).round().cast(pl.Int64)))
-        .explode("_idx")
-        .get_column("_idx")
+    df_flagged = df.sample(fraction=1.0, shuffle=True, seed=random_state).with_columns(
+        _group_id=pl.col(settings.col_target).cum_count().over(settings.col_target),
+        _group_total=pl.len().over(settings.col_target),
     )
 
-    test = df_shuffled.filter(pl.int_range(0, pl.len()).is_in(test_indices))
-    train = df_shuffled.filter(~pl.int_range(0, pl.len()).is_in(test_indices))
+    is_test = pl.col("_group_id") <= (pl.col("_group_total") * test_ratio).round()
+
+    test = df_flagged.filter(is_test).drop("_group_id", "_group_total")
+    train = df_flagged.filter(~is_test).drop("_group_id", "_group_total")
 
     return train, test
 
