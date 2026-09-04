@@ -37,15 +37,14 @@ from bank_clients_ml.features import (
 )
 from bank_clients_ml.graphs import (
     generate_bivariate_charts,
-    plot_roc_and_metrics,
+    plot_evaluation_metrics,
     plot_top_features,
 )
 from bank_clients_ml.models import (
     compute_prediction_deciles,
     get_feature_importances,
     get_scoring,
-    print_test_deciles,
-    print_train_deciles,
+    print_deciles,
     stratified_train_test_split,
 )
 from bank_clients_ml.transformations import (
@@ -1010,44 +1009,24 @@ best_hyperparameters_searcher
 # Performance del modelo
 
 ```python
-y_pred, probabilities_train, probabilities_test = get_scoring(
+y_pred, probabilities_train, probabilities_test, train_based_bins = get_scoring(
     best_hyperparameters_searcher, final_train, final_test, best_features
 )
 
-# Cotas fijas....
-# basado en los porcentajes de training
-bins = [
-    0.035669,
-    0.054470,
-    0.204116,
-    0.241664,
-    0.269271,
-    0.393079,
-    0.443684,
-    0.541165,
-    0.548265,
-]
-
-print_train_deciles(compute_prediction_deciles(final_train, probabilities_train))
-
-print_test_deciles(
-    compute_prediction_deciles(final_test, probabilities_test, bins),
-    final_test,
-    probabilities_test,
+print_deciles(
+    compute_prediction_deciles(final_train, probabilities_train),
+    compute_prediction_deciles(final_test, probabilities_test, train_based_bins),
 )
 
-plot_roc_and_metrics(
-    final_test[settings.col_target],
-    probabilities_test,
-    y_pred,
-    graphic_name="lightgbm",
+plot_evaluation_metrics(
+    final_test[settings.col_target], probabilities_test, y_pred, graphic_name="lightgbm"
 )
 ```
 
 ## ROC
 
 
-![roc_lightgbm](images/plot_roc_and_metrics/lightgbm.svg)
+![evaluation_lightgbm](images/plot_evaluation_metrics/lightgbm.svg)
 
 
 ## Resultados del excel
@@ -1056,14 +1035,14 @@ plot_roc_and_metrics(
 - ordena todos los deciles bien
 - deciles masomenos parejos
 - lift del primer decil = 2,4
-- KS = 46,6 en el 4to decil
+- KS = 47.04 en el 5to decil
 
 ### Testing
-- ~~ordena casi todos los deciles bien~~
-- ~~deciles masomenos parejos~~
-- lift del primer decil = 2
-- KS = 46,4 en el 4to decil
+- ordena todos los deciles bien
+- deciles masomenos parejos
+- lift del primer decil = 2,36
+- KS = 47.22 en el 4to decil
 
 ### Diferencias
 - lift -> 0,4
-- KS -> 0,2
+- ~~KS -> 0,2~~

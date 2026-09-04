@@ -1,3 +1,5 @@
+from typing import cast
+
 import lightgbm as lgb
 import numpy as np
 import polars as pl
@@ -169,25 +171,34 @@ def oversample_with_unique_ids(
     return balanced_train
 
 
+QUANTILES = np.linspace(0.1, 0.9, 9)
+
+
 def get_scoring(
     searcher: RandomizedSearchCV,
     train: pl.DataFrame,
     test: pl.DataFrame,
     features: list[str],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """y_pred predice si es 0 o 1, si la probabilidad es > 0.5 lo pone como 1"""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[float]]:
+    """y_pred predice si es 0 o 1, si la probabilidad es > 0.5 lo pone como 1
+
+    train_based_bins son los 9 puntos de corte (cuantiles 10% a 90%)
+    basados exclusivamente en el set de entrenamiento.
+    """
     final_model: lgb.LGBMClassifier = searcher.best_estimator_
 
-    y_pred = final_model.predict(test.select(features))
+    y_pred = cast(np.ndarray, final_model.predict(test.select(features)))
 
-    probabilities_train = final_model.predict_proba(train.select(features))
-    probabilities_test = final_model.predict_proba(test.select(features))
+    probabilities_train = cast(
+        np.ndarray, final_model.predict_proba(train.select(features))
+    )[:, 1]
+    probabilities_test = cast(
+        np.ndarray, final_model.predict_proba(test.select(features))
+    )[:, 1]
 
-    return (
-        np.asarray(y_pred),
-        np.asarray(probabilities_train),
-        np.asarray(probabilities_test),
-    )
+    train_based_bins = np.quantile(probabilities_train, QUANTILES).tolist()
+
+    return y_pred, probabilities_train, probabilities_test, train_based_bins
 
 
 DECILE_LABELS = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
@@ -208,7 +219,7 @@ def compute_prediction_deciles(
     df :
         DataFrame original que contiene las columnas 'Target' y 'client_id'.
     probabilities :
-        Array bidimensional con las probabilidades predichas por el modelo.
+        Array unidimensional con las probabilidades predichas por el modelo.
     bins : opcional
         Si no es nulo, usa los bins (por defecto es nulo).
 
@@ -227,42 +238,45 @@ def compute_prediction_deciles(
         )
     )
 
-    return (
+    deciles_df = (
         df.select(
             settings.col_target,
-            probabilities=probabilities[:, 1],
+            probabilities=probabilities,
         )
         .with_columns(decil=decil_expr.cast(DECILE_DTYPE))
         .group_by("decil")
         .agg(
             count=pl.len(),
             target_1_count=pl.col(settings.col_target).sum(),
-            min_probability=pl.col("probabilities").min(),
+            min_prob=(pl.col("probabilities").min() * 100).round(2),
+            max_prob=(pl.col("probabilities").max() * 100).round(2),
         )
-        .sort("decil")
+        .sort("decil", descending=True)
+    )
+
+    target_1_count = pl.col("target_1_count")
+    count = pl.col("count")
+    target_0_count = count - target_1_count
+
+    total_target_1_rate = (target_1_count.sum() / count.sum() * 100).round(2)
+    target_1_rate = (target_1_count / count * 100).round(2)
+    cum_gain = (target_1_count.cum_sum() / target_1_count.sum() * 100).round(2)
+    cum_target_0_rate = (target_0_count.cum_sum() / target_0_count.sum() * 100).round(2)
+
+    return deciles_df.with_columns(
+        target_1_rate=target_1_rate,
+        cum_gain=cum_gain,
+        lift=(target_1_rate / total_target_1_rate).round(2),
+        ks=cum_gain - cum_target_0_rate,
     )
 
 
-def print_train_deciles(train_deciles: pl.DataFrame):
-    """imprime metricas de los deciles del set de entrenamiento.
+def print_deciles(train_deciles: pl.DataFrame, test_deciles: pl.DataFrame):
+    """imprime metricas de los deciles del set de entrenamiento y del set de test.
 
     Args:
         train_deciles: deciles del set de entrenamiento
-    """
-    print(f"train:\n{train_deciles}")
-
-
-def print_test_deciles(
-    test_deciles: pl.DataFrame, test: pl.DataFrame, probabilities_test: np.ndarray
-):
-    """imprime metricas de los deciles del set de test
-    e imprime metricas de los deciles recalculados ("trampa").
-
-    Args:
         test_deciles: deciles del set de test
     """
-    print(f"test:\n{test_deciles}")
-
-    print("test trampa: recalculo las cotas...")  # TODO
-    test_deciles = compute_prediction_deciles(test, probabilities_test)
-    print(test_deciles)
+    print(f"train:\n{train_deciles.drop("min_prob", "max_prob")}")
+    print(f"test:\n{test_deciles.drop("min_prob", "max_prob")}")

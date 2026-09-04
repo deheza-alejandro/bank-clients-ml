@@ -257,7 +257,7 @@ def plot_top_features(
     _save_fig_as_svg(fig, graphic_name, images_dir, "plot_top_features")
 
 
-def plot_roc_and_metrics(
+def plot_evaluation_metrics(
     y_true: pl.Series,
     probabilities: np.ndarray,
     y_pred: np.ndarray,
@@ -267,7 +267,7 @@ def plot_roc_and_metrics(
     """Calcula Accuracy y ROC AUC, dibuja la curva ROC y la guarda como SVG.
 
     Computa las métricas básicas, arma el gráfico de la curva ROC con las
-    anotaciones y lo exporta a {images_dir}/plot_roc_and_metrics/{graphic_name}.svg.
+    anotaciones y lo exporta a {images_dir}/plot_evaluation_metrics/{graphic_name}.svg.
 
     Parámetros:
     y_true: Etiquetas reales (target).
@@ -276,11 +276,10 @@ def plot_roc_and_metrics(
     graphic_name: Nombre del archivo SVG de salida (sin extensión).
     """
     y_true_arr = y_true.to_numpy()
-    y_score_arr = probabilities[:, 1]
 
-    roc_auc = roc_auc_score(y_true_arr, y_score_arr)
+    roc_auc = roc_auc_score(y_true_arr, probabilities)
     accuracy = accuracy_score(y_true_arr, y_pred)
-    fpr, tpr, _ = roc_curve(y_true_arr, y_score_arr)
+    fpr, tpr, _ = roc_curve(y_true_arr, probabilities)
 
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.plot(fpr, tpr)
@@ -301,7 +300,7 @@ def plot_roc_and_metrics(
     ax.set_ylim(0, 1)
     ax.grid(True, linestyle=":", alpha=0.6)
 
-    _save_fig_as_svg(fig, graphic_name, images_dir, "plot_roc_and_metrics")
+    _save_fig_as_svg(fig, graphic_name, images_dir, "plot_evaluation_metrics")
 
 
 def _optimize_and_save_svg(fig: Figure, output_path: Path):
