@@ -963,14 +963,9 @@ plot_deciles(
 )
 ```
 
-## Metrics
-
-
+## Metrics results
 ![evaluation_lightgbm](images/plot_evaluation_metrics/lightgbm.svg)
 ![deciles](images/plot_evaluation_metrics/deciles.svg)
-
-
-## Resultados
 
 ### Training
 - ordena todos los deciles bien
