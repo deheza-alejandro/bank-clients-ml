@@ -873,7 +873,6 @@ most_important_features_correlated = [
     "Operations_total_mean",
     "Operations_total_median",
     "CreditCard_Active",
-    "CreditCard_Balance_ARG_SP_porc_std",
     "CreditCard_Balance_ARG_SP_porc_mean",
     "Quantity_Active_Products_median",
     "Quantity_Active_Products_mean",
@@ -887,7 +886,6 @@ tables_analysis_2 = generate_bivariate_charts(
 ![Operations_total_mean](images/analysis_2/Operations_total_mean.svg)
 ![Operations_total_median](images/analysis_2/Operations_total_median.svg)
 ![CreditCard_Active](images/analysis_2/CreditCard_Active.svg)
-![CreditCard_Balance_ARG_SP_porc_std](images/analysis_2/CreditCard_Balance_ARG_SP_porc_std.svg)
 ![CreditCard_Balance_ARG_SP_porc_mean](images/analysis_2/CreditCard_Balance_ARG_SP_porc_mean.svg)
 ![Quantity_Active_Products_median](images/analysis_2/Quantity_Active_Products_median.svg)
 ![Quantity_Active_Products_mean](images/analysis_2/Quantity_Active_Products_mean.svg)
