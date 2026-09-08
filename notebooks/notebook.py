@@ -112,7 +112,7 @@ def _(mo):
 
 @app.cell
 def _(pl):
-    data = pl.read_parquet("../data/data.parquet")
+    data = pl.read_parquet("data/data.parquet")
     print(data.shape)
     data.describe()
     return (data,)
@@ -136,7 +136,9 @@ def _(count_row_matches, data):
     ]
 
     print(
-        count_row_matches(data, columns=less_than_zero_columns, threshold=0, condition="<")
+        count_row_matches(
+            data, columns=less_than_zero_columns, threshold=0, condition="<"
+        )
     )
     print(
         count_row_matches(
@@ -154,7 +156,9 @@ def _(data, low_cardinality_value_counts, print_without_trunc):
 
 @app.cell
 def _(data, filter_columns_by_cardinality, print_without_trunc):
-    print_without_trunc(filter_columns_by_cardinality(data, condition=">", threshold=10))
+    print_without_trunc(
+        filter_columns_by_cardinality(data, condition=">", threshold=10)
+    )
     return
 
 
@@ -257,14 +261,34 @@ def _(
     settings,
     training_months,
 ):
-    is_valid_client = (pl.col('Month') == last_training_month) & (pl.col('Package_Active') == 'No') & (pl.col('CreditCard_CoBranding') == 'No')
-    universe_and_target = clean_data.filter((pl.len().over(settings.col_id) == 9) & is_valid_client.any().over(settings.col_id) & pl.col('Month').is_in(prediction_months)).select(settings.col_id, settings.col_target).unique()
-    clean_data_1 = clean_data.drop(settings.col_target).join(universe_and_target, on=settings.col_id, how='inner')
-    training_data = clean_data_1.filter(pl.col('Month').is_in(training_months))
-    prediction_data = clean_data_1.filter(pl.col('Month').is_in(prediction_months))
-    print(f'universe_and_target.shape: {universe_and_target.shape} \n')
-    print(f'prediction_data.shape: {prediction_data.shape} \n')
-    print(f"training_data['Month'].value_counts(): {training_data['Month'].value_counts()}")
+    is_valid_client = (
+        (pl.col("Month") == last_training_month)
+        & (pl.col("Package_Active") == "No")
+        & (pl.col("CreditCard_CoBranding") == "No")
+    )
+
+    universe_and_target = (
+        clean_data.filter(
+            (pl.len().over(settings.col_id) == 9)
+            & is_valid_client.any().over(settings.col_id)
+            & pl.col("Month").is_in(prediction_months)
+        )
+        .select(settings.col_id, settings.col_target)
+        .unique()
+    )
+
+    clean_data_1 = clean_data.drop(settings.col_target).join(
+        universe_and_target, on=settings.col_id, how="inner"
+    )
+
+    training_data = clean_data_1.filter(pl.col("Month").is_in(training_months))
+    prediction_data = clean_data_1.filter(pl.col("Month").is_in(prediction_months))
+
+    print(f"universe_and_target.shape: {universe_and_target.shape} \n")
+    print(f"prediction_data.shape: {prediction_data.shape} \n")
+    print(
+        f"training_data['Month'].value_counts(): {training_data['Month'].value_counts()}"
+    )
     return clean_data_1, prediction_data, training_data
 
 
@@ -344,7 +368,16 @@ def _(mo):
 
 @app.cell
 def _(inspect_dataframe, pl, training_data):
-    training_data_1 = training_data.with_columns(pl.col('SavingAccount_Balance_Average').fill_null((pl.col('SavingAccount_Balance_FirstDate') + pl.col('SavingAccount_Balance_LastDate')) / 2.0))
+    training_data_1 = training_data.with_columns(
+        pl.col("SavingAccount_Balance_Average").fill_null(
+            (
+                pl.col("SavingAccount_Balance_FirstDate")
+                + pl.col("SavingAccount_Balance_LastDate")
+            )
+            / 2.0
+        )
+    )
+
     print(f"{training_data_1.select('SavingAccount_Balance_Average').describe()} \n")
     inspect_dataframe(training_data_1)
     return (training_data_1,)
@@ -361,11 +394,17 @@ def _(mo):
 
 @app.cell
 def _(clean_data_1, pl, prediction_data, settings, training_data_1):
-    clients_region = prediction_data.select(settings.col_id, 'Region').unique()
-    training_data_2 = training_data_1.drop('Region').join(clients_region.with_columns(pl.col('Region').fill_null('BUENOS AIRES')), on=settings.col_id, how='left')
+    clients_region = prediction_data.select(settings.col_id, "Region").unique()
+
+    training_data_2 = training_data_1.drop("Region").join(
+        clients_region.with_columns(pl.col("Region").fill_null("BUENOS AIRES")),
+        on=settings.col_id,
+        how="left",
+    )
+
     print(f"{clean_data_1.select('Region').describe()} \n")
-    print(f'{clients_region.describe()} \n')
-    print(f'{clients_region.shape} \n')
+    print(f"{clients_region.describe()} \n")
+    print(f"{clients_region.shape} \n")
     print(f"{clients_region['Region'].value_counts(sort=True)} \n")
     print(f"{training_data_2['Region'].value_counts(sort=True)} \n")
     print(f"{training_data_2.select('Region').describe()} \n")
@@ -398,11 +437,31 @@ def _(
     settings,
     training_data_2,
 ):
-    clients_creditcard_product = prediction_data.sort(pl.col('Month') == first_prediction_month, descending=True).group_by(settings.col_id).agg(pl.col('CreditCard_Product').drop_nulls().first())
-    training_data_3 = training_data_2.drop('CreditCard_Product').join(clients_creditcard_product, on=settings.col_id, how='left').with_columns(pl.when(pl.col('CreditCard_Product').is_null() & (pl.col('CreditCard_Active') == 'Yes')).then(pl.col('CreditCard_Product').fill_null('J55660104XX012')).otherwise(pl.col('CreditCard_Product').fill_null('0')).alias('CreditCard_Product'))
+    clients_creditcard_product = (
+        prediction_data.sort(pl.col("Month") == first_prediction_month, descending=True)
+        .group_by(settings.col_id)
+        .agg(pl.col("CreditCard_Product").drop_nulls().first())
+    )
+
+    training_data_3 = (
+        training_data_2.drop("CreditCard_Product")
+        .join(clients_creditcard_product, on=settings.col_id, how="left")
+        .with_columns(
+            pl.when(
+                pl.col("CreditCard_Product").is_null()
+                & (pl.col("CreditCard_Active") == "Yes")
+            )
+            .then(pl.col("CreditCard_Product").fill_null("J55660104XX012"))
+            .otherwise(pl.col("CreditCard_Product").fill_null("0"))
+            .alias("CreditCard_Product")
+        )
+    )
+
     print(f"{clean_data_1.select('CreditCard_Product').describe()} \n")
-    print(f'{clients_creditcard_product.describe()} \n')
-    print(f"{clients_creditcard_product['CreditCard_Product'].value_counts(sort=True)} \n")
+    print(f"{clients_creditcard_product.describe()} \n")
+    print(
+        f"{clients_creditcard_product['CreditCard_Product'].value_counts(sort=True)} \n"
+    )
     print(f"{training_data_3['CreditCard_Product'].value_counts(sort=True)} \n")
     print(f"{training_data_3.select('CreditCard_Product').describe()} \n")
     return (training_data_3,)
@@ -431,13 +490,55 @@ def _(
     settings,
     training_data_3,
 ):
-    binary_dict: dict[str, int] = {'Yes': 1, 'No': 0, 'M': 1, 'F': 0}
-    binary_identity_features_columns = ['CreditCard_Premium', 'CreditCard_Active', 'CreditCard_CoBranding', 'Loan_Active', 'Mortgage_Active', 'SavingAccount_Active_ARG_Salary', 'SavingAccount_Active_ARG', 'SavingAccount_Active_DOLLAR', 'DebitCard_Active', 'Investment_Active', 'Package_Active', 'Insurance_Life', 'Insurance_Home', 'Insurance_Accidents', 'Insurance_Mobile', 'Insurance_ATM', 'Insurance_Unemployment', 'Sex', 'Mobile', 'Email']
-    categorical_cols = ['Client_Age_grp', 'Region', 'CreditCard_Product']
-    identity_features_columns = [settings.col_id, settings.col_target, *categorical_cols, 'First_product_dt', 'Last_product_dt', *binary_identity_features_columns]
-    training_data_4 = training_data_3.with_columns(pl.col(binary_identity_features_columns).replace_strict(binary_dict).cast(pl.UInt8))
-    identity_features = training_data_4.filter(pl.col('Month') == last_training_month).select(identity_features_columns)
-    print_without_trunc(low_cardinality_value_counts(identity_features.drop(categorical_cols)))
+    binary_dict: dict[str, int] = {"Yes": 1, "No": 0, "M": 1, "F": 0}
+
+    binary_identity_features_columns = [
+        "CreditCard_Premium",
+        "CreditCard_Active",
+        "CreditCard_CoBranding",
+        "Loan_Active",
+        "Mortgage_Active",
+        "SavingAccount_Active_ARG_Salary",
+        "SavingAccount_Active_ARG",
+        "SavingAccount_Active_DOLLAR",
+        "DebitCard_Active",
+        "Investment_Active",
+        "Package_Active",
+        "Insurance_Life",
+        "Insurance_Home",
+        "Insurance_Accidents",
+        "Insurance_Mobile",
+        "Insurance_ATM",
+        "Insurance_Unemployment",
+        "Sex",
+        "Mobile",
+        "Email",
+    ]
+
+    categorical_cols = ["Client_Age_grp", "Region", "CreditCard_Product"]
+
+    identity_features_columns = [
+        settings.col_id,
+        settings.col_target,
+        *categorical_cols,
+        "First_product_dt",
+        "Last_product_dt",
+        *binary_identity_features_columns,
+    ]
+
+    training_data_4 = training_data_3.with_columns(
+        pl.col(binary_identity_features_columns)
+        .replace_strict(binary_dict)
+        .cast(pl.UInt8)
+    )
+
+    identity_features = training_data_4.filter(
+        pl.col("Month") == last_training_month
+    ).select(identity_features_columns)
+
+    print_without_trunc(
+        low_cardinality_value_counts(identity_features.drop(categorical_cols))
+    )
     return categorical_cols, identity_features, training_data_4
 
 
@@ -464,9 +565,15 @@ def _(
     print_without_trunc,
     target_encode_columns,
 ):
-    print_without_trunc(low_cardinality_value_counts(identity_features.select(categorical_cols)))
+    print_without_trunc(
+        low_cardinality_value_counts(identity_features.select(categorical_cols))
+    )
+
     identity_features_1 = target_encode_columns(identity_features, categorical_cols)
-    print_without_trunc(low_cardinality_value_counts(identity_features_1.select(categorical_cols)))
+
+    print_without_trunc(
+        low_cardinality_value_counts(identity_features_1.select(categorical_cols))
+    )
     return (identity_features_1,)
 
 
@@ -477,7 +584,7 @@ def _(
     print_without_trunc,
     training_data_4,
 ):
-    print(f'training_data: {training_data_4.shape}')
+    print(f"training_data: {training_data_4.shape}")
     training_data_5 = training_data_4.drop(categorical_cols)
     print_without_trunc(inspect_dataframe(training_data_5))
     return (training_data_5,)
@@ -499,7 +606,20 @@ def _(
     pl,
     print_without_trunc,
 ):
-    identity_features_2 = identity_features_1.with_columns([(pl.col('Last_product_dt') - pl.col('First_product_dt')).dt.total_days().alias('Days_between_first_and_last_product'), (pl.lit(last_training_month).dt.offset_by('1mo') - pl.col('Last_product_dt')).dt.total_days().alias('Recency_in_days')]).drop(['First_product_dt', 'Last_product_dt'])
+    identity_features_2 = identity_features_1.with_columns(
+        [
+            (pl.col("Last_product_dt") - pl.col("First_product_dt"))
+            .dt.total_days()
+            .alias("Days_between_first_and_last_product"),
+            (
+                pl.lit(last_training_month).dt.offset_by("1mo")
+                - pl.col("Last_product_dt")
+            )
+            .dt.total_days()
+            .alias("Recency_in_days"),
+        ]
+    ).drop(["First_product_dt", "Last_product_dt"])
+
     print_without_trunc(inspect_dataframe(identity_features_2))
     identity_features_2.describe()
     return (identity_features_2,)
@@ -531,7 +651,18 @@ def _(mo):
 
 @app.cell
 def _(filter_nonzero, training_data_5):
-    credit_card_cols = ['CreditCard_Balance_ARG', 'CreditCard_Balance_DOLLAR', 'CreditCard_Total_Limit', 'CreditCard_Total_Spending', 'CreditCard_Spending_1_Installment', 'CreditCard_Spending_Installments', 'CreditCard_Spending_CrossBoarder', 'CreditCard_Spending_Aut_Debits', 'CreditCard_Revolving']
+    credit_card_cols = [
+        "CreditCard_Balance_ARG",
+        "CreditCard_Balance_DOLLAR",
+        "CreditCard_Total_Limit",
+        "CreditCard_Total_Spending",
+        "CreditCard_Spending_1_Installment",
+        "CreditCard_Spending_Installments",
+        "CreditCard_Spending_CrossBoarder",
+        "CreditCard_Spending_Aut_Debits",
+        "CreditCard_Revolving",
+    ]
+
     filter_nonzero(training_data_5, credit_card_cols)
     return
 
@@ -553,6 +684,7 @@ def _(
 ):
     print(training_data_5.shape)
     training_data_6 = add_transformations(training_data_5)
+
     print_without_trunc(inspect_dataframe(training_data_6))
     training_data_6.describe()
     return (training_data_6,)
@@ -560,14 +692,35 @@ def _(
 
 @app.cell
 def _(pl, settings, training_data_6):
-    training_data_6.select([settings.col_id, 'SavingAccount_Transactions_Transactions', 'Operations_total', 'CreditCard_Payment_total']).filter((pl.col('SavingAccount_Transactions_Transactions') != 0) & (pl.col('Operations_total') != 0) & (pl.col('CreditCard_Payment_total') != 0))
+    training_data_6.select(
+        [
+            settings.col_id,
+            "SavingAccount_Transactions_Transactions",
+            "Operations_total",
+            "CreditCard_Payment_total",
+        ]
+    ).filter(
+        (pl.col("SavingAccount_Transactions_Transactions") != 0)
+        & (pl.col("Operations_total") != 0)
+        & (pl.col("CreditCard_Payment_total") != 0)
+    )
     return
 
 
 @app.cell
 def _(count_row_matches, training_data_6):
-    greater_than_one_hundred_columns = ['SavingAccount_Transfer_In_Amount_porc', 'SavingAccount_Transfer_In_Amount_CR_porc', 'SavingAccount_Balance_last_minus_first_date_porc']
-    count_row_matches(training_data_6, columns=greater_than_one_hundred_columns, threshold=100, condition='>')
+    greater_than_one_hundred_columns = [
+        "SavingAccount_Transfer_In_Amount_porc",
+        "SavingAccount_Transfer_In_Amount_CR_porc",
+        "SavingAccount_Balance_last_minus_first_date_porc",
+    ]
+
+    count_row_matches(
+        training_data_6,
+        columns=greater_than_one_hundred_columns,
+        threshold=100,
+        condition=">",
+    )
     return
 
 
@@ -594,11 +747,74 @@ def _(
     settings,
     training_data_6,
 ):
-    columns_with_monetary_values = ['SavingAccount_Balance_FirstDate', 'SavingAccount_Balance_LastDate', 'SavingAccount_Balance_Average', 'SavingAccount_Salary_Payment_Amount', 'SavingAccount_Transfer_In_Amount', 'SavingAccount_ATM_Extraction_Amount', 'SavingAccount_Service_Payment_Amount', 'SavingAccount_CreditCard_Payment_Amount', 'SavingAccount_Transfer_Out_Amount', 'SavingAccount_DebitCard_Spend_Amount', 'SavingAccount_Total_Amount', 'SavingAccount_Credits_Amounts', 'SavingAccount_Debits_Amounts', 'SavingAccount_Balance_last_minus_first_date', 'CreditCard_Balance_ARG', 'CreditCard_Balance_DOLLAR', 'CreditCard_Total_Spending', 'CreditCard_Spending_1_Installment', 'CreditCard_Spending_Installments', 'CreditCard_Spending_CrossBoarder', 'CreditCard_Spending_Aut_Debits', 'CreditCard_Revolving']
-    columns_with_quantities = [c for c in training_data_6.columns if c not in {*columns_with_monetary_values, *identity_features_2.columns, 'Month', 'First_product_dt', 'Last_product_dt', settings.col_id, settings.col_target}]
+    columns_with_monetary_values = [
+        "SavingAccount_Balance_FirstDate",
+        "SavingAccount_Balance_LastDate",
+        "SavingAccount_Balance_Average",
+        "SavingAccount_Salary_Payment_Amount",
+        "SavingAccount_Transfer_In_Amount",
+        "SavingAccount_ATM_Extraction_Amount",
+        "SavingAccount_Service_Payment_Amount",
+        "SavingAccount_CreditCard_Payment_Amount",
+        "SavingAccount_Transfer_Out_Amount",
+        "SavingAccount_DebitCard_Spend_Amount",
+        "SavingAccount_Total_Amount",
+        "SavingAccount_Credits_Amounts",
+        "SavingAccount_Debits_Amounts",
+        "SavingAccount_Balance_last_minus_first_date",
+        "CreditCard_Balance_ARG",
+        "CreditCard_Balance_DOLLAR",
+        "CreditCard_Total_Spending",
+        "CreditCard_Spending_1_Installment",
+        "CreditCard_Spending_Installments",
+        "CreditCard_Spending_CrossBoarder",
+        "CreditCard_Spending_Aut_Debits",
+        "CreditCard_Revolving",
+    ]
+
+    columns_with_quantities = [
+        c
+        for c in training_data_6.columns
+        if c
+        not in {
+            *columns_with_monetary_values,
+            *identity_features_2.columns,
+            "Month",
+            "First_product_dt",
+            "Last_product_dt",
+            settings.col_id,
+            settings.col_target,
+        }
+    ]
+
     cols = pl.col([*columns_with_quantities, *columns_with_monetary_values])
-    agg_exprs = [cols.min().name.suffix('_min'), cols.max().name.suffix('_max'), cols.mean().name.suffix('_mean'), cols.median().name.suffix('_median'), cols.sum().name.suffix('_sum'), (cols != 0).sum().name.suffix('_count_nonzero'), cols.var().name.suffix('_var'), cols.std().name.suffix('_std'), pl.col(columns_with_quantities).n_unique().name.suffix('_nunique'), (pl.col(columns_with_monetary_values) / 1000.0).round().n_unique().name.suffix('_rounded_nunique'), (cols.max() - cols.min()).name.suffix('_ptp'), (cols.last() - cols.first()).name.suffix('_diff'), compute_percentage(cols.last(), cols.first()).name.suffix('_diff_rel'), (compute_percentage(cols.last(), cols.first()) - 100.0).name.suffix('_pct_var')]
-    data_agg = training_data_6.sort([settings.col_id, 'Month']).group_by(settings.col_id).agg(agg_exprs)
+
+    agg_exprs = [
+        cols.min().name.suffix("_min"),
+        cols.max().name.suffix("_max"),
+        cols.mean().name.suffix("_mean"),
+        cols.median().name.suffix("_median"),
+        cols.sum().name.suffix("_sum"),
+        (cols != 0).sum().name.suffix("_count_nonzero"),
+        cols.var().name.suffix("_var"),
+        cols.std().name.suffix("_std"),
+        pl.col(columns_with_quantities).n_unique().name.suffix("_nunique"),
+        (pl.col(columns_with_monetary_values) / 1000.0)
+        .round()
+        .n_unique()
+        .name.suffix("_rounded_nunique"),
+        (cols.max() - cols.min()).name.suffix("_ptp"),
+        (cols.last() - cols.first()).name.suffix("_diff"),
+        compute_percentage(cols.last(), cols.first()).name.suffix("_diff_rel"),
+        (compute_percentage(cols.last(), cols.first()) - 100.0).name.suffix("_pct_var"),
+    ]
+
+    data_agg = (
+        training_data_6.sort([settings.col_id, "Month"])
+        .group_by(settings.col_id)
+        .agg(agg_exprs)
+    )
+
     inspect_dataframe(data_agg)
     return (data_agg,)
 
@@ -613,7 +829,7 @@ def _(mo):
 
 @app.cell
 def _(data_agg, identity_features_2, inspect_dataframe, settings):
-    ABT = identity_features_2.join(data_agg, on=settings.col_id, how='inner')
+    ABT = identity_features_2.join(data_agg, on=settings.col_id, how="inner")
     inspect_dataframe(ABT)
     return (ABT,)
 
@@ -685,10 +901,14 @@ def _(
     reduced_train,
 ):
     imbalanced_binary_columns = get_imbalanced_binary_columns(reduced_train)
-    print_without_trunc(low_cardinality_value_counts(reduced_train.select(imbalanced_binary_columns)))
+
+    print_without_trunc(
+        low_cardinality_value_counts(reduced_train.select(imbalanced_binary_columns))
+    )
+
     reduced_train_1 = reduced_train.drop(imbalanced_binary_columns)
     reduced_test_1 = reduced_test.drop(imbalanced_binary_columns)
-    print('train sin columnas binarias poco representativas:', reduced_train_1.shape)
+    print("train sin columnas binarias poco representativas:", reduced_train_1.shape)
     return reduced_test_1, reduced_train_1
 
 
@@ -705,11 +925,13 @@ def _(CorrelationAnalyzer, reduced_test_1, reduced_train_1):
     correlated_train = reduced_train_1.clone()
     correlated_test = reduced_test_1.clone()
     correlation_analyzer = CorrelationAnalyzer(correlated_train)
+
     to_delete = correlation_analyzer.get_redundant_correlated_columns(threshold=0.8)
     uncorrelated_train = correlated_train.drop(to_delete)
     uncorrelated_test = correlated_test.drop(to_delete)
-    print(f'cantidad de columnas con correlacion mayor a 80%: {len(to_delete)}')
-    print('train sin columnas con correlacion mayor a 80%:', uncorrelated_train.shape)
+
+    print(f"cantidad de columnas con correlacion mayor a 80%: {len(to_delete)}")
+    print("train sin columnas con correlacion mayor a 80%:", uncorrelated_train.shape)
     return (
         correlated_test,
         correlated_train,
@@ -874,7 +1096,9 @@ def _(
         30,
     )
     plot_top_features(
-        cols_operations_importances, "cols_operations_importances", cols_operations_searcher
+        cols_operations_importances,
+        "cols_operations_importances",
+        cols_operations_searcher,
     )
     plot_top_features(
         cols_credit_card_payment_importances,
@@ -922,7 +1146,9 @@ def _(
         *cols_saving_account_days_transactions_importances.head(1)
         .get_column("Feature")
         .to_list(),
-        *cols_saving_account_monetary_importances.head(1).get_column("Feature").to_list(),
+        *cols_saving_account_monetary_importances.head(1)
+        .get_column("Feature")
+        .to_list(),
         *cols_operations_importances.head(1).get_column("Feature").to_list(),
         *cols_credit_card_payment_importances.head(1).get_column("Feature").to_list(),
         *cols_credit_card_monetary_importances.head(2).get_column("Feature").to_list(),
@@ -1171,10 +1397,25 @@ def _(
     plot_top_features,
     settings,
 ):
-    best_hyperparameters_searcher, best_importances = get_feature_importances(final_train_1, best_features, n_iter=20)
-    renames_dict = {'Client_Age_grp': 'Age range', 'Operations_total_mean': 'Average quantity of operations', 'CreditCard_Product': 'Credit Card Type', 'Quantity_Active_Products_min': 'Minimum quantity of active products'}
-    best_importances_renamed = best_importances.with_columns(pl.col(settings.col_feature).replace_strict(renames_dict, default=pl.col(settings.col_feature)).alias(settings.col_feature))
-    plot_top_features(best_importances_renamed, 'best_features', best_hyperparameters_searcher)
+    best_hyperparameters_searcher, best_importances = get_feature_importances(
+        final_train_1, best_features, n_iter=20
+    )
+
+    renames_dict = {
+        "Client_Age_grp": "Age range",
+        "Operations_total_mean": "Average quantity of operations",
+        "CreditCard_Product": "Credit Card Type",
+        "Quantity_Active_Products_min": "Minimum quantity of active products",
+    }
+    best_importances_renamed = best_importances.with_columns(
+        pl.col(settings.col_feature)
+        .replace_strict(renames_dict, default=pl.col(settings.col_feature))
+        .alias(settings.col_feature)
+    )
+    plot_top_features(
+        best_importances_renamed, "best_features", best_hyperparameters_searcher
+    )
+
     best_hyperparameters_searcher
     return (best_hyperparameters_searcher,)
 
@@ -1207,11 +1448,27 @@ def _(
     plot_evaluation_metrics,
     settings,
 ):
-    y_pred, probabilities_train, probabilities_test, train_based_bins = get_scoring(best_hyperparameters_searcher, final_train_1, final_test_1, best_features)
+    y_pred, probabilities_train, probabilities_test, train_based_bins = get_scoring(
+        best_hyperparameters_searcher, final_train_1, final_test_1, best_features
+    )
+
     train_deciles = compute_prediction_deciles(final_train_1, probabilities_train)
-    test_deciles = compute_prediction_deciles(final_test_1, probabilities_test, train_based_bins)
-    plot_evaluation_metrics(final_test_1[settings.col_target], probabilities_test, y_pred, graphic_name='lightgbm')
-    plot_deciles(train_deciles.drop('min_prob', 'max_prob'), test_deciles.drop('min_prob', 'max_prob'), 'deciles')
+    test_deciles = compute_prediction_deciles(
+        final_test_1, probabilities_test, train_based_bins
+    )
+
+    plot_evaluation_metrics(
+        final_test_1[settings.col_target],
+        probabilities_test,
+        y_pred,
+        graphic_name="lightgbm",
+    )
+
+    plot_deciles(
+        train_deciles.drop("min_prob", "max_prob"),
+        test_deciles.drop("min_prob", "max_prob"),
+        "deciles",
+    )
     return
 
 
