@@ -894,14 +894,14 @@ def _(
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
-    ![all_cols_importances](images/plot_top_features/all_cols_importances.svg)
-    ![cols_saving_account_days_transactions_importances](images/plot_top_features/cols_saving_account_days_transactions_importances.svg)
-    ![cols_saving_account_monetary_importances](images/plot_top_features/cols_saving_account_monetary_importances.svg)
-    ![cols_operations_importances](images/plot_top_features/cols_operations_importances.svg)
-    ![cols_credit_card_payment_importances](images/plot_top_features/cols_credit_card_payment_importances.svg)
-    ![cols_credit_card_monetary_importances](images/plot_top_features/cols_credit_card_monetary_importances.svg)
-    ![cols_others_importances](images/plot_top_features/cols_others_importances.svg)
+    mo.md(rf"""
+    {mo.image(src="notebooks/images/plot_top_features/all_cols_importances.svg")}
+    {mo.image(src="notebooks/images/plot_top_features/cols_saving_account_days_transactions_importances.svg")}
+    {mo.image(src="notebooks/images/plot_top_features/cols_saving_account_monetary_importances.svg")}
+    {mo.image(src="notebooks/images/plot_top_features/cols_operations_importances.svg")}
+    {mo.image(src="notebooks/images/plot_top_features/cols_credit_card_payment_importances.svg")}
+    {mo.image(src="notebooks/images/plot_top_features/cols_credit_card_monetary_importances.svg")}
+    {mo.image(src="notebooks/images/plot_top_features/cols_others_importances.svg")}
     """)
     return
 
@@ -943,8 +943,8 @@ def _(
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
-    ![most_important_features](images/plot_top_features/most_important_features.svg)
+    mo.md(rf"""
+    {mo.image(src="notebooks/images/plot_top_features/most_important_features.svg")}
     """)
     return
 
@@ -967,16 +967,16 @@ def _(generate_bivariate_charts, most_important_features, uncorrelated_train):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
-    ![Client_Age_grp](images/analysis/Client_Age_grp.svg)
-    ![CreditCard_Balance_ARG_SP_porc_max](images/analysis/CreditCard_Balance_ARG_SP_porc_max.svg)
-    ![CreditCard_Payment_total_max](images/analysis/CreditCard_Payment_total_max.svg)
-    ![CreditCard_Product](images/analysis/CreditCard_Product.svg)
-    ![CreditCard_Total_Limit_diff_rel](images/analysis/CreditCard_Total_Limit_diff_rel.svg)
-    ![Operations_total_min](images/analysis/Operations_total_min.svg)
-    ![Quantity_Active_Products_min](images/analysis/Quantity_Active_Products_min.svg)
-    ![SavingAccount_Transfer_In_Amount_max](images/analysis/SavingAccount_Transfer_In_Amount_max.svg)
-    ![SavingAccount_Transfer_In_Transactions_porc_max](images/analysis/SavingAccount_Transfer_In_Transactions_porc_max.svg)
+    mo.md(rf"""
+    {mo.image(src="notebooks/images/analysis/Client_Age_grp.svg")}
+    {mo.image(src="notebooks/images/analysis/CreditCard_Balance_ARG_SP_porc_max.svg")}
+    {mo.image(src="notebooks/images/analysis/CreditCard_Payment_total_max.svg")}
+    {mo.image(src="notebooks/images/analysis/CreditCard_Product.svg")}
+    {mo.image(src="notebooks/images/analysis/CreditCard_Total_Limit_diff_rel.svg")}
+    {mo.image(src="notebooks/images/analysis/Operations_total_min.svg")}
+    {mo.image(src="notebooks/images/analysis/Quantity_Active_Products_min.svg")}
+    {mo.image(src="notebooks/images/analysis/SavingAccount_Transfer_In_Amount_max.svg")}
+    {mo.image(src="notebooks/images/analysis/SavingAccount_Transfer_In_Transactions_porc_max.svg")}
     """)
     return
 
@@ -1025,13 +1025,13 @@ def _(correlated_train, generate_bivariate_charts):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
-    ![Operations_total_mean](images/analysis_2/Operations_total_mean.svg)
-    ![Operations_total_median](images/analysis_2/Operations_total_median.svg)
-    ![CreditCard_Active](images/analysis_2/CreditCard_Active.svg)
-    ![CreditCard_Balance_ARG_SP_porc_mean](images/analysis_2/CreditCard_Balance_ARG_SP_porc_mean.svg)
-    ![Quantity_Active_Products_median](images/analysis_2/Quantity_Active_Products_median.svg)
-    ![Quantity_Active_Products_mean](images/analysis_2/Quantity_Active_Products_mean.svg)
+    mo.md(rf"""
+    {mo.image(src="notebooks/images/analysis_2/Operations_total_mean.svg")}
+    {mo.image(src="notebooks/images/analysis_2/Operations_total_median.svg")}
+    {mo.image(src="notebooks/images/analysis_2/CreditCard_Active.svg")}
+    {mo.image(src="notebooks/images/analysis_2/CreditCard_Balance_ARG_SP_porc_mean.svg")}
+    {mo.image(src="notebooks/images/analysis_2/Quantity_Active_Products_median.svg")}
+    {mo.image(src="notebooks/images/analysis_2/Quantity_Active_Products_mean.svg")}
     """)
     return
 
@@ -1119,11 +1119,11 @@ def _(final_train, generate_bivariate_charts):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
-    ![CreditCard_Product](images/analysis_t/CreditCard_Product.svg)
-    ![Client_Age_grp](images/analysis_t/Client_Age_grp.svg)
-    ![Operations_total_mean](images/analysis_t/Operations_total_mean.svg)
-    ![Quantity_Active_Products_min](images/analysis_t/Quantity_Active_Products_min.svg)
+    mo.md(rf"""
+    {mo.image(src="notebooks/images/analysis_t/CreditCard_Product.svg")}
+    {mo.image(src="notebooks/images/analysis_t/Client_Age_grp.svg")}
+    {mo.image(src="notebooks/images/analysis_t/Operations_total_mean.svg")}
+    {mo.image(src="notebooks/images/analysis_t/Quantity_Active_Products_min.svg")}
     """)
     return
 
@@ -1181,8 +1181,8 @@ def _(
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
-    ![best_features_final](images/plot_top_features/best_features.svg)
+    mo.md(rf"""
+    {mo.image(src="notebooks/images/plot_top_features/best_features.svg")}
     """)
     return
 
@@ -1217,10 +1217,10 @@ def _(
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
+    mo.md(rf"""
     ## Metrics results
-    ![evaluation_lightgbm](images/plot_evaluation_metrics/lightgbm.svg)
-    ![deciles](images/plot_evaluation_metrics/deciles.svg)
+    {mo.image(src="notebooks/images/plot_evaluation_metrics/lightgbm.svg")}
+    {mo.image(src="notebooks/images/plot_evaluation_metrics/deciles.svg")}
 
     ### Training
     - ordena todos los deciles bien
