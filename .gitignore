@@ -20,3 +20,6 @@ wheels/
 
 # Javascript
 node_modules
+
+# Marimo
+__marimo__/
