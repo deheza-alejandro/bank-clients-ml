@@ -116,7 +116,8 @@ def _generate_single_bivariate_chart(
     _optimize_and_save_svg(fig, output_path)
 
 
-IMAGES_DIR: str = "images"
+PROJECT_DIR: Path = Path(__file__).parent.parent.parent
+IMAGES_DIR: Path = PROJECT_DIR / "notebooks" / "images"
 
 
 def generate_bivariate_charts(
@@ -124,7 +125,7 @@ def generate_bivariate_charts(
     columns_to_graph: list[str],
     analysis_name: str,
     max_bins_quantity: int = 20,
-    images_dir: str = IMAGES_DIR,
+    images_dir: Path = IMAGES_DIR,
     max_workers: int | None = None,
     settings: Settings | None = None,
 ) -> dict[str, pl.DataFrame]:
@@ -146,7 +147,7 @@ def generate_bivariate_charts(
     if settings is None:
         settings = get_settings()
 
-    output_folder = Path(images_dir) / analysis_name
+    output_folder = images_dir / analysis_name
     output_folder.mkdir(parents=True, exist_ok=True)
 
     tables = _get_bivariate_tables(df, columns_to_graph, max_bins_quantity, settings)
@@ -181,7 +182,7 @@ def generate_bivariate_charts(
 def _save_fig_as_svg(
     fig: Figure,
     graphic_name: str,
-    images_dir: str = IMAGES_DIR,
+    images_dir: Path = IMAGES_DIR,
     images_sub_dir: str = "",
 ) -> None:
     """Guarda una figura de Matplotlib como archivo SVG.
@@ -195,7 +196,7 @@ def _save_fig_as_svg(
     images_sub_dir : str
         Subcarpeta dentro del directorio images_dir.
     """
-    output_folder = Path(images_dir) / images_sub_dir
+    output_folder = images_dir / images_sub_dir
     output_folder.mkdir(parents=True, exist_ok=True)
     svg_path = output_folder / f"{graphic_name}.svg"
     _optimize_and_save_svg(fig, svg_path)
@@ -206,7 +207,7 @@ def plot_top_features(
     graphic_name: str,
     searcher: RandomizedSearchCV | None = None,
     top_n: int = 20,
-    images_dir: str = IMAGES_DIR,
+    images_dir: Path = IMAGES_DIR,
     settings: Settings | None = None,
 ) -> None:
     """Grafica el ranking de las top_n features más importantes y lo guarda en SVG.
@@ -261,7 +262,7 @@ def plot_evaluation_metrics(
     probabilities: np.ndarray,
     y_pred: np.ndarray,
     graphic_name: str,
-    images_dir: str = IMAGES_DIR,
+    images_dir: Path = IMAGES_DIR,
 ):
     """Calcula Accuracy y ROC AUC, dibuja la curva ROC y la guarda como SVG.
 
@@ -365,7 +366,7 @@ def plot_deciles(
     graphic_name: str,
     title_train_deciles: str = "Train Deciles",
     title_test_deciles: str = "Test Deciles",
-    images_dir: str = IMAGES_DIR,
+    images_dir: Path = IMAGES_DIR,
 ) -> None:
     """
     Recibe dos DataFrames de Polars y genera un svg con ambas
