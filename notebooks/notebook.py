@@ -358,7 +358,7 @@ def _(clean_data_1, prediction_data, training_data_1):
     print(f"{clients_region['Region'].value_counts(sort=True)} \n")
     print(f"{training_data_2['Region'].value_counts(sort=True)} \n")
     print(f"{training_data_2.select('Region').describe()} \n")
-    training_data_2.shape
+    print(training_data_2.shape)
     return (training_data_2,)
 
 
