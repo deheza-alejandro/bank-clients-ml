@@ -1,0 +1,19 @@
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.py"
+      run: uv run ruff format --check {staged_files}
+    lint:
+      glob: "*.py"
+      run: uv run ruff check {staged_files}
+
+commit-msg:
+  piped: true
+  commands:
+    01-format-commit-body:
+      priority: 1
+      run: powershell -ExecutionPolicy Bypass -File .lefthook/commit-msg/format-commit-body.ps1 {1}
+    02-commitizen-check:
+      priority: 2
+      run: uv run cz check --allow-abort --commit-msg-file {1} --message-length-limit 50
