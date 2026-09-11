@@ -20,3 +20,24 @@ commit-msg:
     02-commitizen-check:
       priority: 2
       run: uv run cz check --allow-abort --commit-msg-file {1} --message-length-limit 50
+
+post-checkout:
+  commands:
+    uv-sync-locked:
+      files: git diff --name-only HEAD@{1} HEAD
+      glob: "{pyproject.toml,uv.lock}"
+      run: uv sync --locked
+
+post-merge:
+  commands:
+    uv-sync-locked:
+      files: git diff --name-only ORIG_HEAD HEAD
+      glob: "{pyproject.toml,uv.lock}"
+      run: uv sync --locked
+
+post-rewrite:
+  commands:
+    uv-sync-locked:
+      files: git diff-tree -r --name-only HEAD@{1} HEAD
+      glob: "{pyproject.toml,uv.lock}"
+      run: uv sync --locked
