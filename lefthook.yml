@@ -21,6 +21,13 @@ commit-msg:
       priority: 2
       run: uv run cz check --allow-abort --commit-msg-file {1} --message-length-limit 50
 
+pre-push:
+  parallel: false
+  commands:
+    pyrefly-locked-check:
+      glob: "*.py"
+      run: uv run --locked pyrefly check
+
 post-checkout:
   commands:
     uv-sync-locked:
