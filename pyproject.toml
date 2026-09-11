@@ -8,11 +8,9 @@ dependencies = [
     "lightgbm>=4.7.0",
     "matplotlib>=3.11.1",
     "numpy>=2.5.1",
-    "pandas>=3.0.5",
     "polars>=1.43.2",
     "pyarrow>=25.0.0",
     "pydantic-settings>=2.15.0",
-    "python-dateutil>=2.9.0.post0",
     "scikit-learn>=1.9.0",
     "scipy>=1.18.0",
 ]
@@ -26,21 +24,16 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "ipykernel>=7.3.0",
-    "ipython>=9.16.1",
-    "jupytext>=1.19.5",
+    "commitizen>=4.18.0",
+    "lefthook>=2.1.12",
+    "marimo>=0.24.0",
     "pyrefly>=1.2.0",
     "ruff>=0.16.1",
-    "types-python-dateutil>=2.9.0.20260807",
 ]
-
-[tool.jupytext]
-formats = "ipynb,md"
 
 [tool.pyrefly]
 project-includes = [
-    "**/*.py*",
-    "**/*.ipynb",
+    "**/*.py*"
 ]
 
 [tool.ruff]
@@ -74,5 +67,20 @@ max-returns = 5
 [tool.ruff.lint.pycodestyle]
 max-line-length = 100
 
-# [tool.ruff.lint.extend-per-file-ignores]
+[tool.ruff.lint.extend-per-file-ignores]
+"notebooks/*.py" = [ # for marimo files
+    "PLR0913",
+    "PLR1711",
+    "B018",     # Found useless expression. Either assign it to a variable or remove it
+    "F841",     # Local variable name is assigned to but never used
+    "E501"      # Line too long
+]
 # "tests/*" = ["S101", "C901", "PLR0911", "PLR0915"]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "$version"
+version_scheme = "pep440"
+version_provider = "uv"
+update_changelog_on_bump = true
+major_version_zero = true
