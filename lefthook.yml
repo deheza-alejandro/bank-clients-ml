@@ -1,12 +1,15 @@
 pre-commit:
   parallel: true
   commands:
-    format:
+    uv-lock-check:
+      glob: "{pyproject.toml,uv.lock}"
+      run: uv lock --check
+    format-locked-check:
       glob: "*.py"
-      run: uv run ruff format --check {staged_files}
-    lint:
+      run: uv run --locked ruff format --check {staged_files}
+    lint-locked-check:
       glob: "*.py"
-      run: uv run ruff check {staged_files}
+      run: uv run --locked ruff check {staged_files}
 
 commit-msg:
   piped: true
