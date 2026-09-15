@@ -1,0 +1,29 @@
+// cSpell Settings
+{
+    // Version of the setting file.  Always 0.2
+    "version": "0.2",
+    "language": "en,es",
+    "import": [
+        "@cspell/dict-es-es/cspell-ext.json"
+    ],
+    // words - list of words to be always considered correct
+    "words": [
+        "lefthook",
+        "pyproject",
+        "pydantic",
+        "ruff",
+        "rumdl",
+        "qcut",
+        "svgo"
+    ],
+    // flagWords - list of words to be always considered incorrect
+    // This is useful for offensive words and common spelling errors.
+    // For example "hte" should be "the"
+    "flagWords": [
+        "hte"
+    ],
+    "dictionaries": ["python", "python-common", "typescript", "node", "softwareTerms", "data-science", "data-science-models", "data-science-tools"],
+    "ignorePaths": [],
+    "files": ["src/**", "tests/**", "notebooks/*.py", "**/*.md", "lefthook.yml", ".lefthook/**"],
+    "useGitignore": true
+}
