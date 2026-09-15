@@ -1,15 +1,27 @@
+no_tty: true
+
 pre-commit:
   parallel: true
-  commands:
-    uv-lock-check:
+  jobs:
+    - name: uv-lock-check
       glob: "{pyproject.toml,uv.lock}"
-      run: uv lock --check
-    format-locked-check:
+      run: uv lock --check --no-progress
+    - name: python-format-lint-check
       glob: "*.py"
-      run: uv run --locked ruff format --check {staged_files}
-    lint-locked-check:
-      glob: "*.py"
-      run: uv run --locked ruff check {staged_files}
+      group:
+        piped: true
+        jobs:
+          - run: uv run --no-sync --no-progress ruff format --check {staged_files}
+          - run: uv run --no-sync --no-progress ruff check {staged_files}
+    - name: markdown-format-lint-check
+      glob: "*.md"
+      group:
+        piped: true
+        jobs:
+          - run: uv run --no-sync --no-progress rumdl check {staged_files}
+            fail_text: "Run `uv run lefthook run auto-fix-staged-markdown` to fix all issues in the staged files that can be automatically resolved"
+          - run: uv run --no-sync --no-progress rumdl fmt --check --silent {staged_files}
+            fail_text: "Run `uv run lefthook run auto-fix-staged-markdown` to fix all issues in the staged files that can be automatically resolved"
 
 commit-msg:
   piped: true
@@ -22,9 +34,10 @@ commit-msg:
       run: uv run cz check --allow-abort --commit-msg-file {1} --message-length-limit 50
 
 pre-push:
-  parallel: false
+  piped: true
   commands:
     pyrefly-locked-check:
+      priority: 1
       glob: "*.py"
       run: uv run --locked pyrefly check
 
@@ -48,3 +61,15 @@ post-rewrite:
       files: git diff-tree -r --name-only HEAD@{1} HEAD
       glob: "{pyproject.toml,uv.lock}"
       run: uv sync --locked
+
+auto-fix-staged-markdown:
+  piped: true
+  commands:
+    01-fmt:
+      priority: 1
+      glob: "*.md"
+      run: uv run rumdl fmt {staged_files}
+    02-lint-fix:
+      priority: 2
+      glob: "*.md"
+      run: uv run rumdl check --fix {staged_files}

@@ -9,6 +9,9 @@
   },
   "[markdown]": {
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "charliermarsh.ruff"
+    "editor.codeActionsOnSave": {
+      "source.fixAll.rumdl": "explicit"
+    },
+    "editor.defaultFormatter": "rvben.rumdl"
   }
 }

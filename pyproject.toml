@@ -29,6 +29,7 @@ dev = [
     "marimo>=0.24.0",
     "pyrefly>=1.2.0",
     "ruff>=0.16.1",
+    "rumdl>=0.2.73",
 ]
 
 [tool.pyrefly]
@@ -84,3 +85,70 @@ version_scheme = "pep440"
 version_provider = "uv"
 update_changelog_on_bump = true
 major_version_zero = true
+
+
+[tool.rumdl]
+# Global configuration options
+# line-length = 100
+# disable = [] # List of rules to disable
+# extend-enable = ["MD060"]  # Add opt-in rules (additive, keeps defaults)
+# extend-disable = []  # Additional rules to disable (additive)
+
+# List of file/directory patterns to include for linting (if provided, only these will be linted)
+# include = [
+#    "docs/*.md",
+#    "src/**/*.md",
+#    "README.md"
+# ]
+
+exclude = [
+    # Common directories to exclude
+    ".git",
+    ".github",
+    "node_modules",
+    "vendor",
+    "dist",
+    "build",
+
+    # Specific files or patterns
+    "CHANGELOG.md",
+    "LICENSE.md",
+]
+respect-gitignore = true
+
+# Rule-specific configurations (uncomment and modify as needed)
+
+# [tool.rumdl.MD003]
+# style = "atx"  # Heading style (atx, atx_closed, setext)
+
+# [tool.rumdl.MD004]
+# style = "asterisk"  # Unordered list style (asterisk, plus, dash, consistent)
+
+# [tool.rumdl.MD007]
+# indent = 4  # Unordered list indentation
+
+# [tool.rumdl.MD013]
+# line-length = 100  # Line length
+# code-blocks = false  # Exclude code blocks from line length check
+# tables = false  # Exclude tables from line length check
+# headings = true  # Include headings in line length check
+
+# [tool.rumdl.MD044]
+# names = ["rumdl", "Markdown", "GitHub"]  # Proper names that should be capitalized correctly
+# code-blocks = false  # Check code blocks for proper names (default: false, skips code blocks)
+
+[tool.rumdl.code-block-tools]
+enabled = true
+
+[tool.rumdl.code-block-tools.tools.ruff-lint-custom]
+command = ["uv", "run", "--locked", "ruff", "check", "--output-format=concise", "-"]
+stdin = true
+stdout = true
+
+[tool.rumdl.code-block-tools.tools.ruff-format-custom]
+command = ["uv", "run", "--locked", "ruff", "format", "-"]
+stdin = true
+stdout = true
+
+[tool.rumdl.code-block-tools.languages]
+python = { lint = ["ruff-lint-custom"], format = ["ruff-format-custom"] }
