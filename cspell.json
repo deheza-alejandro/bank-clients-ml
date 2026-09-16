@@ -6,6 +6,33 @@
     "import": [
         "@cspell/dict-es-es/cspell-ext.json"
     ],
+    "dictionaries": [
+        "python",
+        "python-common",
+        "typescript",
+        "node",
+        "softwareTerms",
+        "data-science",
+        "data-science-models",
+        "data-science-tools"
+    ],
+    "useGitignore": true,
+    "ignorePaths": [
+        "data/**",
+        "**/*.svg",
+        ".vscode/**",
+        "cspell.json"
+    ],
+    "files": [
+        "src/**",
+        "tests/**",
+        "**/*.py",
+        "**/*.md",
+        "**/*.yml",
+        "**/*.yaml",
+        "**/*.toml",
+        ".lefthook/**"
+    ],
     // words - list of words to be always considered correct
     "words": [
         "bivariado",
@@ -58,30 +85,5 @@
     // For example "hte" should be "the"
     "flagWords": [
         "hte"
-    ],
-    "dictionaries": [
-        "python",
-        "python-common",
-        "typescript",
-        "node",
-        "softwareTerms",
-        "data-science",
-        "data-science-models",
-        "data-science-tools"
-    ],
-    "ignorePaths": [
-        "notebooks/images/**",
-        ".vscode/**",
-        "cspell.json"
-    ],
-    "files": [
-        "src/**",
-        "tests/**",
-        "notebooks/*.py",
-        "**/*.md",
-        "lefthook.yml",
-        ".lefthook/**",
-        "pyproject.toml"
-    ],
-    "useGitignore": true
+    ]
 }
