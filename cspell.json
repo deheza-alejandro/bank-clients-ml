@@ -21,6 +21,7 @@
         "figsize",
         "fonttype",
         "fontweight",
+        "github",
         "graficar",
         "gridspec",
         "hashsalt",
@@ -34,9 +35,11 @@
         "oversampled",
         "pydantic",
         "pyproject",
+        "pyupgrade",
         "qcut",
         "ruff",
         "rumdl",
+        "setext",
         "svgo",
         "triu",
         "twinx",
@@ -66,14 +69,19 @@
         "data-science-models",
         "data-science-tools"
     ],
-    "ignorePaths": [],
+    "ignorePaths": [
+        "notebooks/images/**",
+        ".vscode/**",
+        "cspell.json"
+    ],
     "files": [
         "src/**",
         "tests/**",
         "notebooks/*.py",
         "**/*.md",
         "lefthook.yml",
-        ".lefthook/**"
+        ".lefthook/**",
+        "pyproject.toml"
     ],
     "useGitignore": true
 }
