@@ -204,7 +204,7 @@ def _():
     - tienen 9 meses de historia
     - no tienen 'Package_Active' y 'CreditCard_CoBranding' en el ultimo mes de la ventana de entrenamiento
 
-    y para cada cliente del universo mantengo la columna de target de la ventana de prediccion
+    y para cada cliente del universo mantengo la columna de target de la ventana de predicción
     """)
     return
 
@@ -337,7 +337,7 @@ def _(training_data):
 def _():
     mo.md(r"""
     ### Completando 'Region'
-    Traigo las regiones de  los clientes desde la ventana de prediccion y pongo la Region mas comun para llenar los nulos restantes
+    Traigo las regiones de  los clientes desde la ventana de predicción y pongo la Region mas común para llenar los nulos restantes
     """)
     return
 
@@ -367,20 +367,20 @@ def _():
     mo.md(r"""
     ### Completando 'CreditCard_Product'
 
-    Traigo los CreditCard_Product de la ventana de prediccion.
+    Traigo los CreditCard_Product de la ventana de predicción.
 
-    Hay algunos clientes que tienen un CreditCard_Product en el primer mes de prediccion y otro CreditCard_Product en el segundo mes de prediccion
+    Hay algunos clientes que tienen un CreditCard_Product en el primer mes de predicción y otro CreditCard_Product en el segundo mes de predicción
 
-    Por lo tanto se obtiene el valor del primer mes de la ventana de prediccion y, si este es null o no existe, toma el valor del segundo mes como fallback, incluso si también es null
+    Por lo tanto se obtiene el valor del primer mes de la ventana de predicción y, si este es null o no existe, toma el valor del segundo mes como fallback, incluso si también es null
 
-    Luego para llenar los nulos restantes, pongo la CreditCard_Product mas comun cuando el cliente no tiene `CreditCard_Active` en la ventana de prediccion pero si tiene `CreditCard_Active` en la ventana de entrenamiento. en los demas casos lleno los nulls con "0" (cuando no tiene `CreditCard_Active` en la ventana de prediccion ni en la ventana de entrenamiento o cuando no tiene `CreditCard_Active` en la ventana de entrenamiento, por mas que lo tenga en la ventana de prediccion)
+    Luego para llenar los nulos restantes, pongo la CreditCard_Product mas común cuando el cliente no tiene `CreditCard_Active` en la ventana de predicción pero si tiene `CreditCard_Active` en la ventana de entrenamiento. en los demás casos lleno los nulls con "0" (cuando no tiene `CreditCard_Active` en la ventana de predicción ni en la ventana de entrenamiento o cuando no tiene `CreditCard_Active` en la ventana de entrenamiento, por mas que lo tenga en la ventana de predicción)
     """)
     return
 
 
 @app.cell
 def _(clean_data_1, first_prediction_month, prediction_data, training_data_2):
-    clients_creditcard_product = (
+    clients_credit_card_product = (
         prediction_data.sort(pl.col("Month") == first_prediction_month, descending=True)
         .group_by(settings.col_id)
         .agg(pl.col("CreditCard_Product").drop_nulls().first())
@@ -388,7 +388,7 @@ def _(clean_data_1, first_prediction_month, prediction_data, training_data_2):
 
     training_data_3 = (
         training_data_2.drop("CreditCard_Product")
-        .join(clients_creditcard_product, on=settings.col_id, how="left")
+        .join(clients_credit_card_product, on=settings.col_id, how="left")
         .with_columns(
             pl.when(
                 pl.col("CreditCard_Product").is_null()
@@ -401,9 +401,9 @@ def _(clean_data_1, first_prediction_month, prediction_data, training_data_2):
     )
 
     print(f"{clean_data_1.select('CreditCard_Product').describe()} \n")
-    print(f"{clients_creditcard_product.describe()} \n")
+    print(f"{clients_credit_card_product.describe()} \n")
     print(
-        f"{clients_creditcard_product['CreditCard_Product'].value_counts(sort=True)} \n"
+        f"{clients_credit_card_product['CreditCard_Product'].value_counts(sort=True)} \n"
     )
     print(f"{training_data_3['CreditCard_Product'].value_counts(sort=True)} \n")
     print(f"{training_data_3.select('CreditCard_Product').describe()} \n")
@@ -488,7 +488,7 @@ def _(identity_features):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Variables Categoricas
+    ## Variables Categóricas
     """)
     return
 
@@ -548,7 +548,7 @@ def _(identity_features_1, last_training_month):
 def _():
     mo.md(r"""
     ## Transform features
-    ### Analizando valores minimos y ceros
+    ### Analizando valores mínimos y ceros
     """)
     return
 
@@ -624,9 +624,9 @@ def _(training_data_6):
 @app.cell
 def _(training_data_6):
     greater_than_one_hundred_columns = [
-        "SavingAccount_Transfer_In_Amount_porc",
-        "SavingAccount_Transfer_In_Amount_CR_porc",
-        "SavingAccount_Balance_last_minus_first_date_porc",
+        "SavingAccount_Transfer_In_Amount_pct",
+        "SavingAccount_Transfer_In_Amount_CR_pct",
+        "SavingAccount_Balance_last_minus_first_date_pct",
     ]
 
     count_row_matches(
@@ -643,7 +643,7 @@ def _():
     mo.md(r"""
     ## Aggregate Features
 
-    Antes de la agregacion se ordenan los registros de cada cliente por mes para que luego funcionen "first" y "last" correctamente
+    Antes de la agregación se ordenan los registros de cada cliente por mes para que luego funcionen "first" y "last" correctamente
 
     diff_rel (Diferencia relativa): (último / primero)
 
@@ -713,7 +713,9 @@ def _(identity_features_2, training_data_6):
         (cols.max() - cols.min()).name.suffix("_ptp"),
         (cols.last() - cols.first()).name.suffix("_diff"),
         compute_percentage(cols.last(), cols.first()).name.suffix("_diff_rel"),
-        (compute_percentage(cols.last(), cols.first()) - 100.0).name.suffix("_pct_var"),
+        (compute_percentage(cols.last(), cols.first()) - 100.0).name.suffix(
+            "_percent_var"
+        ),
     ]
 
     data_agg = (
@@ -744,7 +746,7 @@ def _(data_agg, identity_features_2):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Agrego transformadas extras luego de las operaciones de agregacion
+    ## Agrego transformadas extras luego de las operaciones de agregación
     """)
     return
 
@@ -768,8 +770,8 @@ def _(ABT_1):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Reduccion de dimensionalidad
-    ### Elimino columnas con valores unicos
+    ## Reducción de dimensionalidad
+    ### Elimino columnas con valores únicos
     """)
     return
 
@@ -780,7 +782,7 @@ def _(test, train):
     reduced_train = train.drop(constant_cols)
     reduced_test = test.drop(constant_cols)
 
-    print(f"reduced_train sin columnas con valores unicos: {reduced_train.shape} \n")
+    print(f"reduced_train sin columnas con valores únicos: {reduced_train.shape} \n")
     constant_cols
     return reduced_test, reduced_train
 
@@ -825,8 +827,8 @@ def _(reduced_test_1, reduced_train_1):
     uncorrelated_train = correlated_train.drop(to_delete)
     uncorrelated_test = correlated_test.drop(to_delete)
 
-    print(f"cantidad de columnas con correlacion mayor a 80%: {len(to_delete)}")
-    print("train sin columnas con correlacion mayor a 80%:", uncorrelated_train.shape)
+    print(f"cantidad de columnas con correlación mayor a 80%: {len(to_delete)}")
+    print("train sin columnas con correlación mayor a 80%:", uncorrelated_train.shape)
     return (
         correlated_test,
         correlated_train,
@@ -840,7 +842,7 @@ def _():
     mo.md(r"""
     # Feature Selection
 
-    ## Ordeno las variables por fuente segun importancia usando lightGBM para quedarme con las mas importantes
+    ## Ordeno las variables por fuente según importancia usando lightGBM para quedarme con las mas importantes
 
     No estandarizo el dataframe por que lightGBM no lo necesita
 
@@ -1070,7 +1072,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Analisis Bivariado
+    ## Análisis Bivariado
     """)
     return
 
@@ -1087,14 +1089,14 @@ def _(most_important_features, uncorrelated_train):
 def _():
     mo.md(rf"""
     {mo.image(src=notebook_dir / "images" / "analysis" / "Client_Age_grp.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis" / "CreditCard_Balance_ARG_SP_porc_max.svg")}
+    {mo.image(src=notebook_dir / "images" / "analysis" / "CreditCard_Balance_ARG_SP_pct_max.svg")}
     {mo.image(src=notebook_dir / "images" / "analysis" / "CreditCard_Payment_total_max.svg")}
     {mo.image(src=notebook_dir / "images" / "analysis" / "CreditCard_Product.svg")}
     {mo.image(src=notebook_dir / "images" / "analysis" / "CreditCard_Total_Limit_diff_rel.svg")}
     {mo.image(src=notebook_dir / "images" / "analysis" / "Operations_total_min.svg")}
     {mo.image(src=notebook_dir / "images" / "analysis" / "Quantity_Active_Products_min.svg")}
     {mo.image(src=notebook_dir / "images" / "analysis" / "SavingAccount_Transfer_In_Amount_max.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis" / "SavingAccount_Transfer_In_Transactions_porc_max.svg")}
+    {mo.image(src=notebook_dir / "images" / "analysis" / "SavingAccount_Transfer_In_Transactions_pct_max.svg")}
     """)
     return
 
@@ -1103,7 +1105,7 @@ def _():
 def _():
     mo.md(r"""
     ### Buscando variables correlacionadas eliminadas anteriormente
-    Para poder intercambiar las variables mas importantes por variables mas faciles de interpretar, si es que existen.
+    Para poder intercambiar las variables mas importantes por variables mas fáciles de interpretar, si es que existen.
     """)
     return
 
@@ -1126,7 +1128,7 @@ def _(correlated_train):
         "Operations_total_mean",
         "Operations_total_median",
         "CreditCard_Active",
-        "CreditCard_Balance_ARG_SP_porc_mean",
+        "CreditCard_Balance_ARG_SP_pct_mean",
         "Quantity_Active_Products_median",
         "Quantity_Active_Products_mean",
     ]
@@ -1143,7 +1145,7 @@ def _():
     {mo.image(src=notebook_dir / "images" / "analysis_2" / "Operations_total_mean.svg")}
     {mo.image(src=notebook_dir / "images" / "analysis_2" / "Operations_total_median.svg")}
     {mo.image(src=notebook_dir / "images" / "analysis_2" / "CreditCard_Active.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis_2" / "CreditCard_Balance_ARG_SP_porc_mean.svg")}
+    {mo.image(src=notebook_dir / "images" / "analysis_2" / "CreditCard_Balance_ARG_SP_pct_mean.svg")}
     {mo.image(src=notebook_dir / "images" / "analysis_2" / "Quantity_Active_Products_median.svg")}
     {mo.image(src=notebook_dir / "images" / "analysis_2" / "Quantity_Active_Products_mean.svg")}
     """)
@@ -1153,20 +1155,20 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### Transformando mejores variables segun analisis bivariado y LightGBM
+    ### Transformando mejores variables según análisis bivariado y LightGBM
 
-    Transformo variables agregandoles el porcentaje de target y agrupo los valores.
-    A las variables categoricas solo las agrupo (ya las transforme anteriormente)
+    Transformo variables agregándoles el porcentaje de target y agrupo los valores.
+    A las variables categóricas solo las agrupo (ya las transforme anteriormente)
 
     variables a modificar:
     - Client_Age_grp
         - agrupo "Entre 50 y 59 años" + "Entre 60 y 64 años" + "Entre 65 y 69 años" (final: "Entre 50 y 69 años")
-        - default -> junto totas las demas edades ("Entre 18 y 29 años" + "Entre 30 y 39 años" + "Entre 40 y 49 años" + "Mayor a 70 años")
+        - default -> junto todas las demás edades ("Entre 18 y 29 años" + "Entre 30 y 39 años" + "Entre 40 y 49 años" + "Mayor a 70 años")
     - Operations_total_mean
     - Operations_total_median
     - CreditCard_Product
         - mantengo tipo tarjeta 202 y 104 separados
-        - default ->  junto los demas tipos de tarjetas de bajo porcentaje de target y los tipos de tarjetas poco representativas en un solo bin (sin tarjeta de credito + 102 + 123 + 124 + 702 + 1002)
+        - default ->  junto los demás tipos de tarjetas de bajo porcentaje de target y los tipos de tarjetas poco representativas en un solo bin (sin tarjeta de crédito + 102 + 123 + 124 + 702 + 1002)
     - CreditCard_Active (no hace falta transformar)
     - Quantity_Active_Products_min
     """)
@@ -1256,8 +1258,8 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Entreno con las mejores features y mejores hiperparametros
-    No realizo ningun balanceo porque la proporcion del target ya es del 30%
+    ## Entreno con las mejores features y mejores hiperparámetros
+    No realizo ningún balanceo porque la proporción del target ya es del 30%
     """)
     return
 
@@ -1343,13 +1345,13 @@ def _():
 
     ### Training
     - ordena todos los deciles bien
-    - deciles masomenos parejos
+    - deciles más o menos parejos
     - lift del primer decil = 2,4
     - KS = 47.04 en el 5to decil
 
     ### Testing
     - ordena todos los deciles bien
-    - deciles masomenos parejos
+    - deciles más o menos parejos
     - lift del primer decil = 2,36
     - KS = 47.22 en el 4to decil
 

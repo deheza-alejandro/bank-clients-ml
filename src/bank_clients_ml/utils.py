@@ -36,7 +36,7 @@ def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.Data
         high: Límite superior del rango (exclusivo).
 
     Returns:
-        DataFrame de Polars con las columnas 'columna' y 'minimo'.
+        DataFrame de Polars con las columnas 'columna' y 'mínimo'.
     """
     return (
         df.select(cs.numeric().min())
@@ -67,7 +67,7 @@ def columns_with_zeros(df: pl.DataFrame) -> pl.DataFrame:
 def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
     """
     Devuelve un DataFrame de diagnóstico con el "shape" del dataframe
-    y las columnas que presentan nulos, NaNs, Infs, valores no numericos
+    y las columnas que presentan nulos, NaNs, Infs, valores no numéricos
     o sufijos de joins de pandas (_x, _y) o sufijos de joins de polars (_right).
     """
     rows_count, columns_count = df.shape
@@ -157,8 +157,8 @@ def count_row_matches(
 def filter_columns_by_cardinality(
     df: pl.DataFrame, condition: ConditionSymbol = ">", threshold: int = 10
 ) -> pl.DataFrame:
-    """Devuelve un DataFrame con las columnas con una cantidad de valores unicos
-    que cumplen la condición, indicando la cantidad de valores unicos de cada columna."""
+    """Devuelve un DataFrame con las columnas con una cantidad de valores únicos
+    que cumplen la condición, indicando la cantidad de valores únicos de cada columna."""
     op_func = get_operator(condition)
 
     return (

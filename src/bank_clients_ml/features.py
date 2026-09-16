@@ -9,11 +9,11 @@ from bank_clients_ml.config import Settings, get_settings
 def get_date_windows(
     df: pl.DataFrame, date_column: str, prediction_window_size: int
 ) -> tuple[list[date], list[date]]:
-    """el parametro prediction_window_size se usa para determinar que "offset_by(...)" usar.
+    """el parámetro prediction_window_size se usa para determinar que "offset_by(...)" usar.
         si prediction_window_size es 2, se usa offset_by("-1mo") para el prediction_months,
         si prediction_window_size es 3, se usa offset_by("-2mo") para el prediction_months, y asi.
 
-        la separacion entre la ventana de prediccion y entrenamiento (Lead Windows
+        la separación entre la ventana de predicción y entrenamiento (Lead Windows
     ) es siempre de 1 mes
     """
     pred_offset = f"-{prediction_window_size - 1}mo"
@@ -44,7 +44,7 @@ def safe_denominator(
     Reemplaza valores inseguros para división.
 
     Args:
-        denominator: Expresion o nombre de columna del denominador.
+        denominator: Expresión o nombre de columna del denominador.
         search: Valor a buscar para reemplazar (por defecto 0).
         replace_with: Valor de reemplazo seguro (por defecto 1).
     """
@@ -71,7 +71,7 @@ def compute_percentage(numerator: str | pl.Expr, denominator: str | pl.Expr) -> 
 def target_encode_columns(
     df: pl.DataFrame, columns: list[str], settings: Settings | None = None
 ) -> pl.DataFrame:
-    """Calcula porcentajes respecto al target por columna categorica usando Polars.
+    """Calcula porcentajes respecto al target por columna categórica usando Polars.
 
     Args:
         df: DataFrame de Polars de entrada.
@@ -251,8 +251,8 @@ def group_columns_by_source(columns: list[str]) -> dict[str, list[str]]:
         raise ValueError(
             f"La lista original (len = {total_columns}) "
             f"no coincide con los grupos generados (len = {total_grouped}).\n"
-            f"Es probable que no estes teniendo en cuenta alguna columna "
-            f"y tengas que revisar esta funcion \n" + " | ".join(msg)
+            f"Es probable que no estés teniendo en cuenta alguna columna "
+            f"y tengas que revisar esta función \n" + " | ".join(msg)
         )
 
     return groups
@@ -310,13 +310,13 @@ def group_bins_by_ranges(
     if settings is None:
         settings = get_settings()
 
-    range_conds = [
+    range_conditions = [
         (pl.col("Bin") >= b_min) & (pl.col("Bin") <= b_max) for b_min, b_max in ranges
     ]
 
-    aggs = []
-    for i, cond in enumerate(range_conds):
-        aggs.extend(
+    aggregations = []
+    for i, cond in enumerate(range_conditions):
+        aggregations.extend(
             [
                 pl.col("Min").filter(cond).min().alias(f"min_{i}"),
                 pl.col("Max").filter(cond).max().alias(f"max_{i}"),
@@ -325,15 +325,18 @@ def group_bins_by_ranges(
             ]
         )
 
-    unranged_cond = ~pl.any_horizontal(range_conds)
-    aggs.extend(
+    out_of_range_cond = ~pl.any_horizontal(range_conditions)
+    aggregations.extend(
         [
-            pl.col("Clients").filter(unranged_cond).sum().alias("cli_def"),
-            pl.col(settings.col_target).filter(unranged_cond).sum().alias("tgt_def"),
+            pl.col("Clients").filter(out_of_range_cond).sum().alias("cli_def"),
+            pl.col(settings.col_target)
+            .filter(out_of_range_cond)
+            .sum()
+            .alias("tgt_def"),
         ]
     )
 
-    stats = table.select(aggs).row(0, named=True)
+    stats = table.select(aggregations).row(0, named=True)
     cli_def = stats["cli_def"] or 0
     tgt_def = stats["tgt_def"] or 0
     default_val = (float(tgt_def) / float(cli_def) * 100.0) if cli_def > 0 else 0.0

@@ -129,7 +129,7 @@ def generate_bivariate_charts(
     max_workers: int | None = None,
     settings: Settings | None = None,
 ) -> dict[str, pl.DataFrame]:
-    """Grafica las variables y guarda cada figura como SVG.
+    """Graficar las variables y guarda cada figura como SVG.
 
     Por cada columna del DataFrame arma el análisis
     bivariado con _generate_single_bivariate_chart
@@ -141,8 +141,8 @@ def generate_bivariate_charts(
     analysis_name: Nombre de la carpeta de salida dentro de {images_dir}/.
     max_bins_quantity: Cantidad maxima de bins en los que se divide cada variable.
     max_workers: maxima cantidad de CPUs a usar.
-    por defecto con None se usan todos los nucleos disponibles.
-    si len(columns_to_graph) < 20 automaticamente se usa 1 sola CPU.
+    por defecto con None se usan todos los núcleos disponibles.
+    si len(columns_to_graph) < 20 automáticamente se usa 1 sola CPU.
     """
     if settings is None:
         settings = get_settings()
@@ -194,7 +194,7 @@ def _save_fig_as_svg(
     graphic_name : str
         Nombre del archivo sin extensión.
     images_sub_dir : str
-        Subcarpeta dentro del directorio images_dir.
+        Sub carpeta dentro del directorio images_dir.
     """
     output_folder = images_dir / images_sub_dir
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -210,7 +210,7 @@ def plot_top_features(
     images_dir: Path = IMAGES_DIR,
     settings: Settings | None = None,
 ) -> None:
-    """Grafica el ranking de las top_n features más importantes y lo guarda en SVG.
+    """Graficar el ranking de las top_n features más importantes y lo guarda en SVG.
 
     Toma las top_n features con mayor importancia, arma un gráfico de barras
     horizontal y lo exporta a {images_dir}/plot_top_features/{graphic_name}.svg.

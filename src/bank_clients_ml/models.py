@@ -21,7 +21,7 @@ def stratified_train_test_split(
     settings: Settings | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Genera particiones de entrenamiento y test estratificadas
-    (manteniendo la proporcion de buenos y malos en ambos sets de train y test) usando Polars.
+    (manteniendo la proporción de buenos y malos en ambos sets de train y test) usando Polars.
 
     Parámetros:
     -----------
@@ -76,7 +76,7 @@ def get_feature_importances(
 
     Returns:
         ``(searcher, importances)`` El objeto searcher entrenado
-        y el DataFrame con las importancias ordenadas descendentemente.
+        y el DataFrame con las importancias ordenadas de forma descendente.
     """
     if settings is None:
         settings = get_settings()
@@ -137,12 +137,12 @@ def oversample_with_unique_ids(
     random_state: int = RANDOM_STATE,
     settings: Settings | None = None,
 ) -> pl.DataFrame:
-    """Asigna IDs únicos a las filas sobremuestreadas
+    """Asigna IDs únicos a las filas nuevas generadas por el oversampling
 
-    No deberias usar esta funcion si usas LightGBM + RandomizedSearchCV + StratifiedKFold.
-    En ese caso deberias usar algo como imbalanced-learn para hacer oversampling
+    No deberías usar esta función si usas LightGBM + RandomizedSearchCV + StratifiedKFold.
+    En ese caso deberías usar algo como imbalanced-learn para hacer oversampling
     solo sobre los datos de entrenamiento de cada fold de StratifiedKFold,
-    dejando intactos los datos de validacion de cada fold"""
+    dejando intactos los datos de validación de cada fold"""
     if not (0 < target_proportion < 1):
         raise ValueError(
             "El parámetro 'target_proportion' debe estar entre 0 y 1 (excluyentes)."
@@ -225,7 +225,7 @@ def compute_prediction_deciles(
 
     Retorna:
     --------
-        DataFrame con metricas de los deciles
+        DataFrame con métricas de los deciles
     """
     if settings is None:
         settings = get_settings()

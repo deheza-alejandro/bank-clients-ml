@@ -59,21 +59,21 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
             ).alias("SavingAccount_Balance_last_minus_first_date"),
             compute_percentage(
                 "SavingAccount_Balance_LastDate", "SavingAccount_Balance_FirstDate"
-            ).alias("SavingAccount_Balance_last_minus_first_date_porc"),
+            ).alias("SavingAccount_Balance_last_minus_first_date_pct"),
             compute_percentage(
                 "SavingAccount_Days_with_Debits", "SavingAccount_Days_with_use"
-            ).alias("SavingAccount_Days_with_Debits_porc"),
+            ).alias("SavingAccount_Days_with_Debits_pct"),
             compute_percentage(
                 "SavingAccount_Days_with_Credits", "SavingAccount_Days_with_use"
-            ).alias("SavingAccount_Days_with_Credits_porc"),
+            ).alias("SavingAccount_Days_with_Credits_pct"),
             compute_percentage(
                 "SavingAccount_Credits_Transactions",
                 "SavingAccount_Transactions_Transactions",
-            ).alias("SavingAccount_Credits_Transactions_porc"),
+            ).alias("SavingAccount_Credits_Transactions_pct"),
             compute_percentage(
                 "SavingAccount_Debits_Transactions",
                 "SavingAccount_Transactions_Transactions",
-            ).alias("SavingAccount_Debits_Transactions_porc"),
+            ).alias("SavingAccount_Debits_Transactions_pct"),
             (
                 pl.col("SavingAccount_Credits_Transactions")
                 / safe_denominator("SavingAccount_Days_with_use")
@@ -89,108 +89,108 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
             compute_percentage(
                 "SavingAccount_Salary_Payment_Transactions",
                 "SavingAccount_Transactions_Transactions",
-            ).alias("SavingAccount_Salary_Payment_Transactions_porc"),
+            ).alias("SavingAccount_Salary_Payment_Transactions_pct"),
             compute_percentage(
                 "SavingAccount_Transfer_In_Transactions",
                 "SavingAccount_Transactions_Transactions",
-            ).alias("SavingAccount_Transfer_In_Transactions_porc"),
+            ).alias("SavingAccount_Transfer_In_Transactions_pct"),
             compute_percentage(
                 "SavingAccount_ATM_Extraction_Transactions",
                 "SavingAccount_Transactions_Transactions",
-            ).alias("SavingAccount_ATM_Extraction_Transactions_porc"),
+            ).alias("SavingAccount_ATM_Extraction_Transactions_pct"),
             compute_percentage(
                 "SavingAccount_Service_Payment_Transactions",
                 "SavingAccount_Transactions_Transactions",
-            ).alias("SavingAccount_Service_Payment_Transactions_porc"),
+            ).alias("SavingAccount_Service_Payment_Transactions_pct"),
             compute_percentage(
                 "SavingAccount_CreditCard_Payment_Transactions",
                 "SavingAccount_Transactions_Transactions",
-            ).alias("SavingAccount_CreditCard_Payment_Transactions_porc"),
+            ).alias("SavingAccount_CreditCard_Payment_Transactions_pct"),
             compute_percentage(
                 "SavingAccount_Transfer_Out_Transactions",
                 "SavingAccount_Transactions_Transactions",
-            ).alias("SavingAccount_Transfer_Out_Transactions_porc"),
+            ).alias("SavingAccount_Transfer_Out_Transactions_pct"),
             compute_percentage(
                 "SavingAccount_DebitCard_Spend_Transactions",
                 "SavingAccount_Transactions_Transactions",
-            ).alias("SavingAccount_DebitCard_Spend_Transactions_porc"),
+            ).alias("SavingAccount_DebitCard_Spend_Transactions_pct"),
             compute_percentage(
                 "SavingAccount_Salary_Payment_Transactions",
                 "SavingAccount_Credits_Transactions",
-            ).alias("SavingAccount_Salary_Payment_Transactions_CR_porc"),
+            ).alias("SavingAccount_Salary_Payment_Transactions_CR_pct"),
             compute_percentage(
                 "SavingAccount_Transfer_In_Transactions",
                 "SavingAccount_Credits_Transactions",
-            ).alias("SavingAccount_Transfer_In_Transactions_CR_porc"),
+            ).alias("SavingAccount_Transfer_In_Transactions_CR_pct"),
             compute_percentage(
                 "SavingAccount_ATM_Extraction_Transactions",
                 "SavingAccount_Debits_Transactions",
-            ).alias("SavingAccount_ATM_Extraction_Transactions_DE_porc"),
+            ).alias("SavingAccount_ATM_Extraction_Transactions_DE_pct"),
             compute_percentage(
                 "SavingAccount_Service_Payment_Transactions",
                 "SavingAccount_Debits_Transactions",
-            ).alias("SavingAccount_Service_Payment_Transactions_DE_porc"),
+            ).alias("SavingAccount_Service_Payment_Transactions_DE_pct"),
             compute_percentage(
                 "SavingAccount_CreditCard_Payment_Transactions",
                 "SavingAccount_Debits_Transactions",
-            ).alias("SavingAccount_CreditCard_Payment_Transactions_DE_porc"),
+            ).alias("SavingAccount_CreditCard_Payment_Transactions_DE_pct"),
             compute_percentage(
                 "SavingAccount_Transfer_Out_Transactions",
                 "SavingAccount_Debits_Transactions",
-            ).alias("SavingAccount_Transfer_Out_Transactions_DE_porc"),
+            ).alias("SavingAccount_Transfer_Out_Transactions_DE_pct"),
             compute_percentage(
                 "SavingAccount_DebitCard_Spend_Transactions",
                 "SavingAccount_Debits_Transactions",
-            ).alias("SavingAccount_DebitCard_Spend_Transactions_DE_porc"),
+            ).alias("SavingAccount_DebitCard_Spend_Transactions_DE_pct"),
             compute_percentage(
                 "SavingAccount_Credits_Amounts", "SavingAccount_Total_Amount"
-            ).alias("SavingAccount_Credits_Amounts_porc"),
+            ).alias("SavingAccount_Credits_Amounts_pct"),
             compute_percentage(
                 "SavingAccount_Debits_Amounts", "SavingAccount_Total_Amount"
-            ).alias("SavingAccount_Debits_Amounts_porc"),
+            ).alias("SavingAccount_Debits_Amounts_pct"),
             compute_percentage(
                 "SavingAccount_Salary_Payment_Amount", "SavingAccount_Total_Amount"
-            ).alias("SavingAccount_Salary_Payment_Amount_porc"),
+            ).alias("SavingAccount_Salary_Payment_Amount_pct"),
             compute_percentage(
                 "SavingAccount_Transfer_In_Amount", "SavingAccount_Total_Amount"
-            ).alias("SavingAccount_Transfer_In_Amount_porc"),
+            ).alias("SavingAccount_Transfer_In_Amount_pct"),
             compute_percentage(
                 "SavingAccount_ATM_Extraction_Amount", "SavingAccount_Total_Amount"
-            ).alias("SavingAccount_ATM_Extraction_Amount_porc"),
+            ).alias("SavingAccount_ATM_Extraction_Amount_pct"),
             compute_percentage(
                 "SavingAccount_Service_Payment_Amount", "SavingAccount_Total_Amount"
-            ).alias("SavingAccount_Service_Payment_Amount_porc"),
+            ).alias("SavingAccount_Service_Payment_Amount_pct"),
             compute_percentage(
                 "SavingAccount_CreditCard_Payment_Amount", "SavingAccount_Total_Amount"
-            ).alias("SavingAccount_CreditCard_Payment_Amount_porc"),
+            ).alias("SavingAccount_CreditCard_Payment_Amount_pct"),
             compute_percentage(
                 "SavingAccount_Transfer_Out_Amount", "SavingAccount_Total_Amount"
-            ).alias("SavingAccount_Transfer_Out_Amount_porc"),
+            ).alias("SavingAccount_Transfer_Out_Amount_pct"),
             compute_percentage(
                 "SavingAccount_DebitCard_Spend_Amount", "SavingAccount_Total_Amount"
-            ).alias("SavingAccount_DebitCard_Spend_Amount_porc"),
+            ).alias("SavingAccount_DebitCard_Spend_Amount_pct"),
             compute_percentage(
                 "SavingAccount_Salary_Payment_Amount", "SavingAccount_Credits_Amounts"
-            ).alias("SavingAccount_Salary_Payment_Amount_CR_porc"),
+            ).alias("SavingAccount_Salary_Payment_Amount_CR_pct"),
             compute_percentage(
                 "SavingAccount_Transfer_In_Amount", "SavingAccount_Credits_Amounts"
-            ).alias("SavingAccount_Transfer_In_Amount_CR_porc"),
+            ).alias("SavingAccount_Transfer_In_Amount_CR_pct"),
             compute_percentage(
                 "SavingAccount_ATM_Extraction_Amount", "SavingAccount_Debits_Amounts"
-            ).alias("SavingAccount_ATM_Extraction_Amount_DE_porc"),
+            ).alias("SavingAccount_ATM_Extraction_Amount_DE_pct"),
             compute_percentage(
                 "SavingAccount_Service_Payment_Amount", "SavingAccount_Debits_Amounts"
-            ).alias("SavingAccount_Service_Payment_Amount_DE_porc"),
+            ).alias("SavingAccount_Service_Payment_Amount_DE_pct"),
             compute_percentage(
                 "SavingAccount_CreditCard_Payment_Amount",
                 "SavingAccount_Debits_Amounts",
-            ).alias("SavingAccount_CreditCard_Payment_Amount_DE_porc"),
+            ).alias("SavingAccount_CreditCard_Payment_Amount_DE_pct"),
             compute_percentage(
                 "SavingAccount_Transfer_Out_Amount", "SavingAccount_Debits_Amounts"
-            ).alias("SavingAccount_Transfer_Out_Amount_DE_porc"),
+            ).alias("SavingAccount_Transfer_Out_Amount_DE_pct"),
             compute_percentage(
                 "SavingAccount_DebitCard_Spend_Amount", "SavingAccount_Debits_Amounts"
-            ).alias("SavingAccount_DebitCard_Spend_Amount_DE_porc"),
+            ).alias("SavingAccount_DebitCard_Spend_Amount_DE_pct"),
         ]
     )
 
@@ -198,141 +198,141 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
         [
             # OPERATION
             compute_percentage("Operations_remote", "Operations_total").alias(
-                "Operations_remote_porc"
+                "Operations_remote_pct"
             ),
             compute_percentage("Operations_in_person", "Operations_total").alias(
-                "Operations_in_person_porc"
+                "Operations_in_person_pct"
             ),
             compute_percentage("Operations_Bank", "Operations_total").alias(
-                "Operations_Bank_porc"
+                "Operations_Bank_pct"
             ),
             compute_percentage("Operations_Terminal", "Operations_total").alias(
-                "Operations_Terminal_porc"
+                "Operations_Terminal_pct"
             ),
             compute_percentage("Operations_HomeBanking", "Operations_total").alias(
-                "Operations_HomeBanking_porc"
+                "Operations_HomeBanking_pct"
             ),
             compute_percentage("Operations_Mobile", "Operations_total").alias(
-                "Operations_Mobile_porc"
+                "Operations_Mobile_pct"
             ),
             compute_percentage("Operations_Ivr", "Operations_total").alias(
-                "Operations_Ivr_porc"
+                "Operations_Ivr_pct"
             ),
             compute_percentage("Operations_Telemarketer", "Operations_total").alias(
-                "Operations_Telemarketer_porc"
+                "Operations_Telemarketer_pct"
             ),
             compute_percentage("Operations_ATM", "Operations_total").alias(
-                "Operations_ATM_porc"
+                "Operations_ATM_pct"
             ),
             compute_percentage("Operations_Bank", "Operations_in_person").alias(
-                "Operations_Bank_IP_porc"
+                "Operations_Bank_IP_pct"
             ),
             compute_percentage("Operations_Terminal", "Operations_in_person").alias(
-                "Operations_Terminal_IP_porc"
+                "Operations_Terminal_IP_pct"
             ),
             compute_percentage("Operations_HomeBanking", "Operations_remote").alias(
-                "Operations_HomeBanking_R_porc"
+                "Operations_HomeBanking_R_pct"
             ),
             compute_percentage("Operations_Mobile", "Operations_remote").alias(
-                "Operations_Mobile_R_porc"
+                "Operations_Mobile_R_pct"
             ),
             compute_percentage("Operations_Ivr", "Operations_remote").alias(
-                "Operations_Ivr_R_porc"
+                "Operations_Ivr_R_pct"
             ),
             compute_percentage("Operations_Telemarketer", "Operations_remote").alias(
-                "Operations_Telemarketer_R_porc"
+                "Operations_Telemarketer_R_pct"
             ),
             compute_percentage("Operations_ATM", "Operations_in_person").alias(
-                "Operations_ATM_IP_porc"
+                "Operations_ATM_IP_pct"
             ),
             # CREDIT CARD
             compute_percentage(
                 "CreditCard_Payment_remote", "CreditCard_Payment_total"
-            ).alias("CreditCard_Payment_remote_porc"),
+            ).alias("CreditCard_Payment_remote_pct"),
             compute_percentage(
                 "CreditCard_Payment_in_person", "CreditCard_Payment_total"
-            ).alias("CreditCard_Payment_in_person_porc"),
+            ).alias("CreditCard_Payment_in_person_pct"),
             compute_percentage(
                 "CreditCard_Payment_Aut_Debit", "CreditCard_Payment_total"
-            ).alias("CreditCard_Payment_Aut_Debit_porc"),
+            ).alias("CreditCard_Payment_Aut_Debit_pct"),
             compute_percentage(
                 "CreditCard_Payment_External", "CreditCard_Payment_total"
-            ).alias("CreditCard_Payment_External_porc"),
+            ).alias("CreditCard_Payment_External_pct"),
             compute_percentage(
                 "CreditCard_Payment_Cash", "CreditCard_Payment_total"
-            ).alias("CreditCard_Payment_Cash_porc"),
+            ).alias("CreditCard_Payment_Cash_pct"),
             compute_percentage(
                 "CreditCard_Payment_Web", "CreditCard_Payment_total"
-            ).alias("CreditCard_Payment_Web_porc"),
+            ).alias("CreditCard_Payment_Web_pct"),
             compute_percentage(
                 "CreditCard_Payment_ATM", "CreditCard_Payment_total"
-            ).alias("CreditCard_Payment_ATM_porc"),
+            ).alias("CreditCard_Payment_ATM_pct"),
             compute_percentage(
                 "CreditCard_Payment_TAS", "CreditCard_Payment_total"
-            ).alias("CreditCard_Payment_TAS_porc"),
+            ).alias("CreditCard_Payment_TAS_pct"),
             compute_percentage(
                 "CreditCard_Payment_Aut_Debit", "CreditCard_Payment_remote"
-            ).alias("CreditCard_Payment_Aut_Debit_R_porc"),
+            ).alias("CreditCard_Payment_Aut_Debit_R_pct"),
             compute_percentage(
                 "CreditCard_Payment_External", "CreditCard_Payment_in_person"
-            ).alias("CreditCard_Payment_External_IP_porc"),
+            ).alias("CreditCard_Payment_External_IP_pct"),
             compute_percentage(
                 "CreditCard_Payment_Cash", "CreditCard_Payment_in_person"
-            ).alias("CreditCard_Payment_Cash_IP_porc"),
+            ).alias("CreditCard_Payment_Cash_IP_pct"),
             compute_percentage(
                 "CreditCard_Payment_Web", "CreditCard_Payment_remote"
-            ).alias("CreditCard_Payment_Web_R_porc"),
+            ).alias("CreditCard_Payment_Web_R_pct"),
             compute_percentage(
                 "CreditCard_Payment_ATM", "CreditCard_Payment_in_person"
-            ).alias("CreditCard_Payment_ATM_IP_porc"),
+            ).alias("CreditCard_Payment_ATM_IP_pct"),
             compute_percentage(
                 "CreditCard_Payment_TAS", "CreditCard_Payment_in_person"
-            ).alias("CreditCard_Payment_TAS_IP_porc"),
+            ).alias("CreditCard_Payment_TAS_IP_pct"),
             compute_percentage(
                 "CreditCard_Balance_ARG", "CreditCard_Total_Limit"
-            ).alias("CreditCard_Balance_ARG_limit_porc"),
+            ).alias("CreditCard_Balance_ARG_limit_pct"),
             compute_percentage(
                 "CreditCard_Balance_DOLLAR", "CreditCard_Total_Limit"
-            ).alias("CreditCard_Balance_DOLLAR_limit_porc"),
+            ).alias("CreditCard_Balance_DOLLAR_limit_pct"),
             compute_percentage(
                 "CreditCard_Total_Spending", "CreditCard_Total_Limit"
-            ).alias("CreditCard_Total_Spending_limit_porc"),
+            ).alias("CreditCard_Total_Spending_limit_pct"),
             compute_percentage(
                 "CreditCard_Spending_1_Installment", "CreditCard_Total_Limit"
-            ).alias("CreditCard_Spending_1_Installment_limit_porc"),
+            ).alias("CreditCard_Spending_1_Installment_limit_pct"),
             compute_percentage(
                 "CreditCard_Spending_Installments", "CreditCard_Total_Limit"
-            ).alias("CreditCard_Spending_Installments_limit_porc"),
+            ).alias("CreditCard_Spending_Installments_limit_pct"),
             compute_percentage(
                 "CreditCard_Spending_CrossBoarder", "CreditCard_Total_Limit"
-            ).alias("CreditCard_Spending_CrossBoarder_limit_porc"),
+            ).alias("CreditCard_Spending_CrossBoarder_limit_pct"),
             compute_percentage(
                 "CreditCard_Spending_Aut_Debits", "CreditCard_Total_Limit"
-            ).alias("CreditCard_Spending_Aut_Debits_limit_porc"),
+            ).alias("CreditCard_Spending_Aut_Debits_limit_pct"),
             compute_percentage("CreditCard_Revolving", "CreditCard_Total_Limit").alias(
-                "CreditCard_Revolving_limit_porc"
+                "CreditCard_Revolving_limit_pct"
             ),
             compute_percentage(
                 "CreditCard_Balance_ARG", "CreditCard_Total_Spending"
-            ).alias("CreditCard_Balance_ARG_SP_porc"),
+            ).alias("CreditCard_Balance_ARG_SP_pct"),
             compute_percentage(
                 "CreditCard_Balance_DOLLAR", "CreditCard_Total_Spending"
-            ).alias("CreditCard_Balance_DOLLAR_SP_porc"),
+            ).alias("CreditCard_Balance_DOLLAR_SP_pct"),
             compute_percentage(
                 "CreditCard_Spending_1_Installment", "CreditCard_Total_Spending"
-            ).alias("CreditCard_Spending_1_Installment_SP_porc"),
+            ).alias("CreditCard_Spending_1_Installment_SP_pct"),
             compute_percentage(
                 "CreditCard_Spending_Installments", "CreditCard_Total_Spending"
-            ).alias("CreditCard_Spending_Installments_SP_porc"),
+            ).alias("CreditCard_Spending_Installments_SP_pct"),
             compute_percentage(
                 "CreditCard_Spending_CrossBoarder", "CreditCard_Total_Spending"
-            ).alias("CreditCard_Spending_CrossBoarder_SP_porc"),
+            ).alias("CreditCard_Spending_CrossBoarder_SP_pct"),
             compute_percentage(
                 "CreditCard_Spending_Aut_Debits", "CreditCard_Total_Spending"
-            ).alias("CreditCard_Spending_Aut_Debits_SP_porc"),
+            ).alias("CreditCard_Spending_Aut_Debits_SP_pct"),
             compute_percentage(
                 "CreditCard_Revolving", "CreditCard_Total_Spending"
-            ).alias("CreditCard_Revolving_SP_porc"),
+            ).alias("CreditCard_Revolving_SP_pct"),
             # OTHERS
             (
                 pl.col("CreditCard_Premium")
@@ -379,7 +379,7 @@ def add_extra_transformations(df: pl.DataFrame) -> pl.DataFrame:
             + min_max_normalize("Operations_total_count_nonzero")
             + min_max_normalize("CreditCard_Payment_total_max")
             + min_max_normalize("CreditCard_Payment_in_person_max")
-            + (pl.col("Operations_in_person_porc_max") > 0).cast(pl.Float64)
+            + (pl.col("Operations_in_person_pct_max") > 0).cast(pl.Float64)
             + (pl.col("CreditCard_Payment_Aut_Debit_max") > 0).cast(pl.Float64)
             + (pl.col("CreditCard_Payment_TAS_max") > 0).cast(pl.Float64)
         ).alias("SUM_OF_USES"),

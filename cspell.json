@@ -8,13 +8,47 @@
     ],
     // words - list of words to be always considered correct
     "words": [
+        "bivariado",
+        "bivariate",
+        "boxstyle",
+        "correlacionadas",
+        "cuantiles",
+        "ddof",
+        "decil",
+        "dimensionalidad",
+        "edgecolor",
+        "facecolor",
+        "figsize",
+        "fonttype",
+        "fontweight",
+        "graficar",
+        "gridspec",
+        "hashsalt",
+        "hiperparámetros",
+        "importances",
+        "labelsize",
         "lefthook",
-        "pyproject",
+        "LGBM",
+        "lightgray",
+        "linestyle",
+        "oversampled",
         "pydantic",
+        "pyproject",
+        "qcut",
         "ruff",
         "rumdl",
-        "qcut",
-        "svgo"
+        "svgo",
+        "triu",
+        "twinx",
+        "unpivot",
+        "verticalalignment",
+        "xlabel",
+        "xlim",
+        "xticklabels",
+        "xticks",
+        "xycoords",
+        "ylabel",
+        "ylim"
     ],
     // flagWords - list of words to be always considered incorrect
     // This is useful for offensive words and common spelling errors.
@@ -22,8 +56,24 @@
     "flagWords": [
         "hte"
     ],
-    "dictionaries": ["python", "python-common", "typescript", "node", "softwareTerms", "data-science", "data-science-models", "data-science-tools"],
+    "dictionaries": [
+        "python",
+        "python-common",
+        "typescript",
+        "node",
+        "softwareTerms",
+        "data-science",
+        "data-science-models",
+        "data-science-tools"
+    ],
     "ignorePaths": [],
-    "files": ["src/**", "tests/**", "notebooks/*.py", "**/*.md", "lefthook.yml", ".lefthook/**"],
+    "files": [
+        "src/**",
+        "tests/**",
+        "notebooks/*.py",
+        "**/*.md",
+        "lefthook.yml",
+        ".lefthook/**"
+    ],
     "useGitignore": true
 }
