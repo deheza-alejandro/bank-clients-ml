@@ -141,12 +141,12 @@ respect-gitignore = true
 enabled = true
 
 [tool.rumdl.code-block-tools.tools.ruff-lint-custom]
-command = ["uv", "run", "--locked", "ruff", "check", "--output-format=concise", "-"]
+command = ["uv", "run", "--no-sync", "--no-progress", "ruff", "check", "--output-format=concise", "-"]
 stdin = true
 stdout = true
 
 [tool.rumdl.code-block-tools.tools.ruff-format-custom]
-command = ["uv", "run", "--locked", "ruff", "format", "-"]
+command = ["uv", "run", "--no-sync", "--no-progress", "ruff", "format", "-"]
 stdin = true
 stdout = true
 
