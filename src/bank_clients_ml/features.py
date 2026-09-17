@@ -1,5 +1,6 @@
 from datetime import date
 
+import marimo as mo
 import numpy as np
 import polars as pl
 
@@ -226,6 +227,62 @@ class CorrelationAnalyzer:
             )
             .sort(pl.col("correlation").abs(), descending=True)
         )
+
+
+class DimensionalityReducer:
+    def __init__(
+        self,
+        train: pl.DataFrame,
+        test: pl.DataFrame,
+        correlation_threshold: float = 0.80,
+        settings: Settings | None = None,
+    ):
+        if settings is None:
+            settings = get_settings()
+
+        self.constant_cols = get_constant_columns(train)
+        self.reduced_train = train.drop(self.constant_cols)
+        self.reduced_test = test.drop(self.constant_cols)
+        self.imbalanced_binary_columns = get_imbalanced_binary_columns(
+            self.reduced_train
+        )
+        self.correlated_train = self.reduced_train.drop(self.imbalanced_binary_columns)
+        self.correlated_test = self.reduced_test.drop(self.imbalanced_binary_columns)
+        self.correlation_analyzer = CorrelationAnalyzer(self.correlated_train, settings)
+        to_delete = self.correlation_analyzer.get_redundant_correlated_columns(
+            threshold=correlation_threshold
+        )
+        self.uncorrelated_train = self.correlated_train.drop(to_delete)
+        self.uncorrelated_test = self.correlated_test.drop(to_delete)
+
+    def print_constant_cols(self) -> None:
+        mo.output.append(mo.md("### constant_cols:"))
+        mo.output.append(self.constant_cols)
+        mo.output.append(
+            f"train sin columnas con valores únicos: {self.reduced_train.shape}"
+        )
+
+    def print_imbalanced_binary_columns(self) -> None:
+        mo.output.append(mo.md("### imbalanced_binary_columns:"))
+        mo.output.append(
+            low_cardinality_value_counts(
+                self.reduced_train.select(self.imbalanced_binary_columns)
+            )
+        )
+        mo.output.append(
+            mo.md(
+                f"train sin columnas binarias poco representativas: {self.correlated_train.shape}"
+            )
+        )
+
+    def get_correlated(self) -> tuple[pl.DataFrame, pl.DataFrame]:
+        return (self.correlated_train, self.correlated_test)
+
+    def get_uncorrelated(self) -> tuple[pl.DataFrame, pl.DataFrame]:
+        return (self.uncorrelated_train, self.uncorrelated_test)
+
+    def get_correlation_analyzer(self) -> CorrelationAnalyzer:
+        return self.correlation_analyzer
 
 
 def standardize(
