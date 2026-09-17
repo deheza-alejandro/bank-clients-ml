@@ -1,6 +1,9 @@
+import io
+from contextlib import redirect_stderr, redirect_stdout
 from typing import cast
 
 import lightgbm as lgb
+import marimo as mo
 import numpy as np
 import polars as pl
 from scipy.stats import uniform as sp_uniform
@@ -10,6 +13,12 @@ from sklearn.model_selection import (
 )
 
 from bank_clients_ml.config import Settings, get_settings
+from bank_clients_ml.features import group_columns_by_source
+from bank_clients_ml.graphs import (
+    plot_deciles,
+    plot_evaluation_metrics,
+    plot_top_features,
+)
 
 RANDOM_STATE: int = 314
 
@@ -129,6 +138,280 @@ def get_feature_importances(
         }
     ).sort(settings.col_importance, descending=True)
     return searcher, importances
+
+
+class GroupsLGBMTrainer:
+    def __init__(
+        self,
+        uncorrelated_train: pl.DataFrame,
+        settings: Settings | None = None,
+    ):
+        if settings is None:
+            settings = get_settings()
+
+        self.all_cols = [
+            col
+            for col in uncorrelated_train.columns
+            if col not in {settings.col_id, settings.col_target}
+        ]
+        self.columns_by_source = group_columns_by_source(self.all_cols)
+
+        self.all_cols_buffer = io.StringIO()
+        with (
+            redirect_stdout(self.all_cols_buffer),
+            redirect_stderr(self.all_cols_buffer),
+        ):
+            self.all_cols_searcher, self.all_cols_importances = get_feature_importances(
+                uncorrelated_train, self.all_cols
+            )
+
+        self.saving_account_days_transactions_buffer = io.StringIO()
+        with (
+            redirect_stdout(self.saving_account_days_transactions_buffer),
+            redirect_stderr(self.saving_account_days_transactions_buffer),
+        ):
+            (
+                self.saving_account_days_transactions_searcher,
+                self.saving_account_days_transactions_importances,
+            ) = get_feature_importances(
+                uncorrelated_train,
+                self.columns_by_source["saving_account_days_transactions"],
+            )
+
+        self.saving_account_monetary_buffer = io.StringIO()
+        with (
+            redirect_stdout(self.saving_account_monetary_buffer),
+            redirect_stderr(self.saving_account_monetary_buffer),
+        ):
+            (
+                self.saving_account_monetary_searcher,
+                self.saving_account_monetary_importances,
+            ) = get_feature_importances(
+                uncorrelated_train, self.columns_by_source["saving_account_monetary"]
+            )
+
+        self.operations_buffer = io.StringIO()
+        with (
+            redirect_stdout(self.operations_buffer),
+            redirect_stderr(self.operations_buffer),
+        ):
+            self.operations_searcher, self.operations_importances = (
+                get_feature_importances(
+                    uncorrelated_train, self.columns_by_source["operations"]
+                )
+            )
+
+        self.credit_card_payment_buffer = io.StringIO()
+        with (
+            redirect_stdout(self.credit_card_payment_buffer),
+            redirect_stderr(self.credit_card_payment_buffer),
+        ):
+            self.credit_card_payment_searcher, self.credit_card_payment_importances = (
+                get_feature_importances(
+                    uncorrelated_train, self.columns_by_source["credit_card_payment"]
+                )
+            )
+
+        self.credit_card_monetary_buffer = io.StringIO()
+        with (
+            redirect_stdout(self.credit_card_monetary_buffer),
+            redirect_stderr(self.credit_card_monetary_buffer),
+        ):
+            (
+                self.credit_card_monetary_searcher,
+                self.credit_card_monetary_importances,
+            ) = get_feature_importances(
+                uncorrelated_train, self.columns_by_source["credit_card_monetary"]
+            )
+
+        self.others_buffer = io.StringIO()
+        with (
+            redirect_stdout(self.others_buffer),
+            redirect_stderr(self.others_buffer),
+        ):
+            self.others_searcher, self.others_importances = get_feature_importances(
+                uncorrelated_train, self.columns_by_source["others"]
+            )
+
+    def print_groups_lengths(self) -> None:
+        mo.output.append(f"all_cols: {len(self.all_cols)}")
+        mo.output.append(
+            f"saving_account_days_transactions: "
+            f"{len(self.columns_by_source['saving_account_days_transactions'])}"
+        )
+        mo.output.append(
+            f"saving_account_monetary: {len(self.columns_by_source['saving_account_monetary'])}"
+        )
+        mo.output.append(f"operations: {len(self.columns_by_source['operations'])}")
+        mo.output.append(
+            f"credit_card_payment: {len(self.columns_by_source['credit_card_payment'])}"
+        )
+        mo.output.append(
+            f"credit_card_monetary: {len(self.columns_by_source['credit_card_monetary'])}"
+        )
+        mo.output.append(f"others: {len(self.columns_by_source['others'])}\n\n")
+
+        mo.output.append(mo.md("### others:"))
+        mo.output.append(self.columns_by_source["others"])
+
+    def print_searchers(self) -> None:
+        mo.output.append(mo.md("### all_cols:"))
+        mo.output.append(self.all_cols_searcher)
+        mo.output.append(mo.md("### saving_account_days_transactions:"))
+        mo.output.append(self.saving_account_days_transactions_searcher)
+        mo.output.append(mo.md("### saving_account_monetary:"))
+        mo.output.append(self.saving_account_monetary_searcher)
+        mo.output.append(mo.md("### operations:"))
+        mo.output.append(self.operations_searcher)
+        mo.output.append(mo.md("### credit_card_payment:"))
+        mo.output.append(self.credit_card_payment_searcher)
+        mo.output.append(mo.md("### credit_card_monetary:"))
+        mo.output.append(self.credit_card_monetary_searcher)
+        mo.output.append(mo.md("### others:"))
+        mo.output.append(self.others_searcher)
+
+    def plot_top_features(self) -> None:
+        plot_top_features(
+            self.all_cols_importances, "all_cols_importances", self.all_cols_searcher
+        )
+        plot_top_features(
+            self.saving_account_days_transactions_importances,
+            "cols_saving_account_days_transactions_importances",
+            self.saving_account_days_transactions_searcher,
+        )
+        plot_top_features(
+            self.saving_account_monetary_importances,
+            "cols_saving_account_monetary_importances",
+            self.saving_account_monetary_searcher,
+            30,
+        )
+        plot_top_features(
+            self.operations_importances,
+            "cols_operations_importances",
+            self.operations_searcher,
+        )
+        plot_top_features(
+            self.credit_card_payment_importances,
+            "cols_credit_card_payment_importances",
+            self.credit_card_payment_searcher,
+        )
+        plot_top_features(
+            self.credit_card_monetary_importances,
+            "cols_credit_card_monetary_importances",
+            self.credit_card_monetary_searcher,
+        )
+        plot_top_features(
+            self.others_importances, "cols_others_importances", self.others_searcher
+        )
+
+    def print_outputs(self) -> None:
+        mo.output.append(mo.md("all_cols:"))
+        mo.output.append(mo.md(f"```text\n{self.all_cols_buffer.getvalue()}\n```"))
+        mo.output.append(mo.md("saving_account_days_transactions:"))
+        mo.output.append(
+            mo.md(
+                f"```text\n{self.saving_account_days_transactions_buffer.getvalue()}\n```"
+            )
+        )
+        mo.output.append(mo.md("saving_account_monetary:"))
+        mo.output.append(
+            mo.md(f"```text\n{self.saving_account_monetary_buffer.getvalue()}\n```")
+        )
+        mo.output.append(mo.md("operations:"))
+        mo.output.append(mo.md(f"```text\n{self.operations_buffer.getvalue()}\n```"))
+        mo.output.append(mo.md("credit_card_payment:"))
+        mo.output.append(
+            mo.md(f"```text\n{self.credit_card_payment_buffer.getvalue()}\n```")
+        )
+        mo.output.append(mo.md("credit_card_monetary:"))
+        mo.output.append(
+            mo.md(f"```text\n{self.credit_card_monetary_buffer.getvalue()}\n```")
+        )
+        mo.output.append(mo.md("others:"))
+        mo.output.append(mo.md(f"```text\n{self.others_buffer.getvalue()}\n```"))
+
+    def get_most_important_features(self) -> list[str]:
+        most_important_features = [
+            *self.saving_account_days_transactions_importances.head(1)
+            .get_column("Feature")
+            .to_list(),
+            *self.saving_account_monetary_importances.head(1)
+            .get_column("Feature")
+            .to_list(),
+            *self.operations_importances.head(1).get_column("Feature").to_list(),
+            *self.credit_card_payment_importances.head(1)
+            .get_column("Feature")
+            .to_list(),
+            *self.credit_card_monetary_importances.head(2)
+            .get_column("Feature")
+            .to_list(),
+            *self.others_importances.head(3).get_column("Feature").to_list(),
+        ]
+        return most_important_features
+
+
+class LGBMTrainer:
+    def __init__(
+        self,
+        train: pl.DataFrame,
+        columns: list[str],
+        n_iter: int = 2,
+        test: pl.DataFrame | None = None,
+        renames_dict: dict[str, str] | None = None,
+        settings: Settings | None = None,
+    ):
+        if settings is None:
+            settings = get_settings()
+
+        self.test = test
+
+        self.buffer = io.StringIO()
+        with (
+            redirect_stdout(self.buffer),
+            redirect_stderr(self.buffer),
+        ):
+            self.searcher, self.importances = get_feature_importances(
+                train, columns, n_iter
+            )
+
+        if renames_dict is not None:
+            self.importances = self.importances.with_columns(
+                pl.col(settings.col_feature)
+                .replace_strict(renames_dict, default=pl.col(settings.col_feature))
+                .alias(settings.col_feature)
+            )
+
+        self.evaluator = None
+        if test is not None:
+            self.evaluator = PerformanceEvaluator(
+                self.searcher, train, test, columns, settings
+            )
+
+    def print_output(self) -> None:
+        mo.output.append(mo.md(f"```text\n{self.buffer.getvalue()}\n```"))
+
+    def print_searcher(self) -> None:
+        mo.output.append(self.searcher)
+
+    def plot_top_features(self, graphic_name: str) -> None:
+        plot_top_features(
+            self.importances,
+            graphic_name,
+            self.searcher,
+        )
+
+    def get_most_important_features(self) -> list[str]:
+        return self.importances.head(5).get_column("Feature").to_list()
+
+    def plot_evaluation_metrics(self, graphic_name: str) -> None:
+        if self.evaluator is None:
+            raise RuntimeError("Esta instancia no fue inicializada con un set de test")
+        self.evaluator.plot_evaluation_metrics(graphic_name=graphic_name)
+
+    def plot_deciles(self, graphic_name: str) -> None:
+        if self.evaluator is None:
+            raise RuntimeError("Esta instancia no fue inicializada con un set de test")
+        self.evaluator.plot_deciles(graphic_name=graphic_name)
 
 
 def oversample_with_unique_ids(
@@ -269,3 +552,47 @@ def compute_prediction_deciles(
         lift=(target_1_rate / total_target_1_rate).round(2),
         ks=cum_gain - cum_target_0_rate,
     )
+
+
+class PerformanceEvaluator:
+    def __init__(
+        self,
+        searcher: RandomizedSearchCV,
+        train: pl.DataFrame,
+        test: pl.DataFrame,
+        columns: list[str],
+        settings: Settings | None = None,
+    ):
+        self.test = test
+
+        if settings is None:
+            self.settings = get_settings()
+        else:
+            self.settings = settings
+
+        (
+            self.y_pred,
+            probabilities_train,
+            self.probabilities_test,
+            train_based_bins,
+        ) = get_scoring(searcher, train, test, columns)
+
+        self.train_deciles = compute_prediction_deciles(train, probabilities_train)
+        self.test_deciles = compute_prediction_deciles(
+            test, self.probabilities_test, train_based_bins
+        )
+
+    def plot_evaluation_metrics(self, graphic_name="lightgbm") -> None:
+        plot_evaluation_metrics(
+            self.test[self.settings.col_target],
+            self.probabilities_test,
+            self.y_pred,
+            graphic_name=graphic_name,
+        )
+
+    def plot_deciles(self, graphic_name="deciles") -> None:
+        plot_deciles(
+            self.train_deciles.drop("min_prob", "max_prob"),
+            self.test_deciles.drop("min_prob", "max_prob"),
+            graphic_name=graphic_name,
+        )
