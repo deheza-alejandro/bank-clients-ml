@@ -68,6 +68,63 @@ def compute_percentage(numerator: str | pl.Expr, denominator: str | pl.Expr) -> 
     return numerator_exp / safe_denominator(denominator) * 100.0
 
 
+def get_saving_account_cols():
+    return [
+        "SavingAccount_Balance_Average",
+        "SavingAccount_Balance_FirstDate",
+        "SavingAccount_Balance_LastDate",
+        "SavingAccount_Total_Amount",
+        "SavingAccount_Salary_Payment_Amount",
+        "SavingAccount_Transfer_In_Amount",
+        "SavingAccount_Credits_Amounts",
+        "SavingAccount_ATM_Extraction_Amount",
+        "SavingAccount_Service_Payment_Amount",
+        "SavingAccount_CreditCard_Payment_Amount",
+        "SavingAccount_Transfer_Out_Amount",
+        "SavingAccount_DebitCard_Spend_Amount",
+        "SavingAccount_Debits_Amounts",
+    ]
+
+
+def get_binary_identity_features_cols() -> list[str]:
+    return [
+        "CreditCard_Premium",
+        "CreditCard_Active",
+        "CreditCard_CoBranding",
+        "Loan_Active",
+        "Mortgage_Active",
+        "SavingAccount_Active_ARG_Salary",
+        "SavingAccount_Active_ARG",
+        "SavingAccount_Active_DOLLAR",
+        "DebitCard_Active",
+        "Investment_Active",
+        "Package_Active",
+        "Insurance_Life",
+        "Insurance_Home",
+        "Insurance_Accidents",
+        "Insurance_Mobile",
+        "Insurance_ATM",
+        "Insurance_Unemployment",
+        "Sex",
+        "Mobile",
+        "Email",
+    ]
+
+
+def get_credit_card_cols() -> list[str]:
+    return [
+        "CreditCard_Balance_ARG",
+        "CreditCard_Balance_DOLLAR",
+        "CreditCard_Total_Limit",
+        "CreditCard_Total_Spending",
+        "CreditCard_Spending_1_Installment",
+        "CreditCard_Spending_Installments",
+        "CreditCard_Spending_CrossBoarder",
+        "CreditCard_Spending_Aut_Debits",
+        "CreditCard_Revolving",
+    ]
+
+
 def target_encode_columns(
     df: pl.DataFrame, columns: list[str], settings: Settings | None = None
 ) -> pl.DataFrame:
