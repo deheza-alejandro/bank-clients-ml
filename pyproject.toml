@@ -78,6 +78,10 @@ max-line-length = 100
 ]
 # "tests/*" = ["S101", "C901", "PLR0911", "PLR0915"]
 
+[tool.marimo.runtime]
+on_cell_change = "lazy"
+auto_reload = "lazy"
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 tag_format = "$version"
