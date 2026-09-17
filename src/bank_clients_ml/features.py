@@ -1,10 +1,13 @@
 from datetime import date
+from typing import NamedTuple
 
 import marimo as mo
 import numpy as np
 import polars as pl
 
 from bank_clients_ml.config import Settings, get_settings
+from bank_clients_ml.graphs import generate_bivariate_charts
+from bank_clients_ml.utils import low_cardinality_value_counts
 
 
 def get_date_windows(
@@ -402,9 +405,14 @@ def min_max_normalize_weighted(column: str, weight: str) -> pl.Expr:
     return min_max_normalize(column) * pl.col(weight)
 
 
+class Range(NamedTuple):
+    start: float
+    end: float
+
+
 def group_bins_by_ranges(
     column: str,
-    ranges: list[tuple[int, int]],
+    ranges: list[Range],
     table: pl.DataFrame,
     settings: Settings | None = None,
 ) -> pl.Expr:
@@ -478,3 +486,71 @@ def _get_range_data(i: int, stats) -> tuple[float, float, float]:
     high = (float(max_val) + 0.01) if isinstance(max_val, (int, float)) else 0.0
     val = (float(tgt_sum) / float(cli_sum) * 100.0) if cli_sum > 0 else 0.0
     return low, high, val
+
+
+class BinTransformation(NamedTuple):
+    column: str
+    ranges: list[Range]
+
+
+class BivariateAnalyzer:
+    def __init__(self, dimensionality_reducer: DimensionalityReducer):
+        self.dimensionality_reducer = dimensionality_reducer
+        self.correlated_train, self.correlated_test = (
+            dimensionality_reducer.get_correlated()
+        )
+        self.uncorrelated_train, _ = dimensionality_reducer.get_uncorrelated()
+        self.uncorrelated_analysis: dict[str, pl.DataFrame] | None = None
+        self.correlated_analysis: dict[str, pl.DataFrame] | None = None
+
+    def plot_uncorrelated(self, columns, analysis_name) -> None:
+        self.uncorrelated_analysis = generate_bivariate_charts(
+            self.uncorrelated_train, columns, analysis_name
+        )
+
+    def plot_correlated(self, correlated_columns, analysis_name) -> None:
+        if any(col in self.uncorrelated_train.columns for col in correlated_columns):
+            raise RuntimeError(
+                "correlated_columns posee columnas dentro de uncorrelated_train"
+            )
+
+        self.correlated_analysis = generate_bivariate_charts(
+            self.correlated_train, correlated_columns, analysis_name
+        )
+
+    def plot_specific(self, df, columns, analysis_name) -> None:
+        _ = generate_bivariate_charts(df, columns, analysis_name)
+
+    def print_correlations_for_each(self, columns) -> None:
+        correlation_analyzer = self.dimensionality_reducer.get_correlation_analyzer()
+        for x in columns:
+            mo.output.append(mo.md(f"###  Columnas correlacionadas con {x}:"))
+            mo.output.append(correlation_analyzer.get_correlations_for(x))
+
+    def _get_table_analysis(self, column: str) -> pl.DataFrame:
+        if self.uncorrelated_analysis is None or self.correlated_analysis is None:
+            raise RuntimeError(
+                "Debe usar los métodos plot_uncorrelated(...) y plot_correlated(...) "
+                "antes de usar este método"
+            )
+
+        if column in self.uncorrelated_analysis:
+            return self.uncorrelated_analysis[column]
+        else:
+            return self.correlated_analysis[column]
+
+    def group_bins_by_ranges(
+        self, bins_transformations: list[BinTransformation]
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        expr = [
+            group_bins_by_ranges(
+                column,
+                ranges=ranges,
+                table=self._get_table_analysis(column),
+            ).alias(column)
+            for column, ranges in bins_transformations
+        ]
+        final_train = self.correlated_train.with_columns(expr)
+        final_test = self.correlated_test.with_columns(expr)
+
+        return final_train, final_test
