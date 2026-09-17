@@ -2,6 +2,7 @@ import operator
 from collections.abc import Sequence
 from typing import Literal
 
+import marimo as mo
 import polars as pl
 import polars.selectors as cs
 
@@ -19,12 +20,10 @@ OPERATORS = {
 }
 
 
-def print_without_trunc(df: pl.DataFrame) -> None:
-    """Imprime un DataFrame de Polars completo en la consola sin truncar
-    filas, columnas ni cadenas largas.
-    """
-    with pl.Config(tbl_rows=-1, tbl_cols=-1, fmt_str_lengths=100):
-        print(df)
+def print_describe(df: pl.DataFrame) -> None:
+    return mo.output.append(
+        df.describe().transpose(include_header=True, column_names="statistic")
+    )
 
 
 def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.DataFrame:
