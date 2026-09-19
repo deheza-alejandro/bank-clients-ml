@@ -36,13 +36,9 @@ def get_date_windows(
     return training_months, prediction_months
 
 
-RANDOM_STATE: int = 314
-
-
 def stratified_train_test_split(
     df: pl.DataFrame,
     test_ratio: float = 0.3,
-    random_state: int = RANDOM_STATE,
     settings: Settings | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Genera particiones de entrenamiento y test estratificadas
@@ -53,7 +49,6 @@ def stratified_train_test_split(
     df : DataFrame de Polars con los datos.
     target : Nombre de la columna objetivo.
     test_size : Proporción del conjunto de test.
-    random_state : Semilla aleatoria.
 
     Retorna:
     --------
@@ -62,7 +57,9 @@ def stratified_train_test_split(
     if settings is None:
         settings = get_settings()
 
-    df_flagged = df.sample(fraction=1.0, shuffle=True, seed=random_state).with_columns(
+    df_flagged = df.sample(
+        fraction=1.0, shuffle=True, seed=settings.random_state
+    ).with_columns(
         _group_id=pl.col(settings.col_target).cum_count().over(settings.col_target),
         _group_total=pl.len().over(settings.col_target),
     )
@@ -78,7 +75,6 @@ def stratified_train_test_split(
 def oversample_with_unique_ids(
     train: pl.DataFrame,
     target_proportion: float = 0.5,
-    random_state: int = RANDOM_STATE,
     settings: Settings | None = None,
 ) -> pl.DataFrame:
     """Asigna IDs únicos a las filas nuevas generadas por el oversampling
@@ -106,10 +102,10 @@ def oversample_with_unique_ids(
     )
 
     df_minority_oversampled = df_minority.sample(
-        n=count_minority_target, with_replacement=True, seed=random_state
+        n=count_minority_target, with_replacement=True, seed=settings.random_state
     ).with_columns((max_id + 1 + pl.int_range(0, pl.len())).alias(settings.col_id))
 
     balanced_train = pl.concat([df_majority, df_minority_oversampled]).sample(
-        fraction=1.0, shuffle=True, seed=random_state
+        fraction=1.0, shuffle=True, seed=settings.random_state
     )
     return balanced_train

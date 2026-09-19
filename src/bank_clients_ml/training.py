@@ -20,15 +20,12 @@ from bank_clients_ml.visualization import (
     plot_top_features,
 )
 
-RANDOM_STATE: int = 314
-
 
 def _get_feature_importances(
     train: pl.DataFrame,
     columns: list[str],
     n_iter: int,
     splits_cross_validation: int,
-    random_state: int = RANDOM_STATE,
     settings: Settings | None = None,
 ) -> tuple[RandomizedSearchCV, pl.DataFrame]:
     """Entrena un modelo LightGBM usando RandomizedSearchCV y devuelve las
@@ -44,8 +41,6 @@ def _get_feature_importances(
         target : Nombre de la columna target.
         splits_cross_validation : Cantidad de k-fold cross-validation para usar con
         ``RandomizedSearchCV``. por defecto es 3
-        random_state :
-        debug :
 
     Returns:
         ``(searcher, importances)`` El objeto searcher entrenado
@@ -57,7 +52,7 @@ def _get_feature_importances(
     verbose: int = 3 if settings.debug else 1
 
     model = lgb.LGBMClassifier(
-        random_state=random_state,
+        random_state=settings.random_state,
         n_jobs=1,
         verbose=verbose,
         metric="auc",
@@ -84,10 +79,10 @@ def _get_feature_importances(
         cv=StratifiedKFold(
             n_splits=splits_cross_validation,
             shuffle=True,
-            random_state=random_state,
+            random_state=settings.random_state,
         ),
         verbose=verbose,
-        random_state=random_state,
+        random_state=settings.random_state,
     )
 
     X_train = train.select(columns)
