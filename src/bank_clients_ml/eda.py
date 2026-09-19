@@ -8,58 +8,10 @@ import polars.selectors as cs
 
 from bank_clients_ml.config import Settings, get_settings
 
-ConditionSymbol = Literal["<", ">", "<=", ">=", "==", "!="]
-
-OPERATORS = {
-    "<": operator.lt,
-    ">": operator.gt,
-    "<=": operator.le,
-    ">=": operator.ge,
-    "==": operator.eq,
-    "!=": operator.ne,
-}
-
 
 def print_describe(df: pl.DataFrame) -> None:
     return mo.output.append(
         df.describe().transpose(include_header=True, column_names="statistic")
-    )
-
-
-def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.DataFrame:
-    """Calcula las columnas numéricas cuyos valores mínimos se encuentran entre un rango dado.
-
-    Args:
-        df: DataFrame de Polars a analizar.
-        low: Límite inferior del rango (exclusivo).
-        high: Límite superior del rango (exclusivo).
-
-    Returns:
-        DataFrame de Polars con las columnas 'columna' y 'mínimo'.
-    """
-    return (
-        df.select(cs.numeric().min())
-        .unpivot(variable_name="column", value_name="minimum")
-        .filter(
-            pl.col("minimum").is_between(low, high, closed="none")
-            & (pl.col("minimum") != 0)
-        )
-    )
-
-
-def columns_with_zeros(df: pl.DataFrame) -> pl.DataFrame:
-    """Devuelve un DataFrame con las columnas numéricas que contienen ceros y su cantidad.
-
-    Args:
-        df: DataFrame de Polars a inspeccionar.
-
-    Returns:
-        DataFrame con columnas 'column' y 'zeros_quantity'.
-    """
-    return (
-        df.select((cs.numeric() == 0).sum())
-        .unpivot(variable_name="column", value_name="zeros_quantity")
-        .filter(pl.col("zeros_quantity") > 0)
     )
 
 
@@ -114,7 +66,19 @@ def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def get_operator(condition: ConditionSymbol):
+ConditionSymbol = Literal["<", ">", "<=", ">=", "==", "!="]
+
+OPERATORS = {
+    "<": operator.lt,
+    ">": operator.gt,
+    "<=": operator.le,
+    ">=": operator.ge,
+    "==": operator.eq,
+    "!=": operator.ne,
+}
+
+
+def _get_operator(condition: ConditionSymbol):
     if condition not in OPERATORS:
         raise ValueError(f"Condición no válida. Usa una de: {list(OPERATORS.keys())}")
 
@@ -145,7 +109,7 @@ def count_row_matches(
     if isinstance(columns, str):
         columns = [columns]
 
-    op_func = get_operator(condition)
+    op_func = _get_operator(condition)
 
     return df.select(op_func(pl.col(columns), threshold).sum()).unpivot(
         variable_name="Column name",
@@ -158,7 +122,7 @@ def filter_columns_by_cardinality(
 ) -> pl.DataFrame:
     """Devuelve un DataFrame con las columnas con una cantidad de valores únicos
     que cumplen la condición, indicando la cantidad de valores únicos de cada columna."""
-    op_func = get_operator(condition)
+    op_func = _get_operator(condition)
 
     return (
         df.select(pl.all().n_unique())
@@ -189,6 +153,43 @@ def low_cardinality_value_counts(
         .group_by(["column", "value"])
         .len("count")
         .sort(["column", "count"], descending=[False, True])
+    )
+
+
+def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.DataFrame:
+    """Calcula las columnas numéricas cuyos valores mínimos se encuentran entre un rango dado.
+
+    Args:
+        df: DataFrame de Polars a analizar.
+        low: Límite inferior del rango (exclusivo).
+        high: Límite superior del rango (exclusivo).
+
+    Returns:
+        DataFrame de Polars con las columnas 'columna' y 'mínimo'.
+    """
+    return (
+        df.select(cs.numeric().min())
+        .unpivot(variable_name="column", value_name="minimum")
+        .filter(
+            pl.col("minimum").is_between(low, high, closed="none")
+            & (pl.col("minimum") != 0)
+        )
+    )
+
+
+def columns_with_zeros(df: pl.DataFrame) -> pl.DataFrame:
+    """Devuelve un DataFrame con las columnas numéricas que contienen ceros y su cantidad.
+
+    Args:
+        df: DataFrame de Polars a inspeccionar.
+
+    Returns:
+        DataFrame con columnas 'column' y 'zeros_quantity'.
+    """
+    return (
+        df.select((cs.numeric() == 0).sum())
+        .unpivot(variable_name="column", value_name="zeros_quantity")
+        .filter(pl.col("zeros_quantity") > 0)
     )
 
 
