@@ -22,8 +22,6 @@ pre-commit:
             fail_text: "Run `uv run lefthook run auto-fix-staged-markdown` to fix all issues in the staged files that can be automatically resolved"
           - run: uv run --no-sync --no-progress rumdl fmt --check --silent {staged_files}
             fail_text: "Run `uv run lefthook run auto-fix-staged-markdown` to fix all issues in the staged files that can be automatically resolved"
-    - name: cspell
-      run: bun cspell --no-must-find-files {staged_files}
 
 commit-msg:
   piped: true
@@ -42,6 +40,9 @@ pre-push:
       priority: 1
       glob: "*.py"
       run: uv run --locked pyrefly check
+    cspell:
+      priority: 2
+      run: bun cspell --no-must-find-files {staged_files}
 
 post-checkout:
   commands:
