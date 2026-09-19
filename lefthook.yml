@@ -42,7 +42,7 @@ pre-push:
       run: uv run --locked pyrefly check
     cspell:
       priority: 2
-      run: bun cspell --no-must-find-files {staged_files}
+      run: bun cspell --no-must-find-files {all_files}
 
 post-checkout:
   commands:
