@@ -9,29 +9,13 @@ with app.setup:
     import marimo as mo
     import polars as pl
 
-    from bank_clients_ml.aggregations import generate_aggregations
-    from bank_clients_ml.config import get_settings
-    from bank_clients_ml.features import (
-        BinTransformation,
-        BivariateAnalyzer,
-        DimensionalityReducer,
-        Range,
+    from bank_clients_ml.column_groups import (
         get_binary_identity_features_cols,
         get_credit_card_cols,
-        get_date_windows,
         get_saving_account_cols,
-        target_encode_columns,
     )
-    from bank_clients_ml.models import (
-        GroupsLGBMTrainer,
-        LGBMTrainer,
-        stratified_train_test_split,
-    )
-    from bank_clients_ml.transformations import (
-        add_extra_transformations,
-        add_transformations,
-    )
-    from bank_clients_ml.utils import (
+    from bank_clients_ml.config import get_settings
+    from bank_clients_ml.eda import (
         columns_with_zeros,
         count_row_matches,
         filter_columns_by_cardinality,
@@ -40,6 +24,25 @@ with app.setup:
         low_cardinality_value_counts,
         mins_in_range,
         print_describe,
+    )
+    from bank_clients_ml.feature_engineering import (
+        add_extra_transformations,
+        add_transformations,
+        generate_aggregations,
+        target_encode_columns,
+    )
+    from bank_clients_ml.redundant_column_filter import (
+        BinTransformation,
+        Range,
+        RedundantColumnFilter,
+    )
+    from bank_clients_ml.sampling import (
+        get_date_windows,
+        stratified_train_test_split,
+    )
+    from bank_clients_ml.training import (
+        GroupsLGBMTrainer,
+        LGBMTrainer,
     )
 
     settings = get_settings()
@@ -535,8 +538,9 @@ def _(
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # ABT
+    # ABT and Train/Test split
     - Agrego transformadas extras luego de generar la ABT
+    - Divido los datos es train y test
     """)
     return
 
@@ -559,6 +563,7 @@ def _(data_agg, identity_features_2):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    # Feature Selection
     ## Reducción de dimensionalidad
     Elimino:
     - columnas con valores únicos
@@ -570,23 +575,21 @@ def _():
 
 @app.cell
 def _(test, train):
-    dimensionality_reducer = DimensionalityReducer(
-        train, test, correlation_threshold=0.80
+    column_filter = RedundantColumnFilter(
+        train, test, imbalanced_binary_threshold=0.10, correlation_threshold=0.80
     )
-    dimensionality_reducer.print_constant_cols()
-    dimensionality_reducer.print_imbalanced_binary_columns()
-    uncorrelated_train, _ = dimensionality_reducer.get_uncorrelated()
+    column_filter.print_constant_cols()
+    column_filter.print_imbalanced_binary_columns()
+    uncorrelated_train, _ = column_filter.get_uncorrelated()
     mo.output.append(
         mo.md(f".\n\n uncorrelated_train.shape: {uncorrelated_train.shape}")
     )
-    return dimensionality_reducer, uncorrelated_train
+    return column_filter, uncorrelated_train
 
 
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # Feature Selection
-
     ## Ordeno las variables por fuente según importancia usando lightGBM para quedarme con las mas importantes
 
     No estandarizo el dataframe por que lightGBM no lo necesita
@@ -611,13 +614,13 @@ def _(uncorrelated_train):
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "all_cols_importances.svg")}
-    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "cols_saving_account_days_transactions_importances.svg")}
-    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "cols_saving_account_monetary_importances.svg")}
-    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "cols_operations_importances.svg")}
-    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "cols_credit_card_payment_importances.svg")}
-    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "cols_credit_card_monetary_importances.svg")}
-    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "cols_others_importances.svg")}
+    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "all_columns.svg")}
+    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "saving_account_days_transactions.svg")}
+    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "saving_account_monetary.svg")}
+    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "operations.svg")}
+    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "credit_card_payment.svg")}
+    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "credit_card_monetary.svg")}
+    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "others.svg")}
     """)
     return
 
@@ -649,10 +652,9 @@ def _():
 
 
 @app.cell
-def _(dimensionality_reducer, most_important_features):
-    bivariate_analyzer = BivariateAnalyzer(dimensionality_reducer)
-    bivariate_analyzer.plot_uncorrelated(most_important_features, "analysis")
-    return (bivariate_analyzer,)
+def _(column_filter, most_important_features):
+    column_filter.plot_uncorrelated(most_important_features, "analysis")
+    return
 
 
 @app.cell(hide_code=True)
@@ -681,14 +683,14 @@ def _():
 
 
 @app.cell
-def _(bivariate_analyzer, trainer):
+def _(column_filter, trainer):
     most_important_features_2 = trainer.get_most_important_features()
-    bivariate_analyzer.print_correlations_for_each(most_important_features_2)
+    column_filter.print_correlations_for_each(most_important_features_2)
     return
 
 
 @app.cell
-def _(bivariate_analyzer):
+def _(column_filter):
     most_important_features_correlated = [
         "Operations_total_mean",
         "Operations_total_median",
@@ -697,7 +699,7 @@ def _(bivariate_analyzer):
         "Quantity_Active_Products_median",
         "Quantity_Active_Products_mean",
     ]
-    bivariate_analyzer.plot_correlated(most_important_features_correlated, "analysis_2")
+    column_filter.plot_correlated(most_important_features_correlated, "analysis_2")
     return
 
 
@@ -738,7 +740,7 @@ def _():
 
 
 @app.cell
-def _(bivariate_analyzer):
+def _(column_filter):
     bins_transformations = [
         BinTransformation("Client_Age_grp", [Range(4, 5), Range(6, 7)]),
         BinTransformation(
@@ -760,15 +762,13 @@ def _(bivariate_analyzer):
         BinTransformation("CreditCard_Product", [Range(5, 5), Range(7, 7)]),
         BinTransformation("Quantity_Active_Products_min", [Range(1, 4), Range(6, 9)]),
     ]
-    final_train, final_test = bivariate_analyzer.group_bins_by_ranges(
-        bins_transformations
-    )
+    final_train, final_test = column_filter.group_bins_by_ranges(bins_transformations)
     inspect_dataframe(final_train)
     return final_test, final_train
 
 
 @app.cell
-def _(bivariate_analyzer, final_train):
+def _(column_filter, final_train):
     best_features = [
         "Client_Age_grp",
         "Operations_total_mean",
@@ -777,7 +777,7 @@ def _(bivariate_analyzer, final_train):
         # "CreditCard_Active",  # sin modificar
         "Quantity_Active_Products_min",
     ]
-    bivariate_analyzer.plot_specific(final_train, best_features, "analysis_t")
+    column_filter.plot_specific(final_train, best_features, "analysis_t")
     return (best_features,)
 
 
@@ -821,7 +821,11 @@ def _(best_features, final_test_1, final_train_1):
         "Quantity_Active_Products_min": "Minimum quantity of active products",
     }
     final_trainer = LGBMTrainer(
-        final_train_1, best_features, 20, final_test_1, renames_dict
+        final_train_1,
+        best_features,
+        n_iter=20,
+        test=final_test_1,
+        renames_dict=renames_dict,
     )
     final_trainer.print_output()
     final_trainer.print_searcher()
