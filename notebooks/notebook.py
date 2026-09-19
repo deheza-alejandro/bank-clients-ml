@@ -32,8 +32,8 @@ with app.setup:
         target_encode_columns,
     )
     from bank_clients_ml.redundant_column_filter import (
+        BinRange,
         BinTransformation,
-        Range,
         RedundantColumnFilter,
     )
     from bank_clients_ml.sampling import (
@@ -742,25 +742,27 @@ def _():
 @app.cell
 def _(column_filter):
     bins_transformations = [
-        BinTransformation("Client_Age_grp", [Range(4, 5), Range(6, 7)]),
+        BinTransformation("Client_Age_grp", [BinRange(4, 5), BinRange(6, 7)]),
         BinTransformation(
             "Operations_total_mean",
             [
-                Range(2, 4),
-                Range(5, 6),
-                Range(7, 8),
-                Range(9, 10),
-                Range(11, 12),
-                Range(13, 14),
-                Range(15, 16),
+                BinRange(2, 4),
+                BinRange(5, 6),
+                BinRange(7, 8),
+                BinRange(9, 10),
+                BinRange(11, 12),
+                BinRange(13, 14),
+                BinRange(15, 16),
             ],
         ),
         BinTransformation(
             "Operations_total_median",
-            [Range(2, 4), Range(5, 7), Range(8, 9), Range(10, 11)],
+            [BinRange(2, 4), BinRange(5, 7), BinRange(8, 9), BinRange(10, 11)],
         ),
-        BinTransformation("CreditCard_Product", [Range(5, 5), Range(7, 7)]),
-        BinTransformation("Quantity_Active_Products_min", [Range(1, 4), Range(6, 9)]),
+        BinTransformation("CreditCard_Product", [BinRange(5, 5), BinRange(7, 7)]),
+        BinTransformation(
+            "Quantity_Active_Products_min", [BinRange(1, 4), BinRange(6, 9)]
+        ),
     ]
     final_train, final_test = column_filter.group_bins_by_ranges(bins_transformations)
     inspect_dataframe(final_train)

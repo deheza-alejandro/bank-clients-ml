@@ -125,14 +125,14 @@ def _get_range_data(i: int, stats) -> tuple[float, float, float]:
     return low, high, val
 
 
-class Range(NamedTuple):
+class BinRange(NamedTuple):
     start: float
     end: float
 
 
 def _group_bins_by_ranges(
     column: str,
-    ranges: list[Range],
+    bin_ranges: list[BinRange],
     table: pl.DataFrame,
     settings: Settings | None = None,
 ) -> pl.Expr:
@@ -153,7 +153,8 @@ def _group_bins_by_ranges(
         settings = get_settings()
 
     range_conditions = [
-        (pl.col("Bin") >= b_min) & (pl.col("Bin") <= b_max) for b_min, b_max in ranges
+        (pl.col("Bin") >= b_min) & (pl.col("Bin") <= b_max)
+        for b_min, b_max in bin_ranges
     ]
 
     aggregations = []
@@ -188,7 +189,7 @@ def _group_bins_by_ranges(
     low, high, val = _get_range_data(0, stats)
     expr = pl.when(expr_col.is_between(low, high)).then(val)
 
-    for i in range(1, len(ranges)):
+    for i in range(1, len(bin_ranges)):
         low, high, val = _get_range_data(i, stats)
         expr = expr.when(expr_col.is_between(low, high)).then(val)
 
@@ -197,7 +198,7 @@ def _group_bins_by_ranges(
 
 class BinTransformation(NamedTuple):
     column: str
-    ranges: list[Range]
+    bin_ranges: list[BinRange]
 
 
 class RedundantColumnFilter:
@@ -315,10 +316,10 @@ class RedundantColumnFilter:
         expr = [
             _group_bins_by_ranges(
                 column,
-                ranges=ranges,
+                bin_ranges=bin_ranges,
                 table=self.train_analysis[column],
             ).alias(column)
-            for column, ranges in bins_transformations
+            for column, bin_ranges in bins_transformations
         ]
         final_train = self.correlated_train.with_columns(expr)
         final_test = self.correlated_test.with_columns(expr)
