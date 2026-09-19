@@ -20,169 +20,33 @@ matplotlib.rcParams["svg.hashsalt"] = "fixed_seed_for_this_project"
 matplotlib.rcParams["svg.fonttype"] = "path"
 
 
-def _get_bivariate_tables(
-    df: pl.DataFrame,
-    columns_to_graph: list[str],
-    max_bins_quantity: int = 20,
-    settings: Settings | None = None,
-) -> dict[str, pl.DataFrame]:
-    if settings is None:
-        settings = get_settings()
+def _optimize_and_save_svg(fig: Figure, output_path: Path):
+    buffer = io.BytesIO()
+    try:
+        fig.savefig(buffer, format="svg", bbox_inches="tight")
+    finally:
+        plt.close(fig)
 
-    target_pct_col = f"{settings.col_target}_pct"
-    tables: dict[str, pl.DataFrame] = {}
+    cmd = ["bun", "run", "svgo", "--multipass", "-i", "-", "-o", "-"]
 
-    for variable_to_graph in columns_to_graph:
-        if df[variable_to_graph].n_unique() > max_bins_quantity:
-            group_expr = pl.col(variable_to_graph).qcut(
-                quantiles=max_bins_quantity, allow_duplicates=True
+    try:
+        with Path.open(output_path, "wb") as out_file:
+            subprocess.run(  # noqa: S603
+                cmd,
+                input=buffer.getvalue(),
+                stdout=out_file,
+                check=True,
             )
-        else:
-            group_expr = pl.col(variable_to_graph)
-
-        tables[variable_to_graph] = (
-            df.select(settings.col_target, variable_to_graph)
-            .group_by(group_expr.alias("_bin"))
-            .agg(
-                pl.col(variable_to_graph).min().round(2).alias("Min"),
-                pl.col(variable_to_graph).max().round(2).alias("Max"),
-                pl.len().alias("Clients"),
-                pl.col(settings.col_target).sum().alias(settings.col_target),
-            )
-            .sort(by="Min", descending=False, nulls_last=True)
-            .with_columns(
-                pl.int_range(1, pl.len() + 1).alias("Bin"),
-                ((pl.col(settings.col_target) / pl.col("Clients")) * 100)
-                .round()
-                .cast(pl.Int64)
-                .alias(target_pct_col),
-            )
-            .select("Bin", "Min", "Max", "Clients", settings.col_target, target_pct_col)
-        )
-
-    return tables
-
-
-def _generate_single_bivariate_chart(
-    table: pl.DataFrame,
-    variable_to_graph: str,
-    output_path: Path,
-    settings: Settings | None = None,
-):
-    """Función auxiliar (worker) que corre en un proceso independiente.
-
-    Genera una figura con la tabla resumen y el gráfico bivariado de la variable.
-
-    Arma una sola figura de Matplotlib con dos subplots: arriba queda la tabla
-    de métricas por bin y abajo quedan las barras de clientes con la curva de
-    % target en verde.
-
-    Parámetros:
-    df: Tabla de datos de los clientes con target y variable_to_graph.
-    cada fila representa a un cliente,
-    variable: Nombre de la variable a analizar. Valores idénticos siempre van al mismo bin.
-    target: Nombre de la columna objetivo.
-    max_bins_quantity: Cantidad maxima de bins en los que se puede dividir la variable.
-    """
-    if settings is None:
-        settings = get_settings()
-
-    fig, (ax_table, ax_graph) = plt.subplots(
-        2, 1, figsize=(9, 8), gridspec_kw={"height_ratios": [1, 1]}
-    )
-
-    ax_table.axis("off")
-    ax_table.set_title(f"Variable analysis: {variable_to_graph}", pad=1)
-    ax_table.table(
-        cellText=table.rows(),
-        colLabels=table.columns,
-        loc="center",
-        cellLoc="center",
-        bbox=[0, 0, 1, 0.99],
-    )
-
-    x_indices = range(len(table))
-
-    ax_graph.bar(x_indices, table.to_series(3), width=0.35)
-    ax_graph.set_ylabel("Clients")
-    ax_graph.set_xticks(x_indices)
-    ax_graph.set_xticklabels(table.to_series(0), rotation=0, ha="center")
-
-    ax_graph_target_pct = ax_graph.twinx()
-    ax_graph_target_pct.plot(x_indices, table.to_series(-1), marker="o", color="green")
-    ax_graph_target_pct.set_ylabel(f"{settings.col_target} pct (%)")
-
-    fig.tight_layout()
-    _optimize_and_save_svg(fig, output_path)
-
-
-PROJECT_DIR: Path = Path(__file__).parent.parent.parent
-IMAGES_DIR: Path = PROJECT_DIR / "notebooks" / "images"
-
-
-def generate_bivariate_charts(
-    df: pl.DataFrame,
-    columns_to_graph: list[str],
-    analysis_name: str,
-    max_bins_quantity: int = 20,
-    images_dir: Path = IMAGES_DIR,
-    max_workers: int | None = None,
-    settings: Settings | None = None,
-) -> dict[str, pl.DataFrame]:
-    """Graficar las variables y guarda cada figura como SVG.
-
-    Por cada columna del DataFrame arma el análisis
-    bivariado con _generate_single_bivariate_chart
-    y lo exporta a {images_dir}/{analysis_name}/{variable_to_graph}.svg.
-
-    Parámetros:
-    df: Tabla de datos de los clientes.
-    columns_to_graph: columnas a graficar
-    analysis_name: Nombre de la carpeta de salida dentro de {images_dir}/.
-    max_bins_quantity: Cantidad maxima de bins en los que se divide cada variable.
-    max_workers: maxima cantidad de CPUs a usar.
-    por defecto con None se usan todos los núcleos disponibles.
-    si len(columns_to_graph) < 20 automáticamente se usa 1 sola CPU.
-    """
-    if settings is None:
-        settings = get_settings()
-
-    output_folder = images_dir / analysis_name
-    output_folder.mkdir(parents=True, exist_ok=True)
-
-    tables = _get_bivariate_tables(df, columns_to_graph, max_bins_quantity, settings)
-
-    if max_workers == 1 or len(columns_to_graph) < 20:
-        for variable_to_graph in columns_to_graph:
-            _generate_single_bivariate_chart(
-                tables[variable_to_graph],
-                variable_to_graph,
-                output_folder / f"{variable_to_graph}.svg",
-                settings,
-            )
-    else:
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            futures = [
-                executor.submit(
-                    _generate_single_bivariate_chart,
-                    table=tables[variable_to_graph],
-                    variable_to_graph=variable_to_graph,
-                    output_path=output_folder / f"{variable_to_graph}.svg",
-                    settings=settings,
-                )
-                for variable_to_graph in columns_to_graph
-            ]
-
-            for future in as_completed(futures):
-                future.result()
-
-    return tables
+    except FileNotFoundError as err:
+        raise RuntimeError(
+            "Bun no se encuentra en el PATH del sistema. Asegúrate de tener Bun instalado."
+        ) from err
 
 
 def _save_fig_as_svg(
     fig: Figure,
     graphic_name: str,
-    images_dir: Path = IMAGES_DIR,
+    images_dir: Path,
     images_sub_dir: str = "",
 ) -> None:
     """Guarda una figura de Matplotlib como archivo SVG.
@@ -200,6 +64,10 @@ def _save_fig_as_svg(
     output_folder.mkdir(parents=True, exist_ok=True)
     svg_path = output_folder / f"{graphic_name}.svg"
     _optimize_and_save_svg(fig, svg_path)
+
+
+PROJECT_DIR: Path = Path(__file__).parent.parent.parent
+IMAGES_DIR: Path = PROJECT_DIR / "notebooks" / "images"
 
 
 def plot_top_features(
@@ -257,6 +125,108 @@ def plot_top_features(
     _save_fig_as_svg(fig, graphic_name, images_dir, "plot_top_features")
 
 
+def _generate_single_bivariate_chart(
+    table: pl.DataFrame,
+    variable_to_graph: str,
+    output_path: Path,
+    settings: Settings | None = None,
+) -> None:
+    """Función auxiliar (worker) que corre en un proceso independiente.
+
+    Genera una figura con la tabla resumen y el gráfico bivariado de la variable.
+
+    Arma una sola figura de Matplotlib con dos subplots: arriba queda la tabla
+    de métricas por bin y abajo quedan las barras de clientes con la curva de
+    % target en verde.
+
+    Parámetros:
+    table: Tabla de datos de los clientes con target y variable_to_graph.
+    variable_to_graph: Nombre de la variable a analizar. Valores idénticos siempre van al mismo bin.
+    target: Nombre de la columna objetivo.
+    """
+    if settings is None:
+        settings = get_settings()
+
+    fig, (ax_table, ax_graph) = plt.subplots(
+        2, 1, figsize=(9, 8), gridspec_kw={"height_ratios": [1, 1]}
+    )
+
+    ax_table.axis("off")
+    ax_table.set_title(f"Variable analysis: {variable_to_graph}", pad=1)
+    ax_table.table(
+        cellText=table.rows(),
+        colLabels=table.columns,
+        loc="center",
+        cellLoc="center",
+        bbox=[0, 0, 1, 0.99],
+    )
+
+    x_indices = range(len(table))
+
+    ax_graph.bar(x_indices, table.to_series(3), width=0.35)
+    ax_graph.set_ylabel("Clients")
+    ax_graph.set_xticks(x_indices)
+    ax_graph.set_xticklabels(table.to_series(0), rotation=0, ha="center")
+
+    ax_graph_target_pct = ax_graph.twinx()
+    ax_graph_target_pct.plot(x_indices, table.to_series(-1), marker="o", color="green")
+    ax_graph_target_pct.set_ylabel(f"{settings.col_target} pct (%)")
+
+    fig.tight_layout()
+    _optimize_and_save_svg(fig, output_path)
+
+
+def generate_bivariate_charts(
+    tables: dict[str, pl.DataFrame],
+    analysis_name: str,
+    images_dir: Path = IMAGES_DIR,
+    max_workers: int | None = None,
+    settings: Settings | None = None,
+) -> None:
+    """Graficar las variables y guarda cada figura como SVG.
+
+    Por cada columna del DataFrame arma el análisis
+    bivariado con _generate_single_bivariate_chart
+    y lo exporta a {images_dir}/{analysis_name}/{variable_to_graph}.svg.
+
+    Parámetros:
+    tables: todas las tablas de cada columna a graficar
+    analysis_name: Nombre de la carpeta de salida dentro de {images_dir}/.
+    max_workers: maxima cantidad de CPUs a usar.
+    por defecto con None se usan todos los núcleos disponibles.
+    si len(tables) < 20 automáticamente se usa 1 sola CPU.
+    """
+    if settings is None:
+        settings = get_settings()
+
+    output_folder = images_dir / analysis_name
+    output_folder.mkdir(parents=True, exist_ok=True)
+
+    if max_workers == 1 or len(tables) < 20:
+        for variable_to_graph, tabla in tables.items():
+            _generate_single_bivariate_chart(
+                tabla,
+                variable_to_graph,
+                output_folder / f"{variable_to_graph}.svg",
+                settings,
+            )
+    else:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(
+                    _generate_single_bivariate_chart,
+                    table=tabla,
+                    variable_to_graph=variable_to_graph,
+                    output_path=output_folder / f"{variable_to_graph}.svg",
+                    settings=settings,
+                )
+                for variable_to_graph, tabla in tables.items()
+            ]
+
+            for future in as_completed(futures):
+                future.result()
+
+
 def plot_evaluation_metrics(
     y_true: pl.Series,
     probabilities: np.ndarray,
@@ -301,29 +271,6 @@ def plot_evaluation_metrics(
     ax.grid(True, linestyle=":", alpha=0.6)
 
     _save_fig_as_svg(fig, graphic_name, images_dir, "plot_evaluation_metrics")
-
-
-def _optimize_and_save_svg(fig: Figure, output_path: Path):
-    buffer = io.BytesIO()
-    try:
-        fig.savefig(buffer, format="svg", bbox_inches="tight")
-    finally:
-        plt.close(fig)
-
-    cmd = ["bun", "run", "svgo", "--multipass", "-i", "-", "-o", "-"]
-
-    try:
-        with Path.open(output_path, "wb") as out_file:
-            subprocess.run(  # noqa: S603
-                cmd,
-                input=buffer.getvalue(),
-                stdout=out_file,
-                check=True,
-            )
-    except FileNotFoundError as err:
-        raise RuntimeError(
-            "Bun no se encuentra en el PATH del sistema. Asegúrate de tener Bun instalado."
-        ) from err
 
 
 def _generate_single_deciles_table(ax, df: pl.DataFrame, title: str) -> None:
