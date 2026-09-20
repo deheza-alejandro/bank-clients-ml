@@ -203,24 +203,24 @@ def generate_bivariate_charts(
     output_folder.mkdir(parents=True, exist_ok=True)
 
     if max_workers == 1 or len(tables) < 20:
-        for variable_to_graph, tabla in tables.items():
+        for variable_to_graph, table in tables.items():
             _generate_single_bivariate_chart(
-                tabla,
+                table,
                 variable_to_graph,
                 output_folder / f"{variable_to_graph}.svg",
                 settings,
             )
     else:
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with ProcessPoolExecutor(max_workers) as executor:
             futures = [
                 executor.submit(
                     _generate_single_bivariate_chart,
-                    table=tabla,
-                    variable_to_graph=variable_to_graph,
-                    output_path=output_folder / f"{variable_to_graph}.svg",
-                    settings=settings,
+                    table,
+                    variable_to_graph,
+                    output_folder / f"{variable_to_graph}.svg",
+                    settings,
                 )
-                for variable_to_graph, tabla in tables.items()
+                for variable_to_graph, table in tables.items()
             ]
 
             for future in as_completed(futures):
