@@ -266,9 +266,7 @@ class LGBMTrainer:
 
     def plot_top_features(self, graphic_name: str) -> None:
         plot_top_features(
-            self.importances,
-            graphic_name,
-            self.searcher,
+            self.importances, graphic_name, self.searcher, settings=self.settings
         )
 
     def get_most_important_features(self) -> list[str]:
@@ -308,7 +306,7 @@ class GroupsLGBMTrainer:
         if settings is None:
             settings = get_settings()
 
-        columns_groups = group_columns_by_source(uncorrelated_train.columns)
+        columns_groups = group_columns_by_source(uncorrelated_train.columns, settings)
 
         self.trainers: dict[str, LGBMTrainer] = {
             group_name: LGBMTrainer(

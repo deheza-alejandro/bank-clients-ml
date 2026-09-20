@@ -219,7 +219,7 @@ class RedundantColumnFilter:
         self.reduced_train = train.drop(self.constant_cols)
         reduced_test = test.drop(self.constant_cols)
         self.imbalanced_binary_columns = _get_imbalanced_binary_columns(
-            self.reduced_train, imbalanced_binary_threshold
+            self.reduced_train, imbalanced_binary_threshold, self.settings
         )
         self.correlated_train = self.reduced_train.drop(self.imbalanced_binary_columns)
         self.correlated_test = reduced_test.drop(self.imbalanced_binary_columns)
@@ -318,6 +318,7 @@ class RedundantColumnFilter:
                 column,
                 bin_ranges=bin_ranges,
                 table=self.train_analysis[column],
+                settings=self.settings,
             ).alias(column)
             for column, bin_ranges in bins_transformations
         ]
