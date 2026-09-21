@@ -69,7 +69,7 @@ def _get_feature_importances(
         "min_child_samples": np.arange(1000, 3000, 100),
     }
 
-    searcher: RandomizedSearchCV = RandomizedSearchCV(
+    searcher = RandomizedSearchCV(
         estimator=model,
         param_distributions=param_test,
         n_iter=n_iter,
@@ -97,11 +97,11 @@ def _get_feature_importances(
 
     output = buffer.getvalue()
 
-    best_estimator: lgb.LGBMClassifier = searcher.best_estimator_
+    model: lgb.LGBMClassifier = searcher.best_estimator_
     importances = pl.DataFrame(
         {
             settings.col_feature: columns,
-            settings.col_importance: best_estimator.feature_importances_,
+            settings.col_importance: model.feature_importances_,
         }
     ).sort(settings.col_importance, descending=True)
     return searcher, importances, output
@@ -208,16 +208,16 @@ def _evaluate(
     """
     settings = settings or get_settings()
 
-    final_model: lgb.LGBMClassifier = searcher.best_estimator_
+    model: lgb.LGBMClassifier = searcher.best_estimator_
 
-    y_pred = cast(np.ndarray, final_model.predict(test.select(columns)))
+    y_pred = cast(np.ndarray, model.predict(test.select(columns)))
 
-    probabilities_train = cast(
-        np.ndarray, final_model.predict_proba(train.select(columns))
-    )[:, 1]
-    probabilities_test = cast(
-        np.ndarray, final_model.predict_proba(test.select(columns))
-    )[:, 1]
+    probabilities_train = cast(np.ndarray, model.predict_proba(train.select(columns)))[
+        :, 1
+    ]
+    probabilities_test = cast(np.ndarray, model.predict_proba(test.select(columns)))[
+        :, 1
+    ]
 
     train_based_bins = np.quantile(probabilities_train, QUANTILES).tolist()
 
@@ -242,7 +242,7 @@ class LGBMTrainer:
         test: pl.DataFrame | None = None,
         renames_dict: dict[str, str] | None = None,
         settings: Settings | None = None,
-    ):
+    ) -> None:
         self.settings = settings or get_settings()
 
         self.columns = columns
@@ -317,7 +317,7 @@ class GroupsLGBMTrainer:
         uncorrelated_train: pl.DataFrame,
         n_iter: int = 2,
         settings: Settings | None = None,
-    ):
+    ) -> None:
         settings = settings or get_settings()
 
         columns_groups = group_columns_by_source(uncorrelated_train, settings)
