@@ -27,7 +27,7 @@ def _get_feature_importances(
     n_iter: int,
     splits_cross_validation: int,
     settings: Settings | None = None,
-) -> tuple[RandomizedSearchCV, pl.DataFrame]:
+) -> tuple[RandomizedSearchCV, pl.DataFrame, str]:
     """Entrena un modelo LightGBM usando RandomizedSearchCV y devuelve las
     importancias de features en un DataFrame de Polars.
 
@@ -87,7 +87,15 @@ def _get_feature_importances(
 
     X_train = train.select(columns)
     y_train = train[settings.col_target]
-    searcher.fit(X_train, y_train)
+
+    buffer = io.StringIO()
+    with (
+        redirect_stdout(buffer),
+        redirect_stderr(buffer),
+    ):
+        searcher.fit(X_train, y_train)
+
+    output = buffer.getvalue()
 
     best_estimator: lgb.LGBMClassifier = searcher.best_estimator_
     importances = pl.DataFrame(
@@ -96,37 +104,21 @@ def _get_feature_importances(
             settings.col_importance: best_estimator.feature_importances_,
         }
     ).sort(settings.col_importance, descending=True)
-    return searcher, importances
+    return searcher, importances, output
 
 
-QUANTILES = np.linspace(0.1, 0.9, 9)
+def _rename_columns(
+    importances: pl.DataFrame,
+    renames_dict: dict[str, str],
+    settings: Settings | None = None,
+) -> pl.DataFrame:
+    settings = settings or get_settings()
 
-
-def _get_scoring(
-    searcher: RandomizedSearchCV,
-    train: pl.DataFrame,
-    test: pl.DataFrame,
-    features: list[str],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[float]]:
-    """y_pred predice si es 0 o 1, si la probabilidad es > 0.5 lo pone como 1
-
-    train_based_bins son los 9 puntos de corte (cuantiles 10% a 90%)
-    basados exclusivamente en el set de entrenamiento.
-    """
-    final_model: lgb.LGBMClassifier = searcher.best_estimator_
-
-    y_pred = cast(np.ndarray, final_model.predict(test.select(features)))
-
-    probabilities_train = cast(
-        np.ndarray, final_model.predict_proba(train.select(features))
-    )[:, 1]
-    probabilities_test = cast(
-        np.ndarray, final_model.predict_proba(test.select(features))
-    )[:, 1]
-
-    train_based_bins = np.quantile(probabilities_train, QUANTILES).tolist()
-
-    return y_pred, probabilities_train, probabilities_test, train_based_bins
+    return importances.with_columns(
+        pl.col(settings.col_feature)
+        .replace_strict(renames_dict, default=pl.col(settings.col_feature))
+        .alias(settings.col_feature)
+    )
 
 
 DECILE_LABELS = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
@@ -199,6 +191,46 @@ def _compute_prediction_deciles(
     )
 
 
+QUANTILES = np.linspace(0.1, 0.9, 9)
+
+
+def _evaluate(
+    searcher: RandomizedSearchCV,
+    train: pl.DataFrame,
+    test: pl.DataFrame,
+    columns: list[str],
+    settings: Settings | None = None,
+) -> tuple[np.ndarray, np.ndarray, pl.DataFrame, pl.DataFrame]:
+    """y_pred predice si es 0 o 1, si la probabilidad es > 0.5 lo pone como 1
+
+    train_based_bins son los 9 puntos de corte (cuantiles 10% a 90%)
+    basados exclusivamente en el set de entrenamiento.
+    """
+    settings = settings or get_settings()
+
+    final_model: lgb.LGBMClassifier = searcher.best_estimator_
+
+    y_pred = cast(np.ndarray, final_model.predict(test.select(columns)))
+
+    probabilities_train = cast(
+        np.ndarray, final_model.predict_proba(train.select(columns))
+    )[:, 1]
+    probabilities_test = cast(
+        np.ndarray, final_model.predict_proba(test.select(columns))
+    )[:, 1]
+
+    train_based_bins = np.quantile(probabilities_train, QUANTILES).tolist()
+
+    train_deciles = _compute_prediction_deciles(
+        train, probabilities_train, settings=settings
+    )
+    test_deciles = _compute_prediction_deciles(
+        test, probabilities_test, train_based_bins, settings=settings
+    )
+
+    return y_pred, probabilities_test, train_deciles, test_deciles
+
+
 class LGBMTrainer:
     def __init__(
         self,
@@ -211,55 +243,38 @@ class LGBMTrainer:
         renames_dict: dict[str, str] | None = None,
         settings: Settings | None = None,
     ):
-        if settings is None:
-            self.settings = get_settings()
-        else:
-            self.settings = settings
+        self.settings = settings or get_settings()
 
         self.columns = columns
         self.top_n = top_n
 
-        self.buffer = io.StringIO()
-        with (
-            redirect_stdout(self.buffer),
-            redirect_stderr(self.buffer),
-        ):
-            self.searcher, self.importances = _get_feature_importances(
-                train,
-                self.columns,
-                n_iter,
-                splits_cross_validation,
-                settings=self.settings,
-            )
+        self.searcher, self.importances, self.output = _get_feature_importances(
+            train,
+            self.columns,
+            n_iter,
+            splits_cross_validation,
+            settings=self.settings,
+        )
 
         if renames_dict is not None:
-            self.importances = self.importances.with_columns(
-                pl.col(self.settings.col_feature)
-                .replace_strict(renames_dict, default=pl.col(self.settings.col_feature))
-                .alias(self.settings.col_feature)
+            self.importances = _rename_columns(
+                self.importances, renames_dict, self.settings
             )
 
         self.test = test
-        if test is not None:
+        if self.test is not None:
             (
                 self.y_pred,
-                probabilities_train,
                 self.probabilities_test,
-                train_based_bins,
-            ) = _get_scoring(self.searcher, train, test, self.columns)
-
-            self.train_deciles = _compute_prediction_deciles(
-                train, probabilities_train, settings=self.settings
-            )
-            self.test_deciles = _compute_prediction_deciles(
-                test, self.probabilities_test, train_based_bins, settings=self.settings
-            )
+                self.train_deciles,
+                self.test_deciles,
+            ) = _evaluate(self.searcher, train, self.test, self.columns, self.settings)
 
     def get_columns(self) -> list[str]:
         return self.columns
 
     def print_output(self) -> None:
-        mo.output.append(mo.md(f"```text\n{self.buffer.getvalue()}\n```"))
+        mo.output.append(mo.md(f"```text\n{self.output}\n```"))
 
     def print_searcher(self) -> None:
         mo.output.append(self.searcher)
@@ -303,10 +318,9 @@ class GroupsLGBMTrainer:
         n_iter: int = 2,
         settings: Settings | None = None,
     ):
-        if settings is None:
-            settings = get_settings()
+        settings = settings or get_settings()
 
-        columns_groups = group_columns_by_source(uncorrelated_train.columns, settings)
+        columns_groups = group_columns_by_source(uncorrelated_train, settings)
 
         self.trainers: dict[str, LGBMTrainer] = {
             group_name: LGBMTrainer(

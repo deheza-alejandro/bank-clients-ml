@@ -1,5 +1,7 @@
 from typing import Final
 
+import polars as pl
+
 from bank_clients_ml.config import Settings, get_settings
 
 
@@ -130,12 +132,12 @@ def _validate_groups(columns: list[str], groups: dict[str, list[str]]) -> None:
 
 
 def group_columns_by_source(
-    columns: list[str], settings: Settings | None = None
+    df: pl.DataFrame, settings: Settings | None = None
 ) -> dict[str, tuple[list[str], int]]:
     """Agrupa las columnas de un DataFrame de Polars según su fuente de negocio.
 
     Args:
-        columns: columnas de un DataFrame estandarizado.
+        df: DataFrame estandarizado.
 
     Returns:
         Diccionario con los grupos de columnas clasificados.
@@ -144,7 +146,7 @@ def group_columns_by_source(
         settings = get_settings()
 
     excluded_cols = {settings.col_id, settings.col_target}
-    all_columns = [col for col in columns if col not in excluded_cols]
+    all_columns = [col for col in df.columns if col not in excluded_cols]
     grouped: dict[str, list[str]] = {group: [] for group in GROUP_WEIGHTS}
 
     for col in all_columns:
