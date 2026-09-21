@@ -7,6 +7,7 @@ import marimo as mo
 import numpy as np
 import polars as pl
 from scipy.stats import uniform as sp_uniform
+from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
 from sklearn.model_selection import (
     RandomizedSearchCV,
     StratifiedKFold,
@@ -200,7 +201,7 @@ def _evaluate(
     test: pl.DataFrame,
     columns: list[str],
     settings: Settings | None = None,
-) -> tuple[np.ndarray, np.ndarray, pl.DataFrame, pl.DataFrame]:
+) -> tuple[float, float, np.ndarray, np.ndarray, pl.DataFrame, pl.DataFrame]:
     """y_pred predice si es 0 o 1, si la probabilidad es > 0.5 lo pone como 1
 
     train_based_bins son los 9 puntos de corte (cuantiles 10% a 90%)
@@ -210,14 +211,19 @@ def _evaluate(
 
     model: lgb.LGBMClassifier = searcher.best_estimator_
 
-    y_pred = cast(np.ndarray, model.predict(test.select(columns)))
-
     probabilities_train = cast(np.ndarray, model.predict_proba(train.select(columns)))[
         :, 1
     ]
     probabilities_test = cast(np.ndarray, model.predict_proba(test.select(columns)))[
         :, 1
     ]
+
+    y_true_arr = test[settings.col_target].to_numpy()
+    y_pred = cast(np.ndarray, model.predict(test.select(columns)))
+
+    roc_auc = roc_auc_score(y_true_arr, probabilities_test)
+    accuracy = accuracy_score(y_true_arr, y_pred)
+    fpr, tpr, _ = roc_curve(y_true_arr, probabilities_test)
 
     train_based_bins = np.quantile(probabilities_train, QUANTILES).tolist()
 
@@ -228,7 +234,14 @@ def _evaluate(
         test, probabilities_test, train_based_bins, settings=settings
     )
 
-    return y_pred, probabilities_test, train_deciles, test_deciles
+    return (
+        cast(float, roc_auc),
+        cast(float, accuracy),
+        cast(np.ndarray, fpr),
+        cast(np.ndarray, tpr),
+        train_deciles,
+        test_deciles,
+    )
 
 
 class LGBMTrainer:
@@ -261,14 +274,17 @@ class LGBMTrainer:
                 self.importances, renames_dict, self.settings
             )
 
-        self.test = test
-        if self.test is not None:
+        self.is_testable = False
+        if test is not None:
             (
-                self.y_pred,
-                self.probabilities_test,
+                self.roc_auc,
+                self.accuracy,
+                self.fpr,
+                self.tpr,
                 self.train_deciles,
                 self.test_deciles,
-            ) = _evaluate(self.searcher, train, self.test, self.columns, self.settings)
+            ) = _evaluate(self.searcher, train, test, self.columns, self.settings)
+            self.is_testable = True
 
     def get_columns(self) -> list[str]:
         return self.columns
@@ -281,7 +297,10 @@ class LGBMTrainer:
 
     def plot_top_features(self, graphic_name: str) -> None:
         plot_top_features(
-            self.importances, graphic_name, self.searcher, settings=self.settings
+            self.importances,
+            graphic_name,
+            self.searcher.best_score_,
+            settings=self.settings,
         )
 
     def get_most_important_features(self) -> list[str]:
@@ -292,22 +311,20 @@ class LGBMTrainer:
         )
 
     def plot_evaluation_metrics(self, graphic_name: str) -> None:
-        if self.test is None:
+        if not self.is_testable:
             raise RuntimeError("Esta instancia no fue inicializada con un set de test")
+
         plot_evaluation_metrics(
-            self.test[self.settings.col_target],
-            self.probabilities_test,
-            self.y_pred,
-            graphic_name=graphic_name,
+            self.roc_auc, self.accuracy, self.fpr, self.tpr, graphic_name
         )
 
     def plot_deciles(self, graphic_name: str) -> None:
-        if self.test is None:
+        if not self.is_testable:
             raise RuntimeError("Esta instancia no fue inicializada con un set de test")
         plot_deciles(
             self.train_deciles.drop("min_prob", "max_prob"),
             self.test_deciles.drop("min_prob", "max_prob"),
-            graphic_name=graphic_name,
+            graphic_name,
         )
 
 

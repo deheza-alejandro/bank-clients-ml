@@ -11,36 +11,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
-from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
-from sklearn.model_selection import RandomizedSearchCV
 
 from bank_clients_ml.config import Settings, get_settings
 
 matplotlib.rcParams["svg.hashsalt"] = "fixed_seed_for_this_project"
 matplotlib.rcParams["svg.fonttype"] = "path"
-
-
-def _optimize_and_save_svg(fig: Figure, output_path: Path) -> None:
-    buffer = io.BytesIO()
-    try:
-        fig.savefig(buffer, format="svg", bbox_inches="tight")
-    finally:
-        plt.close(fig)
-
-    cmd = ["bun", "run", "svgo", "--multipass", "-i", "-", "-o", "-"]
-
-    try:
-        with Path.open(output_path, "wb") as out_file:
-            subprocess.run(  # noqa: S603
-                cmd,
-                input=buffer.getvalue(),
-                stdout=out_file,
-                check=True,
-            )
-    except FileNotFoundError as err:
-        raise RuntimeError(
-            "Bun no se encuentra en el PATH del sistema. Asegúrate de tener Bun instalado."
-        ) from err
 
 
 def _save_fig_as_svg(
@@ -63,7 +38,27 @@ def _save_fig_as_svg(
     output_folder = images_dir / images_sub_dir
     output_folder.mkdir(parents=True, exist_ok=True)
     svg_path = output_folder / f"{graphic_name}.svg"
-    _optimize_and_save_svg(fig, svg_path)
+
+    buffer = io.BytesIO()
+    try:
+        fig.savefig(buffer, format="svg", bbox_inches="tight")
+    finally:
+        plt.close(fig)
+
+    cmd = ["bun", "run", "svgo", "--multipass", "-i", "-", "-o", "-"]
+
+    try:
+        with Path.open(svg_path, "wb") as out_file:
+            subprocess.run(  # noqa: S603
+                cmd,
+                input=buffer.getvalue(),
+                stdout=out_file,
+                check=True,
+            )
+    except FileNotFoundError as err:
+        raise RuntimeError(
+            "Bun no se encuentra en el PATH del sistema. Asegúrate de tener Bun instalado."
+        ) from err
 
 
 PROJECT_DIR: Path = Path(__file__).parent.parent.parent
@@ -73,7 +68,7 @@ IMAGES_DIR: Path = PROJECT_DIR / "notebooks" / "images"
 def plot_top_features(
     variables_to_graph: pl.DataFrame,
     graphic_name: str,
-    searcher: RandomizedSearchCV | None = None,
+    roc_auc: float,
     top_n: int = 20,
     images_dir: Path = IMAGES_DIR,
     settings: Settings | None = None,
@@ -116,11 +111,10 @@ def plot_top_features(
     ax.set_facecolor("#f9f9f9")
     ax.grid(axis="x", linestyle="--", alpha=0.7)
 
-    roc = ""
-    if searcher is not None:
-        roc = f"\nROC AUC: {searcher.best_score_:.6f}"
-
-    ax.set_title(f"{graphic_name}: top {top_n} Features" + roc, fontsize=label_fontsize)
+    ax.set_title(
+        f"{graphic_name}: top {top_n} Features\nROC AUC: {roc_auc:.6f}",
+        fontsize=label_fontsize,
+    )
 
     _save_fig_as_svg(fig, graphic_name, images_dir, "plot_top_features")
 
@@ -128,7 +122,8 @@ def plot_top_features(
 def _generate_single_bivariate_chart(
     table: pl.DataFrame,
     variable_to_graph: str,
-    output_path: Path,
+    images_dir: Path,
+    analysis_name: str,
     settings: Settings | None = None,
 ) -> None:
     """Función auxiliar (worker) que corre en un proceso independiente.
@@ -173,7 +168,7 @@ def _generate_single_bivariate_chart(
     ax_graph_target_pct.set_ylabel(f"{settings.col_target} pct (%)")
 
     fig.tight_layout()
-    _optimize_and_save_svg(fig, output_path)
+    _save_fig_as_svg(fig, variable_to_graph, images_dir, analysis_name)
 
 
 def generate_bivariate_charts(
@@ -199,15 +194,13 @@ def generate_bivariate_charts(
     if settings is None:
         settings = get_settings()
 
-    output_folder = images_dir / analysis_name
-    output_folder.mkdir(parents=True, exist_ok=True)
-
     if max_workers == 1 or len(tables) < 20:
         for variable_to_graph, table in tables.items():
             _generate_single_bivariate_chart(
                 table,
                 variable_to_graph,
-                output_folder / f"{variable_to_graph}.svg",
+                images_dir,
+                analysis_name,
                 settings,
             )
     else:
@@ -217,7 +210,8 @@ def generate_bivariate_charts(
                     _generate_single_bivariate_chart,
                     table,
                     variable_to_graph,
-                    output_folder / f"{variable_to_graph}.svg",
+                    images_dir,
+                    analysis_name,
                     settings,
                 )
                 for variable_to_graph, table in tables.items()
@@ -228,29 +222,21 @@ def generate_bivariate_charts(
 
 
 def plot_evaluation_metrics(
-    y_true: pl.Series,
-    probabilities: np.ndarray,
-    y_pred: np.ndarray,
+    roc_auc: float,
+    accuracy: float,
+    fpr: np.ndarray,
+    tpr: np.ndarray,
     graphic_name: str,
     images_dir: Path = IMAGES_DIR,
 ) -> None:
-    """Calcula Accuracy y ROC AUC, dibuja la curva ROC y la guarda como SVG.
+    """Dibuja la curva ROC y la guarda como SVG.
 
-    Computa las métricas básicas, arma el gráfico de la curva ROC con las
+    Arma el gráfico de la curva ROC con las
     anotaciones y lo exporta a {images_dir}/plot_evaluation_metrics/{graphic_name}.svg.
 
     Parámetros:
-    y_true: Etiquetas reales (target).
-    probabilities: Probabilidades de la clase positiva.
-    y_pred: Predicciones de clase (0 o 1).
     graphic_name: Nombre del archivo SVG de salida (sin extensión).
     """
-    y_true_arr = y_true.to_numpy()
-
-    roc_auc = roc_auc_score(y_true_arr, probabilities)
-    accuracy = accuracy_score(y_true_arr, y_pred)
-    fpr, tpr, _ = roc_curve(y_true_arr, probabilities)
-
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.plot(fpr, tpr)
     ax.plot([0, 1], [0, 1], color="gray", linestyle="--", alpha=0.7)
@@ -273,17 +259,19 @@ def plot_evaluation_metrics(
     _save_fig_as_svg(fig, graphic_name, images_dir, "plot_evaluation_metrics")
 
 
-def _generate_single_deciles_table(ax, df: pl.DataFrame, title: str) -> None:
+def _generate_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
     ax.axis("tight")
     ax.axis("off")
 
-    formatted_df = df.with_columns(cs.float().round(2).cast(pl.String)).select(
+    formatted_df = deciles.with_columns(cs.float().round(2).cast(pl.String)).select(
         pl.all().cast(pl.String)
     )
 
+    columns = deciles.columns
+
     table = ax.table(
         cellText=formatted_df.rows(),
-        colLabels=df.columns,
+        colLabels=columns,
         loc="center",
         cellLoc="center",
     )
@@ -293,7 +281,7 @@ def _generate_single_deciles_table(ax, df: pl.DataFrame, title: str) -> None:
     table.scale(1, 1.4)
 
     num_rows = len(formatted_df) + 1
-    num_cols = len(df.columns)
+    num_cols = len(columns)
 
     for col in range(num_cols):
         cell = table[0, col]
