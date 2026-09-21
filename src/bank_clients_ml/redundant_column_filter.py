@@ -210,10 +210,7 @@ class RedundantColumnFilter:
         correlation_threshold: float = 0.80,
         settings: Settings | None = None,
     ):
-        if settings is None:
-            self.settings = get_settings()
-        else:
-            self.settings = settings
+        self.settings = settings or get_settings()
 
         self.constant_cols = _get_constant_columns(train)
         self.reduced_train = train.drop(self.constant_cols)
@@ -256,39 +253,49 @@ class RedundantColumnFilter:
     def get_uncorrelated(self) -> tuple[pl.DataFrame, pl.DataFrame]:
         return (self.uncorrelated_train, self.uncorrelated_test)
 
+    def _plot_bivariate(
+        self,
+        df: pl.DataFrame,
+        columns: list[str],
+        analysis_name: str,
+        max_bins_quantity: int,
+        save_analysis: bool = True,
+    ) -> None:
+        """Helper privado para evitar duplicar código de generación de gráficos."""
+        temp_tables = _get_bivariate_tables(
+            df, columns, max_bins_quantity, settings=self.settings
+        )
+        if save_analysis:
+            self.train_analysis = _merge_without_duplicates(
+                self.train_analysis, temp_tables
+            )
+        generate_bivariate_charts(temp_tables, analysis_name, settings=self.settings)
+
     def plot_uncorrelated(
         self, columns, analysis_name, max_bins_quantity: int = 20
     ) -> None:
-        temp_table = _get_bivariate_tables(
-            self.uncorrelated_train, columns, max_bins_quantity, self.settings
+        self._plot_bivariate(
+            self.uncorrelated_train, columns, analysis_name, max_bins_quantity
         )
-        self.train_analysis = _merge_without_duplicates(self.train_analysis, temp_table)
-        generate_bivariate_charts(temp_table, analysis_name, settings=self.settings)
 
     def plot_correlated(
         self, correlated_columns, analysis_name, max_bins_quantity: int = 20
     ) -> None:
         if any(col in self.uncorrelated_train.columns for col in correlated_columns):
-            raise RuntimeError(
-                "correlated_columns posee columnas dentro de uncorrelated_train"
+            raise ValueError(
+                "correlated_columns contiene columnas dentro de uncorrelated_train"
             )
 
-        temp_table = _get_bivariate_tables(
-            self.correlated_train,
-            correlated_columns,
-            max_bins_quantity,
-            settings=self.settings,
+        self._plot_bivariate(
+            self.correlated_train, correlated_columns, analysis_name, max_bins_quantity
         )
-        self.train_analysis = _merge_without_duplicates(self.train_analysis, temp_table)
-        generate_bivariate_charts(temp_table, analysis_name, settings=self.settings)
 
     def plot_specific(
         self, df, columns, analysis_name, max_bins_quantity: int = 20
     ) -> None:
-        temp_tables = _get_bivariate_tables(
-            df, columns, max_bins_quantity, settings=self.settings
+        self._plot_bivariate(
+            df, columns, analysis_name, max_bins_quantity, save_analysis=False
         )
-        generate_bivariate_charts(temp_tables, analysis_name, settings=self.settings)
 
     def _get_correlations_for(
         self, column: str, threshold: float = 0.80
