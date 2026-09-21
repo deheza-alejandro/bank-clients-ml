@@ -66,7 +66,7 @@ def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-ConditionSymbol = Literal["<", ">", "<=", ">=", "==", "!="]
+type ConditionSymbol = Literal["<", ">", "<=", ">=", "==", "!="]
 
 OPERATORS = {
     "<": operator.lt,

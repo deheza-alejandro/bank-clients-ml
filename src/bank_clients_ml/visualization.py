@@ -20,7 +20,7 @@ matplotlib.rcParams["svg.hashsalt"] = "fixed_seed_for_this_project"
 matplotlib.rcParams["svg.fonttype"] = "path"
 
 
-def _optimize_and_save_svg(fig: Figure, output_path: Path):
+def _optimize_and_save_svg(fig: Figure, output_path: Path) -> None:
     buffer = io.BytesIO()
     try:
         fig.savefig(buffer, format="svg", bbox_inches="tight")
@@ -233,7 +233,7 @@ def plot_evaluation_metrics(
     y_pred: np.ndarray,
     graphic_name: str,
     images_dir: Path = IMAGES_DIR,
-):
+) -> None:
     """Calcula Accuracy y ROC AUC, dibuja la curva ROC y la guarda como SVG.
 
     Computa las métricas básicas, arma el gráfico de la curva ROC con las

@@ -5,7 +5,7 @@ import polars as pl
 from bank_clients_ml.config import Settings, get_settings
 
 
-def get_saving_account_cols():
+def get_saving_account_cols() -> list[str]:
     return [
         "SavingAccount_Balance_Average",
         "SavingAccount_Balance_FirstDate",

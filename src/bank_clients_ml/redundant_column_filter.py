@@ -36,7 +36,9 @@ def _get_imbalanced_binary_columns(
     )
 
 
-def _get_redundant_correlated_columns(corr_df, threshold: float) -> list[str]:
+def _get_redundant_correlated_columns(
+    corr_df: pl.DataFrame, threshold: float
+) -> list[str]:
     """Deja siempre la primera columna fuera de la lista.
     Si N columnas están correlacionadas entre sí, devolverá N-1 en la lista.
 
@@ -209,7 +211,7 @@ class RedundantColumnFilter:
         imbalanced_binary_threshold: float = 0.10,
         correlation_threshold: float = 0.80,
         settings: Settings | None = None,
-    ):
+    ) -> None:
         self.settings = settings or get_settings()
 
         self.constant_cols = _get_constant_columns(train)
@@ -272,14 +274,17 @@ class RedundantColumnFilter:
         generate_bivariate_charts(temp_tables, analysis_name, settings=self.settings)
 
     def plot_uncorrelated(
-        self, columns, analysis_name, max_bins_quantity: int = 20
+        self, columns: list[str], analysis_name: str, max_bins_quantity: int = 20
     ) -> None:
         self._plot_bivariate(
             self.uncorrelated_train, columns, analysis_name, max_bins_quantity
         )
 
     def plot_correlated(
-        self, correlated_columns, analysis_name, max_bins_quantity: int = 20
+        self,
+        correlated_columns: list[str],
+        analysis_name: str,
+        max_bins_quantity: int = 20,
     ) -> None:
         if any(col in self.uncorrelated_train.columns for col in correlated_columns):
             raise ValueError(
@@ -291,7 +296,11 @@ class RedundantColumnFilter:
         )
 
     def plot_specific(
-        self, df, columns, analysis_name, max_bins_quantity: int = 20
+        self,
+        df: pl.DataFrame,
+        columns: list[str],
+        analysis_name: str,
+        max_bins_quantity: int = 20,
     ) -> None:
         self._plot_bivariate(
             df, columns, analysis_name, max_bins_quantity, save_analysis=False
@@ -312,7 +321,7 @@ class RedundantColumnFilter:
             .sort(pl.col("correlation").abs(), descending=True)
         )
 
-    def print_correlations_for_each(self, columns) -> None:
+    def print_correlations_for_each(self, columns: list[str]) -> None:
         for column in columns:
             mo.output.append(mo.md(f"###  Columnas correlacionadas con {column}:"))
             mo.output.append(self._get_correlations_for(column))
