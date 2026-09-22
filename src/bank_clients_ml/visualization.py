@@ -168,7 +168,9 @@ def _generate_single_bivariate_chart(
     ax_graph_target_pct.set_ylabel(f"{settings.col_target} pct (%)")
 
     fig.tight_layout()
-    _save_fig_as_svg(fig, variable_to_graph, images_dir, analysis_name)
+    _save_fig_as_svg(
+        fig, variable_to_graph, images_dir, f"bivariate_analysis/{analysis_name}"
+    )
 
 
 def generate_bivariate_charts(

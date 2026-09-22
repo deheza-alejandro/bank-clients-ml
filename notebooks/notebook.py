@@ -647,7 +647,7 @@ def _(groups_trainer, uncorrelated_train):
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "most_important_features.svg")}
+    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "important_features.svg")}
     """)
     return
 
@@ -669,15 +669,15 @@ def _(column_filter, important_features):
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    {mo.image(src=notebook_dir / "images" / "analysis" / "Client_Age_grp.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis" / "CreditCard_Balance_ARG_SP_pct_max.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis" / "CreditCard_Payment_total_max.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis" / "CreditCard_Product.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis" / "CreditCard_Total_Limit_diff_rel.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis" / "Operations_total_min.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis" / "Quantity_Active_Products_min.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis" / "SavingAccount_Transfer_In_Amount_max.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis" / "SavingAccount_Transfer_In_Transactions_pct_max.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "uncorrelated" / "Client_Age_grp.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "uncorrelated" / "CreditCard_Balance_ARG_SP_pct_max.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "uncorrelated" / "CreditCard_Payment_total_max.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "uncorrelated" / "CreditCard_Product.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "uncorrelated" / "CreditCard_Total_Limit_diff_rel.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "uncorrelated" / "Operations_total_min.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "uncorrelated" / "Quantity_Active_Products_min.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "uncorrelated" / "SavingAccount_Transfer_In_Amount_max.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "uncorrelated" / "SavingAccount_Transfer_In_Transactions_pct_max.svg")}
     """)
     return
 
@@ -715,12 +715,12 @@ def _(column_filter):
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    {mo.image(src=notebook_dir / "images" / "analysis_2" / "Operations_total_mean.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis_2" / "Operations_total_median.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis_2" / "CreditCard_Active.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis_2" / "CreditCard_Balance_ARG_SP_pct_mean.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis_2" / "Quantity_Active_Products_median.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis_2" / "Quantity_Active_Products_mean.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "correlated" / "Operations_total_mean.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "correlated" / "Operations_total_median.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "correlated" / "CreditCard_Active.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "correlated" / "CreditCard_Balance_ARG_SP_pct_mean.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "correlated" / "Quantity_Active_Products_median.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "correlated" / "Quantity_Active_Products_mean.svg")}
     """)
     return
 
@@ -801,10 +801,10 @@ def _(best_features, column_filter, final_train):
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    {mo.image(src=notebook_dir / "images" / "analysis_t" / "CreditCard_Product.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis_t" / "Client_Age_grp.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis_t" / "Operations_total_mean.svg")}
-    {mo.image(src=notebook_dir / "images" / "analysis_t" / "Quantity_Active_Products_min.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "best_features" / "CreditCard_Product.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "best_features" / "Client_Age_grp.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "best_features" / "Operations_total_mean.svg")}
+    {mo.image(src=notebook_dir / "images" / "bivariate_analysis" / "best_features" / "Quantity_Active_Products_min.svg")}
     """)
     return
 
