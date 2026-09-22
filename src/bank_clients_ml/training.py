@@ -300,7 +300,7 @@ class LGBMTrainer:
             settings=self.settings,
         )
 
-    def get_most_important_features(self) -> list[str]:
+    def get_top_ranked_features(self) -> list[str]:
         return (
             self.importances.head(self.top_n)
             .get_column(self.settings.col_feature)
@@ -364,10 +364,10 @@ class GroupsLGBMTrainer:
             mo.output.append(mo.md(f"### {group_name}:"))
             trainer.print_search_logs()
 
-    def get_most_important_features(self) -> list[str]:
+    def get_top_grouped_features(self) -> list[str]:
         return [
             feature
             for group_name, trainer in self.trainers.items()
             if group_name != "all_columns"
-            for feature in trainer.get_most_important_features()
+            for feature in trainer.get_top_ranked_features()
         ]

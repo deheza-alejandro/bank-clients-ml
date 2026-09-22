@@ -47,7 +47,7 @@ with app.setup:
 
     settings = get_settings()
     notebook_dir = Path(__file__).parent
-    data = pl.read_parquet(notebook_dir.parent / "data" / "data.parquet")
+    raw_data = pl.read_parquet(notebook_dir.parent / "data" / "data.parquet")
 
 
 @app.cell(hide_code=True)
@@ -60,8 +60,8 @@ def _():
 
 @app.cell
 def _():
-    print("data.shape:", data.shape)
-    print_describe(data)
+    print("raw_data.shape:", raw_data.shape)
+    print_describe(raw_data)
 
     less_than_zero_columns = [
         "SavingAccount_Balance_Average",
@@ -78,25 +78,30 @@ def _():
     ]
     mo.output.append(
         count_row_matches(
-            data, columns=less_than_zero_columns, threshold=0, condition="<"
+            raw_data, columns=less_than_zero_columns, threshold=0, condition="<"
         )
     )
     mo.output.append(
         count_row_matches(
-            data, columns=greater_than_thirty_one_columns, threshold=31, condition=">"
+            raw_data,
+            columns=greater_than_thirty_one_columns,
+            threshold=31,
+            condition=">",
         )
     )
-    mo.output.append(low_cardinality_value_counts(data))
-    mo.output.append(filter_columns_by_cardinality(data, condition=">", threshold=10))
-    mo.output.append(inspect_dataframe(data))
-    mo.output.append(data.null_count().transpose(include_header=True))
+    mo.output.append(low_cardinality_value_counts(raw_data))
     mo.output.append(
-        data.filter(pl.col(settings.col_target).is_null()).transpose(
+        filter_columns_by_cardinality(raw_data, condition=">", threshold=10)
+    )
+    mo.output.append(inspect_dataframe(raw_data))
+    mo.output.append(raw_data.null_count().transpose(include_header=True))
+    mo.output.append(
+        raw_data.filter(pl.col(settings.col_target).is_null()).transpose(
             include_header=True
         )
     )
     mo.output.append(
-        data.filter(pl.col(settings.col_target).is_null()).select(settings.col_id)
+        raw_data.filter(pl.col(settings.col_target).is_null()).select(settings.col_id)
     )
     return
 
@@ -111,8 +116,8 @@ def _():
 
 @app.cell
 def _():
-    print("data.shape:", data.shape)
-    clean_data = data.filter(pl.col(settings.col_target).is_not_null())
+    print("raw_data.shape:", raw_data.shape)
+    clean_data = raw_data.filter(pl.col(settings.col_target).is_not_null())
     mo.output.append(inspect_dataframe(clean_data))
     clean_data = clean_data.with_columns(
         pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date(),
@@ -547,7 +552,7 @@ def _(
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # ABT and Train/Test split
+    # ABT (analytical base table) and Train/Test split
     - Agrego transformadas extras luego de generar la ABT
     - Divido los datos es train y test
     """)
@@ -556,14 +561,14 @@ def _():
 
 @app.cell
 def _(data_agg, identity_features_2):
-    ABT = identity_features_2.join(data_agg, on=settings.col_id, how="inner")
-    mo.output.append(inspect_dataframe(ABT))
+    abt = identity_features_2.join(data_agg, on=settings.col_id, how="inner")
+    mo.output.append(inspect_dataframe(abt))
 
-    ABT = with_extra_transformations(ABT)
-    mo.output.append(mins_in_range(ABT, -1, 1))
-    mo.output.append(inspect_dataframe(ABT))
+    abt = with_extra_transformations(abt)
+    mo.output.append(mins_in_range(abt, -1, 1))
+    mo.output.append(inspect_dataframe(abt))
 
-    train, test = stratified_train_test_split(ABT)
+    train, test = stratified_train_test_split(abt)
     mo.output.append(mo.md(f".\n\n train.shape: {train.shape}"))
     print_describe(train)
     return test, train
@@ -636,18 +641,18 @@ def _():
 
 @app.cell
 def _(groups_trainer, uncorrelated_train):
-    important_features = groups_trainer.get_most_important_features()
-    trainer = LGBMTrainer(uncorrelated_train, important_features)
+    top_grouped_features = groups_trainer.get_top_grouped_features()
+    trainer = LGBMTrainer(uncorrelated_train, top_grouped_features)
     trainer.print_search_logs()
     trainer.print_searcher()
-    trainer.plot_top_features("important_features")
-    return important_features, trainer
+    trainer.plot_top_features("top_grouped_features")
+    return top_grouped_features, trainer
 
 
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "important_features.svg")}
+    {mo.image(src=notebook_dir / "images" / "plot_top_features" / "top_grouped_features.svg")}
     """)
     return
 
@@ -661,8 +666,8 @@ def _():
 
 
 @app.cell
-def _(column_filter, important_features):
-    column_filter.plot_uncorrelated(important_features, "uncorrelated")
+def _(column_filter, top_grouped_features):
+    column_filter.plot_uncorrelated(top_grouped_features, "uncorrelated")
     return
 
 
@@ -693,8 +698,8 @@ def _():
 
 @app.cell
 def _(column_filter, trainer):
-    most_important_features = trainer.get_most_important_features()
-    column_filter.print_correlations_for_each(most_important_features)
+    top_ranked_features = trainer.get_top_ranked_features()
+    column_filter.print_correlations_for_each(top_ranked_features)
     return
 
 

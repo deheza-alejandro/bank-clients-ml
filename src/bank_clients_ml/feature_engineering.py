@@ -583,8 +583,8 @@ def standardize(
 
     cols_to_standardize = pl.exclude(settings.col_id, settings.col_target)
 
-    standardized_ABT = df.with_columns(
+    standardized_df = df.with_columns(
         (cols_to_standardize - cols_to_standardize.mean())
         / cols_to_standardize.std(ddof=ddof)
     )
-    return standardized_ABT
+    return standardized_df
