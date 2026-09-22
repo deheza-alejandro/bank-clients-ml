@@ -292,10 +292,10 @@ class LGBMTrainer:
     def print_searcher(self) -> None:
         mo.output.append(self.searcher)
 
-    def plot_top_features(self, graphic_name: str) -> None:
+    def plot_top_features(self, plot_name: str) -> None:
         plot_top_features(
             self.importances,
-            graphic_name,
+            plot_name,
             self.searcher.best_score_,
             settings=self.settings,
         )
@@ -307,21 +307,21 @@ class LGBMTrainer:
             .to_list()
         )
 
-    def plot_evaluation_metrics(self, graphic_name: str) -> None:
+    def plot_evaluation_metrics(self, plot_name: str) -> None:
         if not self.is_testable:
             raise RuntimeError("Esta instancia no fue inicializada con un set de test")
 
         plot_evaluation_metrics(
-            self.roc_auc, self.accuracy, self.fpr, self.tpr, graphic_name
+            self.roc_auc, self.accuracy, self.fpr, self.tpr, plot_name
         )
 
-    def plot_deciles(self, graphic_name: str) -> None:
+    def plot_deciles(self, plot_name: str) -> None:
         if not self.is_testable:
             raise RuntimeError("Esta instancia no fue inicializada con un set de test")
         plot_deciles(
             self.train_deciles.drop("min_prob", "max_prob"),
             self.test_deciles.drop("min_prob", "max_prob"),
-            graphic_name,
+            plot_name,
         )
 
 

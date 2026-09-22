@@ -836,9 +836,9 @@ def _(best_features, final_test, final_train):
     )
     final_trainer.print_output()
     final_trainer.print_searcher()
-    final_trainer.plot_top_features(graphic_name="best_features")
-    final_trainer.plot_evaluation_metrics(graphic_name="lightgbm")
-    final_trainer.plot_deciles(graphic_name="deciles")
+    final_trainer.plot_top_features(plot_name="best_features")
+    final_trainer.plot_evaluation_metrics(plot_name="lightgbm")
+    final_trainer.plot_deciles(plot_name="deciles")
     return
 
 

@@ -20,7 +20,7 @@ matplotlib.rcParams["svg.fonttype"] = "path"
 
 def _save_fig_as_svg(
     fig: Figure,
-    graphic_name: str,
+    plot_name: str,
     images_dir: Path,
     images_sub_dir: str = "",
 ) -> None:
@@ -30,14 +30,14 @@ def _save_fig_as_svg(
     -----------
     fig : Figure
         Instancia de la figura de Matplotlib.
-    graphic_name : str
+    plot_name : str
         Nombre del archivo sin extensión.
     images_sub_dir : str
         Sub carpeta dentro del directorio images_dir.
     """
     output_folder = images_dir / images_sub_dir
     output_folder.mkdir(parents=True, exist_ok=True)
-    svg_path = output_folder / f"{graphic_name}.svg"
+    svg_path = output_folder / f"{plot_name}.svg"
 
     buffer = io.BytesIO()
     try:
@@ -66,8 +66,8 @@ IMAGES_DIR: Path = PROJECT_DIR / "notebooks" / "images"
 
 
 def plot_top_features(
-    variables_to_graph: pl.DataFrame,
-    graphic_name: str,
+    variables_to_plot: pl.DataFrame,
+    plot_name: str,
     roc_auc: float,
     top_n: int = 20,
     images_dir: Path = IMAGES_DIR,
@@ -76,18 +76,18 @@ def plot_top_features(
     """Graficar el ranking de las top_n features más importantes y lo guarda en SVG.
 
     Toma las top_n features con mayor importancia, arma un gráfico de barras
-    horizontal y lo exporta a {images_dir}/plot_top_features/{graphic_name}.svg.
+    horizontal y lo exporta a {images_dir}/plot_top_features/{plot_name}.svg.
 
     Parámetros:
-    variables_to_graph (pl.DataFrame): variables con sus importancias. ya viene ordenado
-    graphic_name (str): Nombre del archivo SVG de salida (sin extensión).
+    variables_to_plot (pl.DataFrame): variables con sus importancias. ya viene ordenado
+    plot_name (str): Nombre del archivo SVG de salida (sin extensión).
     """
     if settings is None:
         settings = get_settings()
 
-    top_n = min(top_n, variables_to_graph.height)
+    top_n = min(top_n, variables_to_plot.height)
 
-    top_vars = variables_to_graph.head(top_n)
+    top_vars = variables_to_plot.head(top_n)
 
     label_fontsize = min(35, top_n * 8)
     tick_fontsize = 30
@@ -112,16 +112,16 @@ def plot_top_features(
     ax.grid(axis="x", linestyle="--", alpha=0.7)
 
     ax.set_title(
-        f"{graphic_name}: top {top_n} Features\nROC AUC: {roc_auc:.6f}",
+        f"{plot_name}: top {top_n} Features\nROC AUC: {roc_auc:.6f}",
         fontsize=label_fontsize,
     )
 
-    _save_fig_as_svg(fig, graphic_name, images_dir, "plot_top_features")
+    _save_fig_as_svg(fig, plot_name, images_dir, "plot_top_features")
 
 
 def _generate_single_bivariate_chart(
     table: pl.DataFrame,
-    variable_to_graph: str,
+    variable_to_plot: str,
     images_dir: Path,
     analysis_name: str,
     settings: Settings | None = None,
@@ -135,8 +135,8 @@ def _generate_single_bivariate_chart(
     % target en verde.
 
     Parámetros:
-    table: Tabla de datos de los clientes con target y variable_to_graph.
-    variable_to_graph: Nombre de la variable a analizar. Valores idénticos siempre van al mismo bin.
+    table: Tabla de datos de los clientes con target y variable_to_plot.
+    variable_to_plot: Nombre de la variable a analizar. Valores idénticos siempre van al mismo bin.
     target: Nombre de la columna objetivo.
     """
     if settings is None:
@@ -147,7 +147,7 @@ def _generate_single_bivariate_chart(
     )
 
     ax_table.axis("off")
-    ax_table.set_title(f"Variable analysis: {variable_to_graph}", pad=1)
+    ax_table.set_title(f"Variable analysis: {variable_to_plot}", pad=1)
     ax_table.table(
         cellText=table.rows(),
         colLabels=table.columns,
@@ -169,7 +169,7 @@ def _generate_single_bivariate_chart(
 
     fig.tight_layout()
     _save_fig_as_svg(
-        fig, variable_to_graph, images_dir, f"bivariate_analysis/{analysis_name}"
+        fig, variable_to_plot, images_dir, f"bivariate_analysis/{analysis_name}"
     )
 
 
@@ -184,7 +184,7 @@ def generate_bivariate_charts(
 
     Por cada columna del DataFrame arma el análisis
     bivariado con _generate_single_bivariate_chart
-    y lo exporta a {images_dir}/{analysis_name}/{variable_to_graph}.svg.
+    y lo exporta a {images_dir}/{analysis_name}/{variable_to_plot}.svg.
 
     Parámetros:
     tables: todas las tablas de cada columna a graficar
@@ -197,10 +197,10 @@ def generate_bivariate_charts(
         settings = get_settings()
 
     if max_workers == 1 or len(tables) < 20:
-        for variable_to_graph, table in tables.items():
+        for variable_to_plot, table in tables.items():
             _generate_single_bivariate_chart(
                 table,
-                variable_to_graph,
+                variable_to_plot,
                 images_dir,
                 analysis_name,
                 settings,
@@ -211,12 +211,12 @@ def generate_bivariate_charts(
                 executor.submit(
                     _generate_single_bivariate_chart,
                     table,
-                    variable_to_graph,
+                    variable_to_plot,
                     images_dir,
                     analysis_name,
                     settings,
                 )
-                for variable_to_graph, table in tables.items()
+                for variable_to_plot, table in tables.items()
             ]
 
             for future in as_completed(futures):
@@ -228,23 +228,23 @@ def plot_evaluation_metrics(
     accuracy: float,
     fpr: np.ndarray,
     tpr: np.ndarray,
-    graphic_name: str,
+    plot_name: str,
     images_dir: Path = IMAGES_DIR,
 ) -> None:
     """Dibuja la curva ROC y la guarda como SVG.
 
     Arma el gráfico de la curva ROC con las
-    anotaciones y lo exporta a {images_dir}/plot_evaluation_metrics/{graphic_name}.svg.
+    anotaciones y lo exporta a {images_dir}/plot_evaluation_metrics/{plot_name}.svg.
 
     Parámetros:
-    graphic_name: Nombre del archivo SVG de salida (sin extensión).
+    plot_name: Nombre del archivo SVG de salida (sin extensión).
     """
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.plot(fpr, tpr)
     ax.plot([0, 1], [0, 1], color="gray", linestyle="--", alpha=0.7)
     ax.set_xlabel("False Positive Rate (FPR)")
     ax.set_ylabel("True Positive Rate (TPR)")
-    ax.set_title(f"ROC Curve - {graphic_name}")
+    ax.set_title(f"ROC Curve - {plot_name}")
 
     ax.annotate(
         f"Accuracy: {accuracy:.6f}\nROC AUC:  {roc_auc:.6f}",
@@ -258,7 +258,7 @@ def plot_evaluation_metrics(
     ax.set_ylim(0, 1)
     ax.grid(True, linestyle=":", alpha=0.6)
 
-    _save_fig_as_svg(fig, graphic_name, images_dir, "plot_evaluation_metrics")
+    _save_fig_as_svg(fig, plot_name, images_dir, "plot_evaluation_metrics")
 
 
 def _generate_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
@@ -300,7 +300,7 @@ def _generate_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> Non
 def plot_deciles(
     train_deciles: pl.DataFrame,
     test_deciles: pl.DataFrame,
-    graphic_name: str,
+    plot_name: str,
     title_train_deciles: str = "Train Deciles",
     title_test_deciles: str = "Test Deciles",
     images_dir: Path = IMAGES_DIR,
@@ -315,4 +315,4 @@ def plot_deciles(
     _generate_single_deciles_table(ax2, test_deciles, title_test_deciles)
 
     plt.tight_layout()
-    _save_fig_as_svg(fig, graphic_name, images_dir, "plot_evaluation_metrics")
+    _save_fig_as_svg(fig, plot_name, images_dir, "plot_evaluation_metrics")
