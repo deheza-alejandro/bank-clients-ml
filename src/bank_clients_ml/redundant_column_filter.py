@@ -6,7 +6,7 @@ import polars as pl
 
 from bank_clients_ml.config import Settings, get_settings
 from bank_clients_ml.eda import low_cardinality_value_counts
-from bank_clients_ml.visualization import generate_bivariate_charts
+from bank_clients_ml.visualization import plot_bivariate_charts
 
 
 def _get_true_column_names(df: pl.DataFrame) -> list[str]:
@@ -271,7 +271,7 @@ class RedundantColumnFilter:
             self.train_analysis = _merge_without_duplicates(
                 self.train_analysis, temp_tables
             )
-        generate_bivariate_charts(temp_tables, analysis_name, settings=self.settings)
+        plot_bivariate_charts(temp_tables, analysis_name, settings=self.settings)
 
     def plot_uncorrelated(
         self, columns: list[str], analysis_name: str, max_bins_quantity: int = 20

@@ -119,7 +119,7 @@ def plot_top_features(
     _save_fig_as_svg(fig, plot_name, images_dir, "plot_top_features")
 
 
-def _generate_single_bivariate_chart(
+def _plot_single_bivariate_chart(
     table: pl.DataFrame,
     variable_to_plot: str,
     images_dir: Path,
@@ -173,7 +173,7 @@ def _generate_single_bivariate_chart(
     )
 
 
-def generate_bivariate_charts(
+def plot_bivariate_charts(
     tables: dict[str, pl.DataFrame],
     analysis_name: str,
     images_dir: Path = IMAGES_DIR,
@@ -183,7 +183,7 @@ def generate_bivariate_charts(
     """Graficar las variables y guarda cada figura como SVG.
 
     Por cada columna del DataFrame arma el análisis
-    bivariado con _generate_single_bivariate_chart
+    bivariado con _plot_single_bivariate_chart
     y lo exporta a {images_dir}/{analysis_name}/{variable_to_plot}.svg.
 
     Parámetros:
@@ -198,7 +198,7 @@ def generate_bivariate_charts(
 
     if max_workers == 1 or len(tables) < 20:
         for variable_to_plot, table in tables.items():
-            _generate_single_bivariate_chart(
+            _plot_single_bivariate_chart(
                 table,
                 variable_to_plot,
                 images_dir,
@@ -209,7 +209,7 @@ def generate_bivariate_charts(
         with ProcessPoolExecutor(max_workers) as executor:
             futures = [
                 executor.submit(
-                    _generate_single_bivariate_chart,
+                    _plot_single_bivariate_chart,
                     table,
                     variable_to_plot,
                     images_dir,
@@ -261,7 +261,7 @@ def plot_evaluation_metrics(
     _save_fig_as_svg(fig, plot_name, images_dir, "plot_evaluation_metrics")
 
 
-def _generate_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
+def _plot_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
     ax.axis("tight")
     ax.axis("off")
 
@@ -311,8 +311,8 @@ def plot_deciles(
     """
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8), dpi=300)
 
-    _generate_single_deciles_table(ax1, train_deciles, title_train_deciles)
-    _generate_single_deciles_table(ax2, test_deciles, title_test_deciles)
+    _plot_single_deciles_table(ax1, train_deciles, title_train_deciles)
+    _plot_single_deciles_table(ax2, test_deciles, title_test_deciles)
 
     plt.tight_layout()
     _save_fig_as_svg(fig, plot_name, images_dir, "plot_evaluation_metrics")
