@@ -67,8 +67,8 @@ def _compute_percentage(
     Returns:
         Expresión de Polars con el porcentaje calculado.
     """
-    numerator_exp = pl.col(numerator) if isinstance(numerator, str) else numerator
-    return numerator_exp / _safe_denominator(denominator) * 100.0
+    numerator_expr = pl.col(numerator) if isinstance(numerator, str) else numerator
+    return numerator_expr / _safe_denominator(denominator) * 100.0
 
 
 def _min_max_normalize(column: str) -> pl.Expr:
@@ -101,9 +101,9 @@ def _min_max_normalize_weighted(column: str, weight: str) -> pl.Expr:
     return _min_max_normalize(column) * pl.col(weight)
 
 
-def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
+def with_transformations(df: pl.DataFrame) -> pl.DataFrame:
 
-    df = df.with_columns(
+    result = df.with_columns(
         [
             # OPERATION
             (
@@ -287,7 +287,7 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
         ]
     )
 
-    df = df.with_columns(
+    result = result.with_columns(
         [
             # OPERATION
             _compute_percentage("Operations_remote", "Operations_total").alias(
@@ -458,10 +458,10 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
         ]
     )
 
-    return df
+    return result
 
 
-def generate_aggregations(
+def aggregate_monthly_to_client(
     saving_account_cols: list[str],
     credit_card_cols: list[str],
     training_data: pl.DataFrame,
@@ -533,8 +533,8 @@ def generate_aggregations(
     return data_agg
 
 
-def add_extra_transformations(df: pl.DataFrame) -> pl.DataFrame:
-    df = df.with_columns(
+def with_extra_transformations(df: pl.DataFrame) -> pl.DataFrame:
+    result = df.with_columns(
         (
             _min_max_normalize("SavingAccount_Days_with_use_count_nonzero")
             + _min_max_normalize("SavingAccount_Days_with_use_min")
@@ -572,7 +572,7 @@ def add_extra_transformations(df: pl.DataFrame) -> pl.DataFrame:
         ).alias("Limit_payment"),
     )
 
-    return df
+    return result
 
 
 def standardize(

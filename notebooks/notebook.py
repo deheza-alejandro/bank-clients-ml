@@ -26,10 +26,10 @@ with app.setup:
         print_describe,
     )
     from bank_clients_ml.feature_engineering import (
-        add_extra_transformations,
-        add_transformations,
-        generate_aggregations,
+        aggregate_monthly_to_client,
         target_encode_columns,
+        with_extra_transformations,
+        with_transformations,
     )
     from bank_clients_ml.redundant_column_filter import (
         BinRange,
@@ -488,7 +488,7 @@ def _():
 @app.cell
 def _(training_data_5):
     print(training_data_5.shape)
-    training_data_6 = add_transformations(training_data_5)
+    training_data_6 = with_transformations(training_data_5)
 
     mo.output.append(inspect_dataframe(training_data_6))
     print_describe(training_data_6)
@@ -537,7 +537,7 @@ def _(
     saving_account_cols,
     training_data_6,
 ):
-    data_agg = generate_aggregations(
+    data_agg = aggregate_monthly_to_client(
         saving_account_cols, credit_card_cols, training_data_6, identity_features_2
     )
     inspect_dataframe(data_agg)
@@ -559,7 +559,7 @@ def _(data_agg, identity_features_2):
     ABT = identity_features_2.join(data_agg, on=settings.col_id, how="inner")
     mo.output.append(inspect_dataframe(ABT))
 
-    ABT = add_extra_transformations(ABT)
+    ABT = with_extra_transformations(ABT)
     mo.output.append(mins_in_range(ABT, -1, 1))
     mo.output.append(inspect_dataframe(ABT))
 
