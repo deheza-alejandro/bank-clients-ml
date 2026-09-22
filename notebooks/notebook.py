@@ -195,19 +195,23 @@ def _(clean_data, last_training_month, prediction_months, training_months):
         .unique()
     )
 
-    clean_data_1 = clean_data.drop(settings.col_target).join(
+    universe_and_target_data = clean_data.drop(settings.col_target).join(
         universe_and_target, on=settings.col_id, how="inner"
     )
 
-    training_data = clean_data_1.filter(pl.col("Month").is_in(training_months))
-    prediction_data = clean_data_1.filter(pl.col("Month").is_in(prediction_months))
+    training_data = universe_and_target_data.filter(
+        pl.col("Month").is_in(training_months)
+    )
+    prediction_data = universe_and_target_data.filter(
+        pl.col("Month").is_in(prediction_months)
+    )
 
     print(f"universe_and_target.shape: {universe_and_target.shape} \n")
     print(f"prediction_data.shape: {prediction_data.shape} \n")
     mo.output.append(mo.md("### training_data['Month'].value_counts():"))
     mo.output.append(training_data["Month"].value_counts())
     inspect_dataframe(training_data)
-    return clean_data_1, prediction_data, training_data
+    return prediction_data, training_data, universe_and_target_data
 
 
 @app.cell(hide_code=True)
@@ -286,7 +290,7 @@ def _():
 
 
 @app.cell
-def _(clean_data_1, prediction_data, training_data_1):
+def _(prediction_data, training_data_1, universe_and_target_data):
     clients_region = prediction_data.select(settings.col_id, "Region").unique()
 
     training_data_2 = training_data_1.drop("Region").join(
@@ -299,7 +303,7 @@ def _(clean_data_1, prediction_data, training_data_1):
     print(f"{training_data_2.shape} \n")
     mo.output.append(clients_region["Region"].value_counts(sort=True))
     mo.output.append(training_data_2["Region"].value_counts(sort=True))
-    print_describe(clean_data_1.select("Region"))
+    print_describe(universe_and_target_data.select("Region"))
     print_describe(clients_region)
     print_describe(training_data_2.select("Region"))
     return (training_data_2,)
@@ -322,7 +326,12 @@ def _():
 
 
 @app.cell
-def _(clean_data_1, first_prediction_month, prediction_data, training_data_2):
+def _(
+    first_prediction_month,
+    prediction_data,
+    training_data_2,
+    universe_and_target_data,
+):
     clients_credit_card_product = (
         prediction_data.sort(pl.col("Month") == first_prediction_month, descending=True)
         .group_by(settings.col_id)
@@ -345,7 +354,7 @@ def _(clean_data_1, first_prediction_month, prediction_data, training_data_2):
         clients_credit_card_product["CreditCard_Product"].value_counts(sort=True)
     )
     mo.output.append(training_data_3["CreditCard_Product"].value_counts(sort=True))
-    print_describe(clean_data_1.select("CreditCard_Product"))
+    print_describe(universe_and_target_data.select("CreditCard_Product"))
     print_describe(clients_credit_card_product)
     print_describe(training_data_3.select("CreditCard_Product"))
     inspect_dataframe(training_data_3)
@@ -627,12 +636,12 @@ def _():
 
 @app.cell
 def _(groups_trainer, uncorrelated_train):
-    most_important_features = groups_trainer.get_most_important_features()
-    trainer = LGBMTrainer(uncorrelated_train, most_important_features)
+    important_features = groups_trainer.get_most_important_features()
+    trainer = LGBMTrainer(uncorrelated_train, important_features)
     trainer.print_output()
     trainer.print_searcher()
-    trainer.plot_top_features("most_important_features")
-    return most_important_features, trainer
+    trainer.plot_top_features("important_features")
+    return important_features, trainer
 
 
 @app.cell(hide_code=True)
@@ -652,8 +661,8 @@ def _():
 
 
 @app.cell
-def _(column_filter, most_important_features):
-    column_filter.plot_uncorrelated(most_important_features, "analysis")
+def _(column_filter, important_features):
+    column_filter.plot_uncorrelated(important_features, "uncorrelated")
     return
 
 
@@ -684,14 +693,14 @@ def _():
 
 @app.cell
 def _(column_filter, trainer):
-    most_important_features_2 = trainer.get_most_important_features()
-    column_filter.print_correlations_for_each(most_important_features_2)
+    most_important_features = trainer.get_most_important_features()
+    column_filter.print_correlations_for_each(most_important_features)
     return
 
 
 @app.cell
 def _(column_filter):
-    most_important_features_correlated = [
+    correlated_features = [
         "Operations_total_mean",
         "Operations_total_median",
         "CreditCard_Active",
@@ -699,7 +708,7 @@ def _(column_filter):
         "Quantity_Active_Products_median",
         "Quantity_Active_Products_mean",
     ]
-    column_filter.plot_correlated(most_important_features_correlated, "analysis_2")
+    column_filter.plot_correlated(correlated_features, "correlated")
     return
 
 
@@ -764,13 +773,6 @@ def _(column_filter):
             "Quantity_Active_Products_min", [BinRange(1, 4), BinRange(6, 9)]
         ),
     ]
-    final_train, final_test = column_filter.group_bins_by_ranges(bins_transformations)
-    inspect_dataframe(final_train)
-    return final_test, final_train
-
-
-@app.cell
-def _(column_filter, final_train):
     best_features = [
         "Client_Age_grp",
         "Operations_total_mean",
@@ -779,8 +781,21 @@ def _(column_filter, final_train):
         # "CreditCard_Active",  # sin modificar
         "Quantity_Active_Products_min",
     ]
-    column_filter.plot_specific(final_train, best_features, "analysis_t")
-    return (best_features,)
+    final_train, final_test = column_filter.group_bins_by_ranges(bins_transformations)
+    mo.output.append(inspect_dataframe(final_train))
+
+    final_cols = [settings.col_id, settings.col_target, *best_features]
+    final_train = final_train.select(final_cols)
+    final_test = final_test.select(final_cols)
+    mo.output.append(inspect_dataframe(final_train))
+    print_describe(final_train)
+    return best_features, final_test, final_train
+
+
+@app.cell
+def _(best_features, column_filter, final_train):
+    column_filter.plot_specific(final_train, best_features, "best_features")
+    return
 
 
 @app.cell(hide_code=True)
@@ -794,16 +809,6 @@ def _():
     return
 
 
-@app.cell
-def _(best_features, final_test, final_train):
-    final_cols = [settings.col_id, settings.col_target, *best_features]
-    final_train_1 = final_train.select(final_cols)
-    final_test_1 = final_test.select(final_cols)
-    mo.output.append(inspect_dataframe(final_train_1))
-    print_describe(final_train_1)
-    return final_test_1, final_train_1
-
-
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
@@ -815,7 +820,7 @@ def _():
 
 
 @app.cell
-def _(best_features, final_test_1, final_train_1):
+def _(best_features, final_test, final_train):
     renames_dict = {
         "Client_Age_grp": "Age range",
         "Operations_total_mean": "Average quantity of operations",
@@ -823,10 +828,10 @@ def _(best_features, final_test_1, final_train_1):
         "Quantity_Active_Products_min": "Minimum quantity of active products",
     }
     final_trainer = LGBMTrainer(
-        final_train_1,
+        final_train,
         best_features,
         n_iter=20,
-        test=final_test_1,
+        test=final_test,
         renames_dict=renames_dict,
     )
     final_trainer.print_output()

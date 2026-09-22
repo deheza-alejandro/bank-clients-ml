@@ -464,8 +464,8 @@ def add_transformations(df: pl.DataFrame) -> pl.DataFrame:
 def generate_aggregations(
     saving_account_cols: list[str],
     credit_card_cols: list[str],
-    training_data_6: pl.DataFrame,
-    identity_features_2: pl.DataFrame,
+    training_data: pl.DataFrame,
+    identity_features: pl.DataFrame,
     settings: Settings | None = None,
 ) -> pl.DataFrame:
     """
@@ -487,11 +487,11 @@ def generate_aggregations(
 
     columns_with_quantities = [
         c
-        for c in training_data_6.columns
+        for c in training_data.columns
         if c
         not in {
             *columns_with_monetary_values,
-            *identity_features_2.columns,
+            *identity_features.columns,
             "Month",
             "First_product_dt",
             "Last_product_dt",
@@ -525,7 +525,7 @@ def generate_aggregations(
     ]
 
     data_agg = (
-        training_data_6.sort([settings.col_id, "Month"])
+        training_data.sort([settings.col_id, "Month"])
         .group_by(settings.col_id)
         .agg(agg_exprs)
     )
