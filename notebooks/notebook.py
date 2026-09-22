@@ -613,7 +613,7 @@ def _():
 @app.cell
 def _(uncorrelated_train):
     groups_trainer = GroupsLGBMTrainer(uncorrelated_train)
-    groups_trainer.print_outputs()
+    groups_trainer.print_search_logs()
     groups_trainer.print_groups_lengths()
     groups_trainer.print_searchers()
     groups_trainer.plot_top_features()
@@ -638,7 +638,7 @@ def _():
 def _(groups_trainer, uncorrelated_train):
     important_features = groups_trainer.get_most_important_features()
     trainer = LGBMTrainer(uncorrelated_train, important_features)
-    trainer.print_output()
+    trainer.print_search_logs()
     trainer.print_searcher()
     trainer.plot_top_features("important_features")
     return important_features, trainer
@@ -834,7 +834,7 @@ def _(best_features, final_test, final_train):
         test=final_test,
         renames_dict=renames_dict,
     )
-    final_trainer.print_output()
+    final_trainer.print_search_logs()
     final_trainer.print_searcher()
     final_trainer.plot_top_features(plot_name="best_features")
     final_trainer.plot_evaluation_metrics(plot_name="lightgbm")

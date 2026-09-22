@@ -22,7 +22,7 @@ from bank_clients_ml.visualization import (
 )
 
 
-def _get_feature_importances(
+def _fit_lgbm_random_search(
     train: pl.DataFrame,
     columns: list[str],
     n_iter: int,
@@ -52,14 +52,14 @@ def _get_feature_importances(
 
     verbose: int = 3 if settings.debug else 1
 
-    model = lgb.LGBMClassifier(
+    classifier = lgb.LGBMClassifier(
         random_state=settings.random_state,
         n_jobs=1,
         verbose=verbose,
         metric="auc",
     )
 
-    param_test = {
+    param_distributions = {
         "n_estimators": np.arange(6, 50, 1),
         "max_depth": np.arange(
             4, 10, 1
@@ -71,8 +71,8 @@ def _get_feature_importances(
     }
 
     searcher = RandomizedSearchCV(
-        estimator=model,
-        param_distributions=param_test,
+        estimator=classifier,
+        param_distributions=param_distributions,
         n_iter=n_iter,
         scoring="roc_auc",
         n_jobs=-1,
@@ -89,26 +89,26 @@ def _get_feature_importances(
     X_train = train.select(columns)
     y_train = train[settings.col_target]
 
-    buffer = io.StringIO()
+    log_buffer = io.StringIO()
     with (
-        redirect_stdout(buffer),
-        redirect_stderr(buffer),
+        redirect_stdout(log_buffer),
+        redirect_stderr(log_buffer),
     ):
         searcher.fit(X_train, y_train)
 
-    output = buffer.getvalue()
+    search_logs = log_buffer.getvalue()
 
-    model: lgb.LGBMClassifier = searcher.best_estimator_
+    fitted_classifier: lgb.LGBMClassifier = searcher.best_estimator_
     importances = pl.DataFrame(
         {
             settings.col_feature: columns,
-            settings.col_importance: model.feature_importances_,
+            settings.col_importance: fitted_classifier.feature_importances_,
         }
     ).sort(settings.col_importance, descending=True)
-    return searcher, importances, output
+    return searcher, importances, search_logs
 
 
-def _rename_columns(
+def _with_rename_columns(
     importances: pl.DataFrame,
     renames_dict: dict[str, str],
     settings: Settings | None = None,
@@ -209,12 +209,12 @@ def _evaluate(
     """
     settings = settings or get_settings()
 
-    model: lgb.LGBMClassifier = searcher.best_estimator_
+    best_model: lgb.LGBMClassifier = searcher.best_estimator_
     X_train = train.select(columns)
     X_test = test.select(columns)
 
-    probabilities_train = cast(np.ndarray, model.predict_proba(X_train))[:, 1]
-    probabilities_test = cast(np.ndarray, model.predict_proba(X_test))[:, 1]
+    probabilities_train = cast(np.ndarray, best_model.predict_proba(X_train))[:, 1]
+    probabilities_test = cast(np.ndarray, best_model.predict_proba(X_test))[:, 1]
     y_true_arr = test.get_column(settings.col_target).to_numpy()
     y_pred = (probabilities_test >= 0.5).astype(int)
 
@@ -258,7 +258,7 @@ class LGBMTrainer:
         self.columns = columns
         self.top_n = top_n
 
-        self.searcher, self.importances, self.output = _get_feature_importances(
+        self.searcher, self.importances, self.search_logs = _fit_lgbm_random_search(
             train,
             self.columns,
             n_iter,
@@ -267,7 +267,7 @@ class LGBMTrainer:
         )
 
         if renames_dict is not None:
-            self.importances = _rename_columns(
+            self.importances = _with_rename_columns(
                 self.importances, renames_dict, self.settings
             )
 
@@ -286,8 +286,8 @@ class LGBMTrainer:
     def get_columns(self) -> list[str]:
         return self.columns
 
-    def print_output(self) -> None:
-        mo.output.append(mo.md(f"```text\n{self.output}\n```"))
+    def print_search_logs(self) -> None:
+        mo.output.append(mo.md(f"```text\n{self.search_logs}\n```"))
 
     def print_searcher(self) -> None:
         mo.output.append(self.searcher)
@@ -359,10 +359,10 @@ class GroupsLGBMTrainer:
         for group_name, trainer in self.trainers.items():
             trainer.plot_top_features(group_name)
 
-    def print_outputs(self) -> None:
+    def print_search_logs(self) -> None:
         for group_name, trainer in self.trainers.items():
             mo.output.append(mo.md(f"### {group_name}:"))
-            trainer.print_output()
+            trainer.print_search_logs()
 
     def get_most_important_features(self) -> list[str]:
         return [
