@@ -210,19 +210,16 @@ def _evaluate(
     settings = settings or get_settings()
 
     model: lgb.LGBMClassifier = searcher.best_estimator_
+    X_train = train.select(columns)
+    X_test = test.select(columns)
 
-    probabilities_train = cast(np.ndarray, model.predict_proba(train.select(columns)))[
-        :, 1
-    ]
-    probabilities_test = cast(np.ndarray, model.predict_proba(test.select(columns)))[
-        :, 1
-    ]
+    probabilities_train = cast(np.ndarray, model.predict_proba(X_train))[:, 1]
+    probabilities_test = cast(np.ndarray, model.predict_proba(X_test))[:, 1]
+    y_true_arr = test.get_column(settings.col_target).to_numpy()
+    y_pred = (probabilities_test >= 0.5).astype(int)
 
-    y_true_arr = test[settings.col_target].to_numpy()
-    y_pred = cast(np.ndarray, model.predict(test.select(columns)))
-
-    roc_auc = roc_auc_score(y_true_arr, probabilities_test)
-    accuracy = accuracy_score(y_true_arr, y_pred)
+    roc_auc = float(roc_auc_score(y_true_arr, probabilities_test))
+    accuracy = float(accuracy_score(y_true_arr, y_pred))
     fpr, tpr, _ = roc_curve(y_true_arr, probabilities_test)
 
     train_based_bins = np.quantile(probabilities_train, QUANTILES).tolist()
@@ -235,8 +232,8 @@ def _evaluate(
     )
 
     return (
-        cast(float, roc_auc),
-        cast(float, accuracy),
+        roc_auc,
+        accuracy,
         cast(np.ndarray, fpr),  # pyrefly: ignore[redundant-cast]
         cast(np.ndarray, tpr),  # pyrefly: ignore[redundant-cast]
         train_deciles,
