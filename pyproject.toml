@@ -36,6 +36,7 @@ dev = [
 project-includes = [
     "**/*.py*"
 ]
+min-severity = "warn"
 
 [tool.ruff]
 extend-exclude = [".env", ".venv"]

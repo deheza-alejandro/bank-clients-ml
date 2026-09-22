@@ -237,8 +237,8 @@ def _evaluate(
     return (
         cast(float, roc_auc),
         cast(float, accuracy),
-        cast(np.ndarray, fpr),
-        cast(np.ndarray, tpr),
+        cast(np.ndarray, fpr),  # pyrefly: ignore[redundant-cast]
+        cast(np.ndarray, tpr),  # pyrefly: ignore[redundant-cast]
         train_deciles,
         test_deciles,
     )
