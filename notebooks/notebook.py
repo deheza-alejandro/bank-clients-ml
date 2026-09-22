@@ -781,7 +781,9 @@ def _(column_filter):
         # "CreditCard_Active",  # sin modificar
         "Quantity_Active_Products_min",
     ]
-    final_train, final_test = column_filter.group_bins_by_ranges(bins_transformations)
+    final_train, final_test = column_filter.apply_bin_transformations(
+        bins_transformations
+    )
     mo.output.append(inspect_dataframe(final_train))
 
     final_cols = [settings.col_id, settings.col_target, *best_features]
@@ -794,7 +796,7 @@ def _(column_filter):
 
 @app.cell
 def _(best_features, column_filter, final_train):
-    column_filter.plot_specific(final_train, best_features, "best_features")
+    column_filter.plot_adhoc(final_train, best_features, "best_features")
     return
 
 

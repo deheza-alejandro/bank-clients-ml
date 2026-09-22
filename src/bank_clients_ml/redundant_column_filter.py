@@ -255,7 +255,7 @@ class RedundantColumnFilter:
     def get_uncorrelated(self) -> tuple[pl.DataFrame, pl.DataFrame]:
         return (self.uncorrelated_train, self.uncorrelated_test)
 
-    def _plot_bivariate(
+    def _build_tables_and_plot(
         self,
         df: pl.DataFrame,
         columns: list[str],
@@ -276,7 +276,7 @@ class RedundantColumnFilter:
     def plot_uncorrelated(
         self, columns: list[str], analysis_name: str, max_bins_quantity: int = 20
     ) -> None:
-        self._plot_bivariate(
+        self._build_tables_and_plot(
             self.uncorrelated_train, columns, analysis_name, max_bins_quantity
         )
 
@@ -291,18 +291,18 @@ class RedundantColumnFilter:
                 "correlated_columns contiene columnas dentro de uncorrelated_train"
             )
 
-        self._plot_bivariate(
+        self._build_tables_and_plot(
             self.correlated_train, correlated_columns, analysis_name, max_bins_quantity
         )
 
-    def plot_specific(
+    def plot_adhoc(
         self,
         df: pl.DataFrame,
         columns: list[str],
         analysis_name: str,
         max_bins_quantity: int = 20,
     ) -> None:
-        self._plot_bivariate(
+        self._build_tables_and_plot(
             df, columns, analysis_name, max_bins_quantity, save_analysis=False
         )
 
@@ -326,7 +326,7 @@ class RedundantColumnFilter:
             mo.output.append(mo.md(f"###  Columnas correlacionadas con {column}:"))
             mo.output.append(self._get_correlations_for(column))
 
-    def group_bins_by_ranges(
+    def apply_bin_transformations(
         self, bins_transformations: list[BinTransformation]
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         expr = [
