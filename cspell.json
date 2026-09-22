@@ -58,6 +58,7 @@
         "importances",
         "labelsize",
         "lefthook",
+        "lgbm",
         "LGBM",
         "lightgray",
         "linestyle",
