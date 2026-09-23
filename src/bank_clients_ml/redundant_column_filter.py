@@ -239,9 +239,7 @@ class RedundantColumnFilter:
     def print_constant_cols(self) -> None:
         mo.output.append(mo.md("### constant_cols:"))
         mo.output.append(self.constant_cols)
-        mo.output.append(
-            f"train sin columnas con valores únicos: {self.reduced_train.shape}"
-        )
+        mo.output.append(f"train without constant_cols: {self.reduced_train.shape}")
 
     def print_imbalanced_binary_columns(self) -> None:
         mo.output.append(mo.md("### imbalanced_binary_columns:"))
@@ -252,7 +250,7 @@ class RedundantColumnFilter:
         )
         mo.output.append(
             mo.md(
-                f"train sin columnas binarias poco representativas: {self.correlated_train.shape}"
+                f"train without imbalanced_binary_columns: {self.correlated_train.shape}"
             )
         )
 
@@ -333,7 +331,7 @@ class RedundantColumnFilter:
 
     def print_correlations_for_each(self, columns: list[str]) -> None:
         for column in columns:
-            mo.output.append(mo.md(f"###  Columnas correlacionadas con {column}:"))
+            mo.output.append(mo.md(f"###  Columns correlated with {column}:"))
             mo.output.append(self._get_correlations_for(column))
 
     def apply_bin_transformations(

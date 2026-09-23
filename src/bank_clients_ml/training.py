@@ -63,7 +63,7 @@ def _fit_lgbm_random_search(
         "n_estimators": np.arange(6, 50, 1),
         "max_depth": np.arange(
             4, 10, 1
-        ),  # [4, 5, 6, 7, 8, 9] de 4 a (10-1) aumentando de a 1
+        ),  # [4, 5, 6, 7, 8, 9] from 4 to (10-1) increasing by 1
         "num_leaves": np.arange(3, 20, 1),
         "subsample": sp_uniform(loc=0.2, scale=0.8),
         "learning_rate": [0.01, 0.05, 0.1, 0.2],

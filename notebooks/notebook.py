@@ -289,7 +289,7 @@ def _(training_data):
 def _():
     mo.md(r"""
     ### Completando 'Region'
-    Traigo las regiones de  los clientes desde la ventana de predicción y pongo la Region mas común para llenar los nulos restantes
+    Traigo las regiones de los clientes desde la ventana de predicción y pongo la Region mas común para llenar los nulos restantes
     """)
     return
 
@@ -783,7 +783,7 @@ def _(column_filter):
         "Operations_total_mean",
         # "Operations_total_median",
         "CreditCard_Product",
-        # "CreditCard_Active",  # sin modificar
+        # "CreditCard_Active",  # unmodified
         "Quantity_Active_Products_min",
     ]
     final_train, final_test = column_filter.apply_bin_transformations(
