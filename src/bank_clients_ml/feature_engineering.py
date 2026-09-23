@@ -26,7 +26,7 @@ def target_encode_columns(
         df: DataFrame que contiene la columna target y las columnas categóricas a codificar.
         columns: Nombres de las columnas categóricas a codificar.
         settings: Configuración con el nombre de la columna target.
-            Si es None, se obtiene la configuración global.
+            Si no se indica, se obtiene la configuración global.
 
     Returns:
         Nuevo DataFrame con las mismas filas de entrada donde cada columna indicada
@@ -528,7 +528,7 @@ def aggregate_monthly_to_client(
         identity_features: DataFrame con identity features cuyas columnas se excluyen de
             la agregación.
         settings: Configuración con los nombres de identificador y target.
-            Si es None, se obtiene la configuración global.
+            Si no se indica, se obtiene la configuración global.
 
     Returns:
         Nuevo DataFrame agregado a nivel de cliente con una fila por identificador y
@@ -655,7 +655,7 @@ def standardize(
         df: DataFrame a estandarizar.
         ddof: Grados de libertad para el cálculo del desvío estándar.
         settings: Configuración con los nombres de identificador y target a excluir.
-            Si es None, se obtiene la configuración global.
+            Si no se indica, se obtiene la configuración global.
 
     Returns:
         Nuevo DataFrame con las variables numéricas estandarizadas.

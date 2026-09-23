@@ -197,7 +197,7 @@ def group_columns_by_source(
     Args:
         df: DataFrame de entrada cuyas columnas se desean agrupar.
         settings: Configuración con los nombres del identificador y del
-            target. Si es None, se obtiene la configuración global.
+            target. Si no se indica, se obtiene la configuración global.
 
     Returns:
         Agrupamiento por fuente, donde cada grupo se asocia con sus columnas

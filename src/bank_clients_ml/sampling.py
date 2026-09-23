@@ -70,7 +70,7 @@ def stratified_train_test_split(
         df: Dataframe a dividir.
         test_ratio: Fracción de cada clase destinada al conjunto de prueba.
         settings: Configuración con el nombre de la columna target y la
-            semilla aleatoria. Si es None, se obtiene la configuración global.
+            semilla aleatoria. Si no se indica, se obtiene la configuración global.
 
     Returns:
         Tupla con el DataFrame de entrenamiento seguido del DataFrame de
@@ -119,7 +119,7 @@ def oversample_with_unique_ids(
             extremos.
         settings: Configuración con los nombres de las columnas de
             identificador y target, y la semilla aleatoria.
-            Si es None, se obtiene la configuración global.
+            Si no se indica, se obtiene la configuración global.
 
     Returns:
         DataFrame balanceado según la proporción solicitada, con
