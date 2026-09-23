@@ -1,3 +1,20 @@
+"""Feature Engineering para el modelo de "bank_clients_ml".
+
+Reúne funciones basadas en Polars para codificar variables categóricas por target,
+generar variables transformadas, generar agregaciones para la historia mensual a nivel de cliente,
+crear transformadas adicionales y estandarizar variables numéricas.
+
+Provee las funciones `target_encode_columns`, `with_transformations`, `aggregate_monthly_to_client`,
+`with_extra_transformations` y `standardize`, además de funciones auxiliares internas
+para porcentajes y normalización min-max.
+
+Ejemplo típico de uso:
+
+    from bank_clients_ml.feature_engineering import with_transformations
+
+    data_with_transformations = with_transformations(monthly_data)
+"""
+
 import polars as pl
 
 from bank_clients_ml.config import Settings, get_settings
@@ -6,15 +23,25 @@ from bank_clients_ml.config import Settings, get_settings
 def target_encode_columns(
     df: pl.DataFrame, columns: list[str], settings: Settings | None = None
 ) -> pl.DataFrame:
-    """Calcula porcentajes respecto al target por columna categórica usando Polars.
+    """Reemplaza columnas categóricas por su porcentaje respecto al target.
+
+    Calcula, para cada categoría de cada columna indicada, la proporción de
+    registros con target igual a 1.0 sobre el total de registros con target 0.0 o 1.0,
+    la multiplica por 100 y sustituye la categoría por dicho valor redondeado a tres decimales.
 
     Args:
-        df: DataFrame de Polars de entrada.
-        columns: Columnas categóricas para agrupar.
-        target: Nombre de la columna objetivo (por defecto settings.col_target).
+        df: DataFrame que contiene la columna target y las columnas categóricas a codificar.
+        columns: Nombres de las columnas categóricas a codificar.
+        settings: Configuración con el nombre de la columna target.
+            Si es None, se obtiene la configuración global.
 
     Returns:
-        DataFrame con cada columna categórica y su porcentaje de target.
+        Nuevo DataFrame con las mismas filas de entrada donde cada columna indicada
+            contiene el porcentaje de target.
+
+    Raises:
+        ZeroDivisionError: Si alguna categoría no tiene registros con target 0.0 o 1.0
+            y el denominador del calculo resulta cero.
     """
     if settings is None:
         settings = get_settings()
@@ -43,13 +70,18 @@ def target_encode_columns(
 def _safe_denominator(
     denominator: str | pl.Expr, search: int = 0, replace_with: int = 1
 ) -> pl.Expr:
-    """
-    Reemplaza valores inseguros para división.
+    """Reemplaza un denominador para evitar división por cero.
+
+    Reemplaza el valor buscado por un valor alternativo en la expresión del denominador
+    para evitar divisiones por cero en cálculos posteriores.
 
     Args:
-        denominator: Expresión o nombre de columna del denominador.
-        search: Valor a buscar para reemplazar (por defecto 0).
-        replace_with: Valor de reemplazo seguro (por defecto 1).
+        denominator: Nombre de columna o expresión de Polars que actúa como denominador.
+        search: Valor a buscar y reemplazar en el denominador.
+        replace_with: Valor de reemplazo.
+
+    Returns:
+        Nueva Expresión de Polars con el denominador modificado.
     """
     expr_denominator = (
         pl.col(denominator) if isinstance(denominator, str) else denominator
@@ -60,28 +92,33 @@ def _safe_denominator(
 def _compute_percentage(
     numerator: str | pl.Expr, denominator: str | pl.Expr
 ) -> pl.Expr:
-    """Calcula el porcentaje entre dos columnas asegurando división segura.
+    """Calcula un porcentaje a partir de numerador y denominador.
+
+    Divide la expresión del numerador por el denominador (evitando división por cero)
+    y multiplica el resultado por 100.0.
 
     Args:
-        numerator: Numerador.
-        denominator: Denominador.
+        numerator: Nombre de columna o expresión de Polars que actúa como numerador.
+        denominator: Nombre de columna o expresión de Polars que actúa como denominador.
 
     Returns:
-        Expresión de Polars con el porcentaje calculado.
+        Nueva Expresión de Polars con el porcentaje calculado.
     """
     numerator_expr = pl.col(numerator) if isinstance(numerator, str) else numerator
     return numerator_expr / _safe_denominator(denominator) * 100.0
 
 
 def _min_max_normalize(column: str) -> pl.Expr:
-    """Devuelve una expresión de Polars que normaliza una columna al rango [0, 1]
-    usando normalización min-max.
+    """Normaliza una columna con min-max.
+
+    Resta el mínimo de la columna y divide por el rango entre el máximo y el mínimo
+    (evitando división por cero).
 
     Args:
-        column: Columna a normalizar.
+        column: Nombre de la columna a normalizar.
 
     Returns:
-        Expresión de Polars normalizada.
+        Nueva Expresión de Polars con los valores normalizados.
     """
     column_expr = pl.col(column)
     min = column_expr.min()
@@ -91,20 +128,31 @@ def _min_max_normalize(column: str) -> pl.Expr:
 
 
 def _min_max_normalize_weighted(column: str, weight: str) -> pl.Expr:
-    """Normaliza una columna usando min-max y la multiplica por un peso dado.
+    """Pondera una normalización min-max por una columna de peso.
+
+    Normaliza la columna indicada y multiplica el resultado por los valores de la columna de peso.
 
     Args:
-        column: Columna a normalizar.
-        weight: Columna de ponderación.
+        column: Nombre de la columna a normalizar.
+        weight: Nombre de la columna que pondera el valor normalizado.
 
     Returns:
-        Expresión de Polars ponderada.
+        Nueva Expresión de Polars con el valor normalizado y ponderado.
     """
     return _min_max_normalize(column) * pl.col(weight)
 
 
 def with_transformations(df: pl.DataFrame) -> pl.DataFrame:
+    """Genera variables transformadas mensuales.
 
+    Todas las divisiones utilizan denominadores protegidos contra ceros.
+
+    Args:
+        df: DataFrame mensual con columnas base
+
+    Returns:
+        Nuevo DataFrame con las columnas originales más las variables transformadas mensuales.
+    """
     result = df.with_columns(
         [
             # OPERATION
@@ -470,13 +518,28 @@ def aggregate_monthly_to_client(
     identity_features: pl.DataFrame,
     settings: Settings | None = None,
 ) -> pl.DataFrame:
-    """
-    Antes de la agregación se ordenan los registros de cada cliente por mes para que
-    luego funcionen "first" y "last" correctamente
+    """Genera agregaciones para la historia mensual a una fila por cliente.
 
-    diff_rel (Diferencia relativa): (último / primero)
+    Ordena por identificador y mes, agrupa por cliente y calcula estadísticas
+    para cada variable. Protege las divisiones contra ceros.
 
-    pct_var (Variación porcentual): 1 - diferencia relativa
+    Las estadísticas incluyen mínimo, máximo, media, mediana, suma, conteo de no ceros,
+    varianza, desvío estándar, cantidad de valores únicos (valores únicos redondeados para montos),
+    diferencia entre valor máximo y valor mínimo, diferencia entre último y primer mes,
+    diferencia relativa (último / primero) y variación porcentual (1 - diferencia relativa).
+
+    Args:
+        saving_account_cols: Nombres de las columnas monetarias de caja de ahorro.
+        credit_card_cols: Nombres de las columnas monetarias de tarjeta de crédito.
+        training_data: DataFrame ya transformado con la historia por cliente y mes.
+        identity_features: DataFrame con identity features cuyas columnas se excluyen de
+            la agregación.
+        settings: Configuración con los nombres de identificador y target.
+            Si es None, se obtiene la configuración global.
+
+    Returns:
+        Nuevo DataFrame agregado a nivel de cliente con una fila por identificador y columnas
+            con sufijos de estadísticas.
     """
     if settings is None:
         settings = get_settings()
@@ -536,6 +599,16 @@ def aggregate_monthly_to_client(
 
 
 def with_extra_transformations(df: pl.DataFrame) -> pl.DataFrame:
+    """Crea transformaciones adicionales.
+
+    Combina variables agregadas a nivel de cliente.
+
+    Args:
+        df: Tabla analítica a nivel de cliente con variables agregadas.
+
+    Returns:
+        Nuevo DataFrame con las columnas originales más las transformaciones adicionales.
+    """
     result = df.with_columns(
         (
             _min_max_normalize("SavingAccount_Days_with_use_count_nonzero")
@@ -580,6 +653,20 @@ def with_extra_transformations(df: pl.DataFrame) -> pl.DataFrame:
 def standardize(
     df: pl.DataFrame, ddof: int = 0, settings: Settings | None = None
 ) -> pl.DataFrame:
+    """Estandariza las variables numéricas.
+
+    Resta la media y divide por el desvío estándar para todas las columnas, excepto las
+    de identificador y target, que se conservan sin modificar.
+
+    Args:
+        df: DataFrame a estandarizar.
+        ddof: Grados de libertad para el cálculo del desvío estándar.
+        settings: Configuración con los nombres de identificador y target a excluir.
+            Si es None, se obtiene la configuración global.
+
+    Returns:
+        Nuevo DataFrame con las variables numéricas estandarizadas.
+    """
     if settings is None:
         settings = get_settings()
 
