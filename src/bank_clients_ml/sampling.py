@@ -1,3 +1,13 @@
+"""Ventanas temporales y muestreo para el modelo de "bank_clients_ml".
+
+Centraliza las funciones de muestreo del proyecto basadas en Polars
+
+Funciones exportadas:
+    get_date_windows: Divide en ventanas de entrenamiento y predicción.
+    stratified_train_test_split: Divide en entrenamiento y prueba de forma estratificada.
+    oversample_with_unique_ids: Realiza oversampling con identificadores únicos.
+"""
+
 from datetime import date
 
 import polars as pl
@@ -8,12 +18,22 @@ from bank_clients_ml.config import Settings, get_settings
 def get_date_windows(
     df: pl.DataFrame, date_column: str, prediction_window_size: int
 ) -> tuple[list[date], list[date]]:
-    """el parámetro prediction_window_size se usa para determinar que "offset_by(...)" usar.
-        si prediction_window_size es 2, se usa offset_by("-1mo") para el prediction_months,
-        si prediction_window_size es 3, se usa offset_by("-2mo") para el prediction_months, y asi.
+    """Divide en ventanas de entrenamiento y predicción.
 
-        la separación entre la ventana de predicción y entrenamiento (Lead Windows
-    ) es siempre de 1 mes
+    Toma el mes mínimo y el mes máximo de la columna de fechas y reserva los
+    últimos `prediction_window_size` meses como ventana de predicción. La
+    ventana de entrenamiento abarca desde el primer mes hasta dos meses antes
+    del inicio de la predicción, de modo que siempre queda un mes intermedio de
+    separación (Lead Window) que evita la fuga de información entre ambas ventanas.
+
+    Args:
+        df: DataFrame con todos los meses.
+        date_column: Nombre de la columna con las fechas mensuales.
+        prediction_window_size: Cantidad de meses reservados para predicción.
+
+    Returns:
+        Tupla con la lista de meses de entrenamiento seguida de la lista de
+        meses de predicción, ambas en orden cronológico ascendente.
     """
     pred_offset = f"-{prediction_window_size - 1}mo"
     train_offset = f"-{prediction_window_size + 1}mo"
@@ -41,18 +61,20 @@ def stratified_train_test_split(
     test_ratio: float = 0.3,
     settings: Settings | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Genera particiones de entrenamiento y test estratificadas
-    (manteniendo la proporción de buenos y malos en ambos sets de train y test) usando Polars.
+    """Divide un DataFrame en entrenamiento y prueba de forma estratificada.
 
-    Parámetros:
-    -----------
-    df : DataFrame de Polars con los datos.
-    target : Nombre de la columna objetivo.
-    test_size : Proporción del conjunto de test.
+    Mezcla las filas con la semilla configurada.
+    Se conserva la proporción original del target en ambos conjuntos.
 
-    Retorna:
-    --------
-        Tupla con los DataFrames de entrenamiento y test.
+    Args:
+        df: Dataframe a dividir.
+        test_ratio: Fracción de cada clase destinada al conjunto de prueba.
+        settings: Configuración con el nombre de la columna target y la
+            semilla aleatoria. Si es None, se obtiene la configuración global.
+
+    Returns:
+        Tupla con el DataFrame de entrenamiento seguido del DataFrame de
+        prueba.
     """
     if settings is None:
         settings = get_settings()
@@ -77,12 +99,36 @@ def oversample_with_unique_ids(
     target_proportion: float = 0.5,
     settings: Settings | None = None,
 ) -> pl.DataFrame:
-    """Asigna IDs únicos a las filas nuevas generadas por el oversampling
+    """Realiza oversampling con identificadores únicos.
+
+    Mantiene intacta la clase mayoritaria (target igual a 0) y muestrea con
+    reemplazo la clase minoritaria (target igual a 1) hasta alcanzar la
+    proporción deseada. A las filas duplicadas se les asignan identificadores
+    nuevos y consecutivos a partir del máximo existente, y el resultado final
+    se mezcla para evitar bloques ordenados por clase.
 
     No deberías usar esta función si usas LightGBM + RandomizedSearchCV + StratifiedKFold.
     En ese caso deberías usar algo como imbalanced-learn para hacer oversampling
     solo sobre los datos de entrenamiento de cada fold de StratifiedKFold,
-    dejando intactos los datos de validación de cada fold"""
+    dejando intactos los datos de validación de cada fold.
+
+    Args:
+        train: Conjunto de entrenamiento con el target binario.
+        target_proportion: Proporción de target de la clase minoritaria en el
+            resultado, expresada como un valor entre 0 y 1 sin incluir los
+            extremos.
+        settings: Configuración con los nombres de las columnas de
+            identificador y target, y la semilla aleatoria.
+            Si es None, se obtiene la configuración global.
+
+    Returns:
+        DataFrame balanceado según la proporción solicitada, con
+        identificadores únicos y filas mezcladas.
+
+    Raises:
+        ValueError: Si la proporción de target no está en el intervalo abierto
+            entre 0 y 1.
+    """
     if not (0 < target_proportion < 1):
         raise ValueError(
             f"Invalid target_proportion {target_proportion}: must satisfy 0 < target_proportion < 1"
