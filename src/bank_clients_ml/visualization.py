@@ -1,3 +1,19 @@
+"""Generación y guardado de gráficos para análisis y evaluación del modelo.
+
+Este módulo centraliza las visualizaciones utilizadas en el notebook.
+Todas las figuras se guardan como archivos SVG optimizados con SVGO a través de Bun.
+
+Funciones exportadas:
+    plot_top_features: Genera un gráfico con las variables más importantes.
+    plot_bivariate_charts: Genera gráficos bivariados para un conjunto de variables.
+    plot_evaluation_metrics: Genera una curva ROC con métricas de evaluación.
+    plot_deciles: Genera un gráfico con tablas de deciles de entrenamiento y prueba.
+
+Constantes exportadas:
+    PROJECT_DIR: Directorio base del proyecto.
+    IMAGES_DIR: Directorio base donde se guardan las imágenes.
+"""
+
 import io
 import subprocess
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -24,16 +40,22 @@ def _save_fig_as_svg(
     images_dir: Path,
     images_sub_dir: str = "",
 ) -> None:
-    """Guarda una figura de Matplotlib como archivo SVG.
+    """Guarda una figura de Matplotlib como archivo SVG optimizado con SVGO.
 
-    Parámetros:
-    -----------
-    fig : Figure
-        Instancia de la figura de Matplotlib.
-    plot_name : str
-        Nombre del archivo sin extensión.
-    images_sub_dir : str
-        Sub carpeta dentro del directorio images_dir.
+    Canaliza el contenido SVG a través de SVGO mediante Bun para optimizarlo
+    antes de escribirlo en disco. Crea la carpeta de destino si no existe.
+
+    El resultado se exporta a {images_dir}/{images_sub_dir}/{plot_name}.svg
+
+    Args:
+        fig: Figura de Matplotlib a guardar. Queda cerrada tras la operación.
+        plot_name: Nombre base del archivo, sin extensión.
+        images_dir: Directorio base donde se guardan las imágenes.
+        images_sub_dir: Subdirectorio opcional dentro del directorio base.
+
+    Raises:
+        RuntimeError: Si el ejecutable de Bun no se encuentra en el PATH y no
+            es posible optimizar el SVG con SVGO.
     """
     output_folder = images_dir / images_sub_dir
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -74,14 +96,24 @@ def plot_top_features(
     images_dir: Path = IMAGES_DIR,
     settings: Settings | None = None,
 ) -> None:
-    """Graficar el ranking de las top_n features más importantes y lo guarda en SVG.
+    """Genera un gráfico de barras horizontales con las variables más importantes.
 
-    Toma las top_n features con mayor importancia, arma un gráfico de barras
-    horizontal y lo exporta a {images_dir}/plot_top_features/{plot_name}.svg.
+    Selecciona las primeras filas del DataFrame de importancias, ya ordenado de
+    forma descendente, y representa cada variable como una barra horizontal. El
+    título incluye el nombre del gráfico y el valor de ROC AUC. Los tamaños de
+    fuente y de figura se ajustan según la cantidad de variables a mostrar.
 
-    Parámetros:
-    variables_to_plot (pl.DataFrame): variables con sus importancias. ya viene ordenado
-    plot_name (str): Nombre del archivo SVG de salida (sin extensión).
+    El resultado se exporta a {images_dir}/plot_top_features/{plot_name}.svg
+
+    Args:
+        variables_to_plot: DataFrame con las variables y sus importancias,
+            ordenado de mayor a menor importancia.
+        plot_name: Nombre base del archivo SVG a generar, sin extensión.
+        roc_auc: Métrica ROC AUC a mostrar en el título del gráfico.
+        top_n: Cantidad máxima de variables a incluir en el gráfico.
+        images_dir: Directorio base donde se guarda la imagen.
+        settings: Configuración con los nombres de columnas de variable e importancia.
+            Si no se indica, se obtiene la configuración global.
     """
     if settings is None:
         settings = get_settings()
@@ -127,18 +159,24 @@ def _plot_single_bivariate_chart(
     analysis_name: str,
     settings: Settings | None = None,
 ) -> None:
-    """Función auxiliar (worker) que corre en un proceso independiente.
+    """Genera el gráfico bivariado individual para una variable.
 
-    Genera una figura con la tabla resumen y el gráfico bivariado de la variable.
+    Construye una figura con dos secciones: una tabla de análisis en la parte
+    superior, y en la parte inferior un gráfico bivariado de barras con la cantidad de
+    clientes por bin junto con una línea del porcentaje de la variable
+    target en un eje secundario.
 
-    Arma una sola figura de Matplotlib con dos subplots: arriba queda la tabla
-    de métricas por bin y abajo quedan las barras de clientes con la curva de
-    % target en verde.
+    El resultado se exporta a {images_dir}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
 
-    Parámetros:
-    table: Tabla de datos de los clientes con target y variable_to_plot.
-    variable_to_plot: Nombre de la variable a analizar. Valores idénticos siempre van al mismo bin.
-    target: Nombre de la columna objetivo.
+    Args:
+        table: Tabla de análisis bivariado con las columnas de intervalo,
+            conteo de clientes y porcentaje de la variable target.
+        variable_to_plot: Nombre de la variable analizada. Se usa como título
+            y como nombre del archivo generado.
+        images_dir: Directorio base donde se guarda la imagen.
+        analysis_name: Nombre del análisis. Define el subdirectorio de salida.
+        settings: Configuración con el nombre de la columna target. Si no se
+            indica, se obtiene la configuración global.
     """
     if settings is None:
         settings = get_settings()
@@ -181,18 +219,25 @@ def plot_bivariate_charts(
     max_workers: int | None = None,
     settings: Settings | None = None,
 ) -> None:
-    """Graficar las variables y guarda cada figura como SVG.
+    """Genera gráficos bivariados para un conjunto de variables.
 
-    Por cada columna del DataFrame arma el análisis
-    bivariado con _plot_single_bivariate_chart
-    y lo exporta a {images_dir}/{analysis_name}/{variable_to_plot}.svg.
+    Recorre el diccionario de tablas de análisis y genera un gráfico por variable.
+    Utiliza ejecución secuencial cuando se solicita un solo worker o cuando
+    hay pocas tablas, y ejecución en paralelo con procesos separados en caso
+    contrario para acelerar la generación de una gran cantidad de gráficos.
 
-    Parámetros:
-    tables: todas las tablas de cada columna a graficar
-    analysis_name: Nombre de la carpeta de salida dentro de {images_dir}/.
-    max_workers: maxima cantidad de CPUs a usar.
-    por defecto con None se usan todos los núcleos disponibles.
-    si len(tables) < 20 automáticamente se usa 1 sola CPU.
+    Las imágenes se exportan a {images_dir}/bivariate_analysis/{analysis_name}/
+
+    Args:
+        tables: Diccionario que asocia cada nombre de variable con su tabla de
+            análisis bivariado.
+        analysis_name: Nombre del análisis. Define el subdirectorio de salida.
+        images_dir: Directorio base donde se guardan las imágenes.
+        max_workers: Cantidad máxima de procesos en paralelo. Si no se indica,
+            se usan todos los núcleos disponibles. si len(tables) < 20 se usa
+            1 solo proceso. El valor 1 fuerza la ejecución secuencial.
+        settings: Configuración con el nombre de la columna target. Si no se
+            indica, se obtiene la configuración global.
     """
     if settings is None:
         settings = get_settings()
@@ -232,13 +277,21 @@ def plot_evaluation_metrics(
     plot_name: str,
     images_dir: Path = IMAGES_DIR,
 ) -> None:
-    """Dibuja la curva ROC y la guarda como SVG.
+    """Genera una curva ROC con las métricas resumidas de evaluación.
 
-    Arma el gráfico de la curva ROC con las
-    anotaciones y lo exporta a {images_dir}/plot_evaluation_metrics/{plot_name}.svg.
+    Dibuja la tasa de verdaderos positivos frente a la tasa de falsos positivos,
+    junto con la línea de referencia diagonal de un clasificador aleatorio.
+    Incluye una anotación con los valores de accuracy y ROC AUC.
 
-    Parámetros:
-    plot_name: Nombre del archivo SVG de salida (sin extensión).
+    El resultado se exporta a {images_dir}/plot_evaluation_metrics/{plot_name}.svg
+
+    Args:
+        roc_auc: Métrica ROC AUC del modelo evaluado.
+        accuracy: Exactitud del modelo evaluado.
+        fpr: Tasas de falsos positivos de la curva ROC.
+        tpr: Tasas de verdaderos positivos de la curva ROC.
+        plot_name: Nombre base del archivo SVG a generar, sin extensión.
+        images_dir: Directorio base donde se guarda la imagen.
     """
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.plot(fpr, tpr)
@@ -263,6 +316,18 @@ def plot_evaluation_metrics(
 
 
 def _plot_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
+    """Genera una tabla de deciles con formato en un eje de Matplotlib.
+
+    Convierte los valores numéricos a texto con dos decimales y representa el
+    DataFrame como una tabla de Matplotlib. Aplica un encabezado con fondo azul
+    oscuro y texto blanco en negrita, alterna el color de fondo de las filas y
+    asigna el título indicado al eje.
+
+    Args:
+        ax: Eje de Matplotlib donde se dibuja la tabla.
+        deciles: Tabla de deciles con las métricas por decil.
+        title: Título a mostrar sobre la tabla.
+    """
     ax.axis("tight")
     ax.axis("off")
 
@@ -306,9 +371,22 @@ def plot_deciles(
     title_test_deciles: str = "Test Deciles",
     images_dir: Path = IMAGES_DIR,
 ) -> None:
-    """
-    Recibe dos DataFrames de Polars y genera un svg con ambas
-    tablas organizadas verticalmente.
+    """Genera un gráfico con tablas de deciles de entrenamiento y prueba.
+
+    Crea dos tablas formateadas apiladas verticalmente, una para el conjunto de
+    entrenamiento y otra para el conjunto de prueba, y guarda el resultado como
+    un único archivo SVG optimizado.
+
+    El resultado se exporta a {images_dir}/plot_evaluation_metrics/{plot_name}.svg
+
+    Args:
+        train_deciles: Tabla de deciles calculada sobre el conjunto de
+            entrenamiento.
+        test_deciles: Tabla de deciles calculada sobre el conjunto de prueba.
+        plot_name: Nombre base del archivo SVG a generar, sin extensión.
+        title_train_deciles: Título de la tabla de entrenamiento.
+        title_test_deciles: Título de la tabla de prueba.
+        images_dir: Directorio base donde se guarda la imagen.
     """
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8), dpi=300)
 
