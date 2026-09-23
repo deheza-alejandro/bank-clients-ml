@@ -1,18 +1,11 @@
-"""Feature Engineering para el modelo de "bank_clients_ml".
+"""Feature Engineering con Polars para el modelo de "bank_clients_ml".
 
-Reúne funciones basadas en Polars para codificar variables categóricas por target,
-generar variables transformadas, generar agregaciones para la historia mensual a nivel de cliente,
-crear transformadas adicionales y estandarizar variables numéricas.
-
-Provee las funciones `target_encode_columns`, `with_transformations`, `aggregate_monthly_to_client`,
-`with_extra_transformations` y `standardize`, además de funciones auxiliares internas
-para porcentajes y normalización min-max.
-
-Ejemplo típico de uso:
-
-    from bank_clients_ml.feature_engineering import with_transformations
-
-    data_with_transformations = with_transformations(monthly_data)
+Funciones exportadas:
+    target_encode_columns: Reemplaza columnas categóricas por su porcentaje respecto al target.
+    with_transformations: Genera variables transformadas mensuales.
+    aggregate_monthly_to_client: Genera agregaciones a una fila por cliente.
+    with_extra_transformations: Crea transformaciones adicionales.
+    standardize: Estandariza las variables numéricas.
 """
 
 import polars as pl
@@ -37,7 +30,7 @@ def target_encode_columns(
 
     Returns:
         Nuevo DataFrame con las mismas filas de entrada donde cada columna indicada
-            contiene el porcentaje de target.
+        contiene el porcentaje de target.
 
     Raises:
         ZeroDivisionError: Si alguna categoría no tiene registros con target 0.0 o 1.0
@@ -538,8 +531,8 @@ def aggregate_monthly_to_client(
             Si es None, se obtiene la configuración global.
 
     Returns:
-        Nuevo DataFrame agregado a nivel de cliente con una fila por identificador y columnas
-            con sufijos de estadísticas.
+        Nuevo DataFrame agregado a nivel de cliente con una fila por identificador y
+        columnas con sufijos de estadísticas.
     """
     if settings is None:
         settings = get_settings()

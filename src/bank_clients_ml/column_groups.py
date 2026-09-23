@@ -12,13 +12,6 @@ Funciones exportadas:
 Constantes exportadas:
     CREDIT_CARD_EXCLUDED: Columnas asociadas a la tarjeta de crédito excluidas del grupo monetario.
     GROUP_WEIGHTS: Ponderación aplicada a cada grupo en la selección.
-
-Ejemplo típico de uso:
-
-    from bank_clients_ml.column_groups import group_columns_by_source
-
-    columns_groups = group_columns_by_source(df, settings)
-    operation_cols, weight = columns_groups["operations"]
 """
 
 from typing import Final
