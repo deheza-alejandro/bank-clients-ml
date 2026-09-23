@@ -115,19 +115,13 @@ def _validate_groups(columns: list[str], groups: dict[str, list[str]]) -> None:
         total_columns = len(columns)
         total_grouped = sum(map(len, groups.values()))
         if missing:
-            msg.append(
-                f"Columnas faltantes en los grupos (len = {len(missing)}): {missing} \n"
-            )
+            msg.append(f"Missing ({len(missing)}): {sorted(missing)} \n")
         if extra:
-            msg.append(
-                f"Columnas extra/duplicadas en los grupos (len = {len(extra)}): {extra} \n"
-            )
+            msg.append(f"Extra ({len(extra)}): {sorted(extra)} \n")
 
         raise ValueError(
-            f"La lista original (len = {total_columns}) "
-            f"no coincide con los grupos generados (len = {total_grouped}).\n"
-            f"Es probable que no estés teniendo en cuenta alguna columna "
-            f"y tengas que revisar esta función \n" + " | ".join(msg)
+            f"Column grouping mismatch: expected {total_columns} columns, "
+            f"got {total_grouped} grouped. \n" + " | ".join(msg)
         )
 
 

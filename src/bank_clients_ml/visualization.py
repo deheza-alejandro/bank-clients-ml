@@ -57,7 +57,8 @@ def _save_fig_as_svg(
             )
     except FileNotFoundError as err:
         raise RuntimeError(
-            "Bun no se encuentra en el PATH del sistema. Asegúrate de tener Bun instalado."
+            f"Bun executable not found in PATH. "
+            f"Ensure Bun is installed and available in PATH to optimize SVG with SVGO: \n{svg_path}"
         ) from err
 
 

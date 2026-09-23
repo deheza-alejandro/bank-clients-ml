@@ -80,7 +80,9 @@ OPERATORS = {
 
 def _get_operator(condition: ConditionSymbol):
     if condition not in OPERATORS:
-        raise ValueError(f"Condición no válida. Usa una de: {list(OPERATORS.keys())}")
+        raise ValueError(
+            f"Invalid condition {condition!r}. Must be one of {list(OPERATORS.keys())}"
+        )
 
     return OPERATORS[condition]
 

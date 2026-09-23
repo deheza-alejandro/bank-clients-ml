@@ -307,17 +307,20 @@ class LGBMTrainer:
             .to_list()
         )
 
-    def plot_evaluation_metrics(self, plot_name: str) -> None:
+    def _ensure_testable(self) -> None:
         if not self.is_testable:
-            raise RuntimeError("Esta instancia no fue inicializada con un set de test")
+            raise RuntimeError(
+                "Cannot plot: LGBMTrainer was initialized without a test set"
+            )
 
+    def plot_evaluation_metrics(self, plot_name: str) -> None:
+        self._ensure_testable()
         plot_evaluation_metrics(
             self.roc_auc, self.accuracy, self.fpr, self.tpr, plot_name
         )
 
     def plot_deciles(self, plot_name: str) -> None:
-        if not self.is_testable:
-            raise RuntimeError("Esta instancia no fue inicializada con un set de test")
+        self._ensure_testable()
         plot_deciles(
             self.train_deciles.drop("min_prob", "max_prob"),
             self.test_deciles.drop("min_prob", "max_prob"),

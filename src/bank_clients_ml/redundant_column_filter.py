@@ -109,7 +109,11 @@ def _merge_without_duplicates(
 ) -> dict[str, pl.DataFrame]:
     common_keys = dict_1.keys() & dict_2.keys()
     if common_keys:
-        raise KeyError(f"Claves duplicadas detectadas: {list(common_keys)}")
+        raise KeyError(
+            f"Cannot merge tables to save analysis before plot: "
+            f"Duplicate {len(common_keys)} keys on merge:"
+            f"\n{sorted(common_keys)}"
+        )
 
     return dict_1 | dict_2
 
@@ -286,9 +290,15 @@ class RedundantColumnFilter:
         analysis_name: str,
         max_bins_quantity: int = 20,
     ) -> None:
-        if any(col in self.uncorrelated_train.columns for col in correlated_columns):
+        overlapping = [
+            col for col in correlated_columns if col in self.uncorrelated_train.columns
+        ]
+
+        if overlapping:
             raise ValueError(
-                "correlated_columns contiene columnas dentro de uncorrelated_train"
+                f"Correlated_columns must not overlap uncorrelated_train columns. "
+                f"Expected only removed columns, got overlap:"
+                f"\n{overlapping}"
             )
 
         self._build_tables_and_plot(

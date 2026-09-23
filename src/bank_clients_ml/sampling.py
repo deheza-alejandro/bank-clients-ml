@@ -85,7 +85,7 @@ def oversample_with_unique_ids(
     dejando intactos los datos de validación de cada fold"""
     if not (0 < target_proportion < 1):
         raise ValueError(
-            "El parámetro 'target_proportion' debe estar entre 0 y 1 (excluyentes)."
+            f"Invalid target_proportion {target_proportion}: must satisfy 0 < target_proportion < 1"
         )
 
     if settings is None:
