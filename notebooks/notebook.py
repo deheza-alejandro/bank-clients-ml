@@ -594,7 +594,7 @@ def _(test, train):
     )
     column_filter.print_constant_cols()
     column_filter.print_imbalanced_binary_columns()
-    uncorrelated_train, _ = column_filter.get_uncorrelated()
+    uncorrelated_train = column_filter.uncorrelated_train
     mo.output.append(
         mo.md(f".\n\n uncorrelated_train.shape: {uncorrelated_train.shape}")
     )

@@ -216,25 +216,42 @@ class RedundantColumnFilter:
         correlation_threshold: float = 0.80,
         settings: Settings | None = None,
     ) -> None:
-        self.settings = settings or get_settings()
+        """Ejecuta las etapas de reducción.
+
+        Detecta columnas constantes, columnas binarias desbalanceadas y columnas
+        correlacionadas, y genera las versiones reducidas de los conjuntos de
+        entrenamiento y prueba.
+
+        Args:
+            train: Conjunto de entrenamiento sobre el que se detectan las columnas
+                a eliminar.
+            test: Conjunto de prueba al que se aplican las mismas eliminaciones.
+            imbalanced_binary_threshold: Proporción mínima aceptada para la clase
+                minoritaria en columnas binarias.
+            correlation_threshold: Umbral de correlación para considerar
+                redundante una columna numérica.
+            settings: Configuración con los nombres de las columnas identificadora
+                y target. Si no se indica, se obtiene la configuración global.
+        """
+        self._settings = settings or get_settings()
 
         self.constant_cols = _get_constant_columns(train)
         self.reduced_train = train.drop(self.constant_cols)
         reduced_test = test.drop(self.constant_cols)
         self.imbalanced_binary_columns = _get_imbalanced_binary_columns(
-            self.reduced_train, imbalanced_binary_threshold, self.settings
+            self.reduced_train, imbalanced_binary_threshold, self._settings
         )
         self.correlated_train = self.reduced_train.drop(self.imbalanced_binary_columns)
         self.correlated_test = reduced_test.drop(self.imbalanced_binary_columns)
-        self.corr_df = self.correlated_train.drop(
-            self.settings.col_id, self.settings.col_target
+        self._corr_df = self.correlated_train.drop(
+            self._settings.col_id, self._settings.col_target
         ).corr()
         to_delete = _get_redundant_correlated_columns(
-            self.corr_df, correlation_threshold
+            self._corr_df, correlation_threshold
         )
         self.uncorrelated_train = self.correlated_train.drop(to_delete)
         self.uncorrelated_test = self.correlated_test.drop(to_delete)
-        self.train_analysis: dict[str, pl.DataFrame] = {}
+        self._train_analysis: dict[str, pl.DataFrame] = {}
 
     def print_constant_cols(self) -> None:
         mo.output.append(mo.md("### constant_cols:"))
@@ -254,9 +271,6 @@ class RedundantColumnFilter:
             )
         )
 
-    def get_uncorrelated(self) -> tuple[pl.DataFrame, pl.DataFrame]:
-        return (self.uncorrelated_train, self.uncorrelated_test)
-
     def _build_tables_and_plot(
         self,
         df: pl.DataFrame,
@@ -267,13 +281,13 @@ class RedundantColumnFilter:
     ) -> None:
         """Helper privado para evitar duplicar código de generación de gráficos."""
         temp_tables = _get_bivariate_tables(
-            df, columns, max_bins_quantity, settings=self.settings
+            df, columns, max_bins_quantity, settings=self._settings
         )
         if save_analysis:
-            self.train_analysis = _merge_without_duplicates(
-                self.train_analysis, temp_tables
+            self._train_analysis = _merge_without_duplicates(
+                self._train_analysis, temp_tables
             )
-        plot_bivariate_charts(temp_tables, analysis_name, settings=self.settings)
+        plot_bivariate_charts(temp_tables, analysis_name, settings=self._settings)
 
     def plot_uncorrelated(
         self, columns: list[str], analysis_name: str, max_bins_quantity: int = 20
@@ -318,8 +332,8 @@ class RedundantColumnFilter:
         self, column: str, threshold: float = 0.80
     ) -> pl.DataFrame:
         return (
-            self.corr_df.select(
-                pl.Series("feature_name", self.corr_df.columns),
+            self._corr_df.select(
+                pl.Series("feature_name", self._corr_df.columns),
                 pl.col(column).alias("correlation"),
             )
             .filter(
@@ -341,8 +355,8 @@ class RedundantColumnFilter:
             _group_bins_by_ranges(
                 column,
                 bin_ranges=bin_ranges,
-                table=self.train_analysis[column],
-                settings=self.settings,
+                table=self._train_analysis[column],
+                settings=self._settings,
             ).alias(column)
             for column, bin_ranges in bins_transformations
         ]
