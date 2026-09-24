@@ -28,7 +28,7 @@ commit-msg:
   commands:
     01-format-commit-body:
       priority: 1
-      run: uv run .lefthook/commit-msg/format-commit-body.py {1}
+      run: uv run .lefthook/commit-msg/format_commit_body.py {1}
     02-commitizen-check:
       priority: 2
       run: uv run cz check --allow-abort --commit-msg-file {1} --message-length-limit 50
