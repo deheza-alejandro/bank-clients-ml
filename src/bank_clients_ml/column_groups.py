@@ -14,6 +14,7 @@ Constantes exportadas:
     GROUP_WEIGHTS: Ponderación aplicada a cada grupo en la selección.
 """
 
+from collections.abc import Mapping
 from typing import Final
 
 import polars as pl
@@ -96,7 +97,7 @@ CREDIT_CARD_EXCLUDED: Final[frozenset[str]] = frozenset(
     }
 )
 
-GROUP_WEIGHTS: Final[dict[str, int]] = {
+GROUP_WEIGHTS: Final[Mapping[str, int]] = {
     "saving_account_days_transactions": 1,
     "saving_account_monetary": 1,
     "operations": 1,
@@ -145,7 +146,7 @@ def _classify_column(col: str) -> str:
     return group
 
 
-def _validate_groups(columns: list[str], groups: dict[str, list[str]]) -> None:
+def _validate_groups(columns: list[str], groups: Mapping[str, list[str]]) -> None:
     """Valida que el agrupamiento cubra exactamente las columnas esperadas.
 
     Compara el conjunto de columnas agrupadas con el conjunto de columnas

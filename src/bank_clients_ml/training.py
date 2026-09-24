@@ -110,14 +110,14 @@ def _fit_lgbm_random_search(
 
 def _with_rename_columns(
     importances: pl.DataFrame,
-    renames_dict: dict[str, str],
+    renames: Mapping[str, str],
     settings: Settings | None = None,
 ) -> pl.DataFrame:
     settings = settings or get_settings()
 
     return importances.with_columns(
         pl.col(settings.col_feature)
-        .replace_strict(renames_dict, default=pl.col(settings.col_feature))
+        .replace_strict(renames, default=pl.col(settings.col_feature))
         .alias(settings.col_feature)
     )
 
@@ -250,7 +250,7 @@ class LGBMTrainer:
         n_iter: int = 2,
         splits_cross_validation: int = 3,
         test: pl.DataFrame | None = None,
-        renames_dict: dict[str, str] | None = None,
+        renames: Mapping[str, str] | None = None,
         settings: Settings | None = None,
     ) -> None:
         self.settings = settings or get_settings()
@@ -266,9 +266,9 @@ class LGBMTrainer:
             settings=self.settings,
         )
 
-        if renames_dict is not None:
+        if renames is not None:
             self.importances = _with_rename_columns(
-                self.importances, renames_dict, self.settings
+                self.importances, renames, self.settings
             )
 
         self.is_testable = False

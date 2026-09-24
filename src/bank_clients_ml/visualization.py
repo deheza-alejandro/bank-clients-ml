@@ -16,6 +16,7 @@ Constantes exportadas:
 
 import io
 import subprocess
+from collections.abc import Mapping
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -213,7 +214,7 @@ def _plot_single_bivariate_chart(
 
 
 def plot_bivariate_charts(
-    tables: dict[str, pl.DataFrame],
+    tables: Mapping[str, pl.DataFrame],
     analysis_name: str,
     images_dir: Path = IMAGES_DIR,
     max_workers: int | None = None,

@@ -839,7 +839,7 @@ def _(best_features, final_test, final_train):
         best_features,
         n_iter=20,
         test=final_test,
-        renames_dict=renames_dict,
+        renames=renames_dict,
     )
     final_trainer.print_search_logs()
     final_trainer.print_searcher()
