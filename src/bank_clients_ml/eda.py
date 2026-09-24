@@ -14,12 +14,12 @@ Funciones exportadas:
     filter_nonzero: Filtra las filas donde todas las columnas indicadas son distintas de cero.
 
 Constantes exportadas:
-    OPERATORS: diccionario con símbolos asociados a funciones de comparación del módulo `operator`.
+    OPERATORS: funciones del módulo `operator` asociadas a símbolos de comparación.
 """
 
 import operator
-from collections.abc import Sequence
-from typing import Literal
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Final, Literal
 
 import marimo as mo
 import polars as pl
@@ -102,7 +102,9 @@ def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
 
 type ConditionSymbol = Literal["<", ">", "<=", ">=", "==", "!="]
 
-OPERATORS = {
+type ComparisonFunction = Callable[[Any, Any], Any]
+
+OPERATORS: Final[Mapping[ConditionSymbol, ComparisonFunction]] = {
     "<": operator.lt,
     ">": operator.gt,
     "<=": operator.le,
@@ -112,7 +114,7 @@ OPERATORS = {
 }
 
 
-def _get_operator(condition: ConditionSymbol):
+def _get_operator(condition: ConditionSymbol) -> ComparisonFunction:
     """Obtiene la función de comparación asociada a un símbolo condicional.
 
     Args:
@@ -159,9 +161,9 @@ def count_row_matches(
     if isinstance(columns, str):
         columns = [columns]
 
-    op_func = _get_operator(condition)
+    comparison_function = _get_operator(condition)
 
-    return df.select(op_func(pl.col(columns), threshold).sum()).unpivot(
+    return df.select(comparison_function(pl.col(columns), threshold).sum()).unpivot(
         variable_name="Column name",
         value_name=f"Number of rows {condition} {threshold}",
     )
@@ -181,12 +183,12 @@ def filter_columns_by_cardinality(
         Nuevo DataFrame con las columnas que cumplen la condición y su cantidad de
         valores únicos.
     """
-    op_func = _get_operator(condition)
+    comparison_function = _get_operator(condition)
 
     return (
         df.select(pl.all().n_unique())
         .unpivot(variable_name="column", value_name="unique_values")
-        .filter(op_func(pl.col("unique_values"), threshold))
+        .filter(comparison_function(pl.col("unique_values"), threshold))
     )
 
 
