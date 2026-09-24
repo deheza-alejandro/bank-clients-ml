@@ -1,3 +1,13 @@
+"""Entrenamiento y evaluación de modelos LightGBM para "bank_clients_ml".
+
+Centraliza el ajuste de hiperparámetros con RandomizedSearchCV y StratifiedKFold,
+el cálculo de deciles de probabilidad y la evaluación sobre el conjunto de prueba.
+
+Clases exportadas:
+    LGBMTrainer: Entrenador de un modelo LightGBM, expone métricas y gráficos.
+    GroupsLGBMTrainer: Entrenador de modelos LightGBM por grupos de variables (usa LGBMTrainer).
+"""
+
 import io
 from collections.abc import Mapping
 from contextlib import redirect_stderr, redirect_stdout
@@ -30,23 +40,25 @@ def _fit_lgbm_random_search(
     splits_cross_validation: int,
     settings: Settings | None = None,
 ) -> tuple[RandomizedSearchCV, pl.DataFrame, str]:
-    """Entrena un modelo LightGBM usando RandomizedSearchCV y devuelve las
-    importancias de features en un DataFrame de Polars.
+    """Entrena un modelo clasificador LightGBM con RandomizedSearchCV y StratifiedKFold.
+
+    Configura el modelo clasificador con StratifiedKFold, ejecuta la
+    búsqueda capturando los registros de salida y construye la tabla de
+    importancias ordenada de mayor a menor.
 
     Args:
-        train : Datos de entrenamiento; debe contener
-            ``columns`` y la columna target.
-        columns : Columnas de features usadas para entrenar el modelo.
-        No debe tener la columna target.
-        n_iter : Cantidad de combinaciones de hiperparámetros a probar al azar con
-            ``RandomizedSearchCV``.
-        target : Nombre de la columna target.
-        splits_cross_validation : Cantidad de k-fold cross-validation para usar con
-        ``RandomizedSearchCV``. por defecto es 3
+        train: Datos de entrenamiento que incluyen la variable target.
+        columns: Columnas utilizadas para el entrenamiento. No debe tener la columna target.
+        n_iter: Cantidad de combinaciones de hiperparámetros a evaluar al azar
+            con `RandomizedSearchCV`.
+        splits_cross_validation: Cantidad de splits de la validación cruzada
+            para usar con ``RandomizedSearchCV``.
+        settings: Configuración con semilla, nivel de detalle y nombres de
+            columnas. Si no se indica, se obtiene la configuración global.
 
     Returns:
-        ``(searcher, importances)`` El objeto searcher entrenado
-        y el DataFrame con las importancias ordenadas de forma descendente.
+        Tupla con el buscador entrenado, la tabla de importancias ordenada de
+            forma descendente y los registros capturados durante el entrenamiento.
     """
     if settings is None:
         settings = get_settings()
@@ -114,6 +126,21 @@ def _with_rename_columns(
     renames: Mapping[str, str],
     settings: Settings | None = None,
 ) -> pl.DataFrame:
+    """Aplica nombres distintos a la tabla de importancias de variables.
+
+    Reemplaza los valores de la columna feature según el diccionario de
+    renombres y conserva el valor original cuando no existe correspondencia.
+
+    Args:
+        importances: Tabla de importancias ordenada de mayor a menor.
+        renames: Nombre nuevo asociado al nombre original de una feature.
+        settings: Configuración con el nombre de la columna feature. Si no
+            se indica, se obtiene la configuración global.
+
+    Returns:
+        Nueva tabla de importancias con los valores de la columna feature
+        renombrada.
+    """
     settings = settings or get_settings()
 
     return importances.with_columns(
@@ -129,21 +156,24 @@ def _compute_prediction_deciles(
     bins: list[float] | None = None,
     settings: Settings | None = None,
 ) -> pl.DataFrame:
-    """Combina los datos del cliente con sus probabilidades de predicción,
-    calcula los deciles y calcula métricas por decil utilizando Polars.
+    """Calcula métricas de desempeño por decil de probabilidad predicha.
 
-    Parámetros:
-    -----------
-    df :
-        DataFrame original que contiene las columnas 'Target' y 'client_id'.
-    probabilities :
-        Array unidimensional con las probabilidades predichas por el modelo.
-    bins : opcional
-        Si no es nulo, usa los bins (por defecto es nulo).
+    Segmenta las probabilidades en diez grupos y calcula por cada decil el
+    conteo de clientes, la tasa de la clase positiva, la ganancia acumulada,
+    el lift y la estadística KS.
 
-    Retorna:
-    --------
-        DataFrame con métricas de los deciles
+    Args:
+        df: Datos que incluyen la variable target.
+        probabilities: Probabilidades predichas por el modelo para la clase positiva.
+        bins: bins para segmentar las probabilidades (util para test).
+            Si no se indica, se calcula en deciles según `probabilities`.
+        settings: Configuración con el nombre de la columna target. Si no se
+            indica, se obtiene la configuración global.
+
+    Returns:
+        Tabla por decil con conteos, probabilidades mínima y máxima, tasa de
+            la clase positiva, ganancia acumulada, lift y KS, ordenada de
+            forma descendente por decil.
     """
     if settings is None:
         settings = get_settings()
@@ -199,10 +229,25 @@ def _evaluate(
     columns: list[str],
     settings: Settings | None = None,
 ) -> tuple[float, float, np.ndarray, np.ndarray, pl.DataFrame, pl.DataFrame]:
-    """y_pred predice si es 0 o 1, si la probabilidad es > 0.5 lo pone como 1
+    """Evalúa el mejor modelo sobre el conjunto de prueba.
 
-    train_based_bins son los 9 puntos de corte (cuantiles 10% a 90%)
-    basados exclusivamente en el set de entrenamiento.
+    Calcula las probabilidades de entrenamiento y prueba, obtiene las
+    métricas ROC AUC y accuracy junto con los puntos de la curva ROC, y
+    construye las tablas de deciles. Los bins de los deciles de prueba se
+    derivan de los bins de las probabilidades de entrenamiento.
+
+    Args:
+        searcher: Buscador entrenado cuyo mejor estimador se desea evaluar.
+        train: Datos de entrenamiento utilizados para definir los bins.
+        test: Datos de prueba sobre los que se calculan las métricas.
+        columns: Columnas utilizadas de `train`.
+        settings: Configuración con el nombre de la columna target. Si no se
+            indica, se obtiene la configuración global.
+
+    Returns:
+        Tupla con ROC AUC, exactitud, tasas de falsos positivos y de
+            verdaderos positivos de la curva ROC, y tablas de deciles de
+            entrenamiento y de prueba.
     """
     settings = settings or get_settings()
 
@@ -240,6 +285,15 @@ def _evaluate(
 
 
 class LGBMTrainer:
+    """Entrenador de un modelo LightGBM, expone métricas y gráficos.
+
+    Attributes:
+        columns: Columnas utilizadas de `train`.
+        searcher: Buscador entrenado con la mejor combinación encontrada.
+        search_logs: Registros capturados durante el entrenamiento.
+        is_testable: Indica si se realizo la instanciación con un conjunto de prueba.
+    """
+
     def __init__(
         self,
         train: pl.DataFrame,
@@ -293,9 +347,11 @@ class LGBMTrainer:
             self.is_testable = True
 
     def print_search_logs(self) -> None:
+        """Muestra los registros de la búsqueda en la salida del notebook."""
         mo.output.append(mo.md(f"```text\n{self.search_logs}\n```"))
 
     def print_searcher(self) -> None:
+        """Muestra el objeto de búsqueda entrenado en la salida del notebook."""
         mo.output.append(self.searcher)
 
     def plot_top_features(
@@ -327,6 +383,7 @@ class LGBMTrainer:
             )
 
     def get_top_ranked_features(self) -> list[str]:
+        """Retorna los nombres de las variables mas relevantes según importancia."""
         return (
             self._importances.head(self._top_n)
             .get_column(self._settings.col_feature)
@@ -334,18 +391,43 @@ class LGBMTrainer:
         )
 
     def _ensure_testable(self) -> None:
+        """Verifica que el entrenador disponga de conjunto de prueba.
+
+        Raises:
+            RuntimeError: Si el entrenador se inicializó sin conjunto de
+                prueba y no es posible evaluar ni graficar métricas.
+        """
         if not self.is_testable:
             raise RuntimeError(
                 "Cannot plot: LGBMTrainer was initialized without a test set"
             )
 
     def plot_evaluation_metrics(self, plot_name: str) -> None:
+        """Genera la curva ROC con las métricas de evaluación sobre el set de prueba.
+
+        Las métricas incluyen: ROC AUC, accuracy, Tasas de falsos positivos,
+        Tasas de verdaderos positivos
+
+        Args:
+            plot_name: Nombre base del archivo SVG a generar, sin extensión.
+
+        Raises:
+            RuntimeError: Si el entrenador se inicializó sin conjunto de prueba.
+        """
         self._ensure_testable()
         plot_evaluation_metrics(
             self._roc_auc, self._accuracy, self._fpr, self._tpr, plot_name
         )
 
     def plot_deciles(self, plot_name: str) -> None:
+        """Genera el gráfico con las tablas de deciles de entrenamiento y prueba.
+
+        Args:
+            plot_name: Nombre base del archivo SVG a generar, sin extensión.
+
+        Raises:
+            RuntimeError: Si el entrenador se inicializó sin conjunto de prueba.
+        """
         self._ensure_testable()
         plot_deciles(
             self._train_deciles.drop("min_prob", "max_prob"),
@@ -355,12 +437,38 @@ class LGBMTrainer:
 
 
 class GroupsLGBMTrainer:
+    """Entrenador de modelos LightGBM por grupos de variables (usa LGBMTrainer).
+
+    Agrupa las columnas por fuente de negocio y entrena un `LGBMTrainer`
+    independiente por cada grupo. Permite comparar la importancia de las
+    variables dentro de cada fuente antes de la selección final.
+
+    Attributes:
+        trainers: Instancias de `LGBMTrainer` indexados por nombre de grupo.
+
+    Example:
+        from bank_clients_ml.training import GroupsLGBMTrainer
+
+        groups_trainer = GroupsLGBMTrainer(uncorrelated_train)
+        selected = groups_trainer.get_top_grouped_features()
+    """
+
     def __init__(
         self,
         uncorrelated_train: pl.DataFrame,
         n_iter: int = 2,
         settings: Settings | None = None,
     ) -> None:
+        """Entrena cada grupo de variables con un LGBMTrainer distinto.
+
+        Args:
+            uncorrelated_train: Datos de entrenamiento sin columnas redundantes,
+                que incluyen la variable target.
+            n_iter: Cantidad de combinaciones de hiperparámetros a evaluar en
+                cada grupo.
+            settings: Configuración global del proyecto. Si no se indica, se
+                obtiene la configuración global.
+        """
         settings = settings or get_settings()
 
         columns_groups = group_columns_by_source(uncorrelated_train, settings)
@@ -373,6 +481,7 @@ class GroupsLGBMTrainer:
         }
 
     def print_groups_lengths(self) -> None:
+        """Muestra la cantidad de columnas de cada grupo en el notebook."""
         for group_name, trainer in self.trainers.items():
             mo.output.append(f"{group_name}: {len(trainer.columns)}")
 
@@ -380,20 +489,31 @@ class GroupsLGBMTrainer:
         mo.output.append(self.trainers["others"].columns)
 
     def print_searchers(self) -> None:
+        """Muestra los buscadores entrenados de cada grupo en el notebook."""
         for group_name, trainer in self.trainers.items():
             mo.output.append(mo.md(f"### {group_name}:"))
             trainer.print_searcher()
 
     def plot_top_features(self) -> None:
+        """Genera el gráfico de variables importantes para cada grupo."""
         for group_name, trainer in self.trainers.items():
             trainer.plot_top_features(group_name)
 
     def print_search_logs(self) -> None:
+        """Muestra los registros de búsqueda de cada grupo en el notebook."""
         for group_name, trainer in self.trainers.items():
             mo.output.append(mo.md(f"### {group_name}:"))
             trainer.print_search_logs()
 
     def get_top_grouped_features(self) -> list[str]:
+        """Retorna las mejores variables de cada grupo, sin el grupo base.
+
+        Combina las variables mejor posicionadas de todos los grupos, con
+        excepción del grupo de referencia que contiene todas las columnas.
+
+        Returns:
+            Nombres de las variables seleccionadas por grupo.
+        """
         return [
             feature
             for group_name, trainer in self.trainers.items()
