@@ -1,4 +1,5 @@
 import io
+from collections.abc import Mapping
 from contextlib import redirect_stderr, redirect_stdout
 from typing import cast
 
@@ -122,10 +123,6 @@ def _with_rename_columns(
     )
 
 
-DECILE_LABELS = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
-DECILE_DTYPE = pl.Enum(DECILE_LABELS)
-
-
 def _compute_prediction_deciles(
     df: pl.DataFrame,
     probabilities: np.ndarray,
@@ -151,11 +148,14 @@ def _compute_prediction_deciles(
     if settings is None:
         settings = get_settings()
 
+    decile_labels = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
+    decile_dtype = pl.Enum(decile_labels)
+
     decile_expr = (
-        pl.col("probabilities").cut(breaks=bins, labels=DECILE_LABELS)
+        pl.col("probabilities").cut(breaks=bins, labels=decile_labels)
         if bins
         else pl.col("probabilities").qcut(
-            10, labels=DECILE_LABELS, allow_duplicates=True
+            10, labels=decile_labels, allow_duplicates=True
         )
     )
 
@@ -164,7 +164,7 @@ def _compute_prediction_deciles(
             settings.col_target,
             probabilities=probabilities,
         )
-        .with_columns(decile=decile_expr.cast(DECILE_DTYPE))
+        .with_columns(decile=decile_expr.cast(decile_dtype))
         .group_by("decile")
         .agg(
             count=pl.len(),
@@ -190,9 +190,6 @@ def _compute_prediction_deciles(
         lift=(target_1_rate / total_target_1_rate).round(2),
         ks=cum_gain - cum_target_0_rate,
     )
-
-
-QUANTILES = np.linspace(0.1, 0.9, 9)
 
 
 def _evaluate(
@@ -222,7 +219,8 @@ def _evaluate(
     accuracy = float(accuracy_score(y_true_arr, y_pred))
     fpr, tpr, _ = roc_curve(y_true_arr, probabilities_test)
 
-    train_based_bins = np.quantile(probabilities_train, QUANTILES).tolist()
+    quantiles = np.linspace(0.1, 0.9, 9)
+    train_based_bins = np.quantile(probabilities_train, quantiles).tolist()
 
     train_deciles = _compute_prediction_deciles(
         train, probabilities_train, settings=settings
@@ -250,41 +248,49 @@ class LGBMTrainer:
         n_iter: int = 2,
         splits_cross_validation: int = 3,
         test: pl.DataFrame | None = None,
-        renames: Mapping[str, str] | None = None,
         settings: Settings | None = None,
     ) -> None:
-        self.settings = settings or get_settings()
+        """Entrena el modelo LightGBM con las columnas indicadas.
+
+        Ejecuta la búsqueda aleatoria de hiperparámetros y, cuando se provee
+        un conjunto de prueba, calcula métricas de evaluación y tablas de
+        deciles sobre el mejor modelo
+
+        Args:
+            train: Datos de entrenamiento que incluyen la variable target.
+            columns: Columnas utilizadas de `train`.
+            top_n: Cantidad de variables consideradas al consultar el ranking.
+            n_iter: Cantidad de combinaciones de hiperparámetros a evaluar.
+            splits_cross_validation: Cantidad de splits de validación cruzada.
+            test: Datos de prueba para evaluar el modelo. Si no se indica, la
+                instancia de LGBMTrainer queda sin métricas de evaluación.
+            settings: Configuración global del proyecto. Si no se indica, se
+                obtiene la configuración global.
+        """
+        self._settings = settings or get_settings()
 
         self.columns = columns
-        self.top_n = top_n
+        self._top_n = top_n
 
-        self.searcher, self.importances, self.search_logs = _fit_lgbm_random_search(
+        self.searcher, self._importances, self.search_logs = _fit_lgbm_random_search(
             train,
             self.columns,
             n_iter,
             splits_cross_validation,
-            settings=self.settings,
+            settings=self._settings,
         )
-
-        if renames is not None:
-            self.importances = _with_rename_columns(
-                self.importances, renames, self.settings
-            )
 
         self.is_testable = False
         if test is not None:
             (
-                self.roc_auc,
-                self.accuracy,
-                self.fpr,
-                self.tpr,
-                self.train_deciles,
-                self.test_deciles,
-            ) = _evaluate(self.searcher, train, test, self.columns, self.settings)
+                self._roc_auc,
+                self._accuracy,
+                self._fpr,
+                self._tpr,
+                self._train_deciles,
+                self._test_deciles,
+            ) = _evaluate(self.searcher, train, test, self.columns, self._settings)
             self.is_testable = True
-
-    def get_columns(self) -> list[str]:
-        return self.columns
 
     def print_search_logs(self) -> None:
         mo.output.append(mo.md(f"```text\n{self.search_logs}\n```"))
@@ -292,18 +298,38 @@ class LGBMTrainer:
     def print_searcher(self) -> None:
         mo.output.append(self.searcher)
 
-    def plot_top_features(self, plot_name: str) -> None:
-        plot_top_features(
-            self.importances,
-            plot_name,
-            self.searcher.best_score_,
-            settings=self.settings,
-        )
+    def plot_top_features(
+        self, plot_name: str, renames: Mapping[str, str] | None = None
+    ) -> None:
+        """Genera el gráfico con las variables más importantes del modelo.
+
+        Args:
+            plot_name: Nombre base del archivo SVG a generar, sin extensión.
+            renames: Nombre nuevo asociado al nombre original de una feature.
+                Si no se indica, se conservan los nombres originales.
+        """
+        if renames is not None:
+            importances_renamed = _with_rename_columns(
+                self._importances, renames, self._settings
+            )
+            plot_top_features(
+                importances_renamed,
+                plot_name,
+                self.searcher.best_score_,
+                settings=self._settings,
+            )
+        else:
+            plot_top_features(
+                self._importances,
+                plot_name,
+                self.searcher.best_score_,
+                settings=self._settings,
+            )
 
     def get_top_ranked_features(self) -> list[str]:
         return (
-            self.importances.head(self.top_n)
-            .get_column(self.settings.col_feature)
+            self._importances.head(self._top_n)
+            .get_column(self._settings.col_feature)
             .to_list()
         )
 
@@ -316,14 +342,14 @@ class LGBMTrainer:
     def plot_evaluation_metrics(self, plot_name: str) -> None:
         self._ensure_testable()
         plot_evaluation_metrics(
-            self.roc_auc, self.accuracy, self.fpr, self.tpr, plot_name
+            self._roc_auc, self._accuracy, self._fpr, self._tpr, plot_name
         )
 
     def plot_deciles(self, plot_name: str) -> None:
         self._ensure_testable()
         plot_deciles(
-            self.train_deciles.drop("min_prob", "max_prob"),
-            self.test_deciles.drop("min_prob", "max_prob"),
+            self._train_deciles.drop("min_prob", "max_prob"),
+            self._test_deciles.drop("min_prob", "max_prob"),
             plot_name,
         )
 
@@ -348,10 +374,10 @@ class GroupsLGBMTrainer:
 
     def print_groups_lengths(self) -> None:
         for group_name, trainer in self.trainers.items():
-            mo.output.append(f"{group_name}: {len(trainer.get_columns())}")
+            mo.output.append(f"{group_name}: {len(trainer.columns)}")
 
         mo.output.append(mo.md("\n\n### others:"))
-        mo.output.append(self.trainers["others"].get_columns())
+        mo.output.append(self.trainers["others"].columns)
 
     def print_searchers(self) -> None:
         for group_name, trainer in self.trainers.items():

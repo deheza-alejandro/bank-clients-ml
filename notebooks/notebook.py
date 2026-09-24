@@ -834,16 +834,10 @@ def _(best_features, final_test, final_train):
         "CreditCard_Product": "Credit Card Type",
         "Quantity_Active_Products_min": "Minimum quantity of active products",
     }
-    final_trainer = LGBMTrainer(
-        final_train,
-        best_features,
-        n_iter=20,
-        test=final_test,
-        renames=renames_dict,
-    )
+    final_trainer = LGBMTrainer(final_train, best_features, n_iter=20, test=final_test)
     final_trainer.print_search_logs()
     final_trainer.print_searcher()
-    final_trainer.plot_top_features(plot_name="best_features")
+    final_trainer.plot_top_features(plot_name="best_features", renames=renames_dict)
     final_trainer.plot_evaluation_metrics(plot_name="lightgbm")
     final_trainer.plot_deciles(plot_name="deciles")
     return
