@@ -1,9 +1,22 @@
+"""Se ejecuta como hook `commit-msg` de Lefthook antes de la validación con Commitizen."""
+
 import sys
 import textwrap
 from pathlib import Path
 
 
 def format_commit_body(file_path: str) -> None:
+    """Formatea el cuerpo del mensaje de commit a 72 caracteres por línea.
+
+    El título se conserva sin cambios y los párrafos del cuerpo se
+    reajustan por separado para mantener las líneas en blanco entre ellos.
+    Las líneas de comentario que comienzan con `#` se descartan al procesar
+    el mensaje. Si el archivo no existe, está vacío o no contiene cuerpo,
+    el archivo se deja sin modificar.
+
+    Args:
+        file_path: Ruta al archivo temporal con el mensaje de commit.
+    """
     commit_file = Path(file_path)
 
     if not commit_file.is_file():
