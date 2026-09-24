@@ -1,3 +1,20 @@
+"""Filtrado de columnas redundantes y transformación por bines con Polars.
+
+Este módulo implementa el proceso de selección de variables utilizado en el notebook
+para reducir la dimensionalidad antes del modelado. Elimina en forma secuencial
+columnas constantes, columnas binarias desbalanceadas y columnas numéricas
+altamente correlacionadas.
+
+El flujo habitual consiste en crear `RedundantColumnFilter` con los conjuntos de
+entrenamiento y prueba, inspeccionar los descartes, graficar el análisis bivariado
+y finalmente aplicar transformaciones de bines con `apply_bin_transformations`.
+
+Clases exportadas:
+    BinRange: Rango inclusivo de bines que se agrupan en un mismo valor.
+    BinTransformation: Asociación entre una columna y sus rangos de bines.
+    RedundantColumnFilter: Filtro secuencial de columnas redundantes con análisis bivariado.
+"""
+
 from typing import NamedTuple
 
 import marimo as mo
@@ -10,11 +27,28 @@ from bank_clients_ml.visualization import plot_bivariate_charts
 
 
 def _get_true_column_names(df: pl.DataFrame) -> list[str]:
-    """Retorna los nombres de las columnas que contienen valores verdaderos"""
+    """Obtiene los nombres de las columnas que contienen valores verdaderos.
+
+    Args:
+        df: DataFrame booleano donde cada celda indica si una columna cumple
+            una condición evaluada previamente.
+
+    Returns:
+        Lista con los nombres de las columnas cuyo valor es verdadero.
+    """
     return df.unpivot().filter(pl.col("value")).get_column("variable").to_list()
 
 
 def _get_constant_columns(df: pl.DataFrame) -> list[str]:
+    """Retorna las columnas con un único valor.
+
+    Args:
+        df: DataFrame sobre el que se evalúa la cardinalidad.
+
+    Returns:
+        Lista con los nombres de las columnas constantes, las cuales no aportan
+        información para el modelado.
+    """
     return _get_true_column_names(df.select(pl.all().n_unique() == 1))
 
 
@@ -23,6 +57,24 @@ def _get_imbalanced_binary_columns(
     threshold: float,
     settings: Settings | None = None,
 ) -> list[str]:
+    """Retorna las columnas binarias desbalanceadas.
+
+    Detecta las columnas con exactamente dos valores únicos. La proporción se
+    calcula contra el primer valor de cada columna y se considera desbalanceada
+    cuando cae fuera del intervalo definido por el `threshold` y su complemento.
+    La columna target se excluye del análisis.
+
+    Args:
+        df: DataFrame sobre el que se buscan columnas binarias desbalanceadas.
+        threshold: Proporción mínima aceptada para la clase minoritaria. Debe
+            encontrarse entre 0 y 0.5.
+        settings: Configuración con el nombre de la columna target. Si no se
+            indica, se obtiene la configuración global.
+
+    Returns:
+        Lista con los nombres de las columnas binarias desbalanceadas,
+        las cuales no aportan información para el modelado.
+    """
     if settings is None:
         settings = get_settings()
 
@@ -39,11 +91,25 @@ def _get_imbalanced_binary_columns(
 def _get_redundant_correlated_columns(
     corr_df: pl.DataFrame, threshold: float
 ) -> list[str]:
-    """Deja siempre la primera columna fuera de la lista.
-    Si N columnas están correlacionadas entre sí, devolverá N-1 en la lista.
+    """Identifica columnas numéricas redundantes por correlación.
 
+    Calcula el valor absoluto de la matriz de correlación y conserva el triángulo
+    superior para evaluar cada columna únicamente contra las columnas previas.
+    Toda columna cuyo máximo de correlación supere el umbral se considera redundante.
+
+    Deja siempre la primer columna fuera de la lista.
+    Si N columnas están correlacionadas entre sí, devolverá N-1 en la lista.
     El triángulo inferior y la diagonal quedan en 0.0,
-    lo que no afecta al max() ya que |r| >= 0"""
+    lo que no afecta al max() ya que |r| >= 0
+
+    Args:
+        corr_df: Matriz de correlación cuadrada entre variables numéricas.
+        threshold: Umbral de correlación absoluta a partir del cual una columna
+            se considera redundante.
+
+    Returns:
+        Lista con los nombres de las columnas redundantes a eliminar.
+    """
     abs_corr_np = np.abs(corr_df.to_numpy())
     upper_triangle = np.triu(abs_corr_np, k=1)
 
@@ -62,10 +128,22 @@ def _get_bivariate_tables(
     max_bins_quantity: int,
     settings: Settings | None = None,
 ) -> dict[str, pl.DataFrame]:
-    """
-    Parámetros:
-    df: cada fila representa a un cliente,
-    max_bins_quantity: Cantidad maxima de bins en los que se puede dividir cada variable.
+    """Construye tablas de análisis bivariado por variable.
+
+    Args:
+        df: DataFrame con la variable target y las columnas a analizar.
+        Cada fila representa a un cliente
+        columns: Columnas para las cuales se generan las tablas de análisis bivariado.
+        max_bins_quantity: Cantidad máxima de bines por variable. Para cada
+            columna, se generan bines cuando su cardinalidad supera este máximo
+            permitido, o se utilizan los valores originales en caso contrario.
+        settings: Configuración con el nombre de la columna target. Si no se
+            indica, se obtiene la configuración global.
+
+    Returns:
+        Diccionario que asocia cada nombre de columna con su tabla de análisis
+        bivariado, con las columnas de bin, mínimo, máximo, clientes, target
+        y porcentaje de target, numerando los bines en forma secuencial.
     """
     if settings is None:
         settings = get_settings()
@@ -107,6 +185,22 @@ def _get_bivariate_tables(
 def _merge_without_duplicates(
     dict_1: dict[str, pl.DataFrame], dict_2: dict[str, pl.DataFrame]
 ) -> dict[str, pl.DataFrame]:
+    """Combina diccionarios sin claves repetidas.
+
+    Verifica que no existan nombres de claves comunes antes de combinar los
+    diccionarios, para preservar el análisis ya almacenado y evitar
+    sobrescrituras accidentales.
+
+    Args:
+        dict_1: Diccionario base con las tablas ya acumuladas.
+        dict_2: Diccionario con las nuevas tablas a incorporar.
+
+    Returns:
+        Nuevo diccionario con la unión de ambos contenidos.
+
+    Raises:
+        KeyError: Si ambos diccionarios comparten una o más claves.
+    """
     common_keys = dict_1.keys() & dict_2.keys()
     if common_keys:
         raise KeyError(
@@ -119,7 +213,21 @@ def _merge_without_duplicates(
 
 
 def _get_range_data(i: int, stats) -> tuple[float, float, float]:
-    """Función auxiliar para extraer bounds y valor por índice"""
+    """Calcula los límites y el valor de reemplazo de un rango de bines.
+
+    Expande levemente los valores mínimo y máximo observados para garantizar
+    la inclusión de los bordes, y calcula el porcentaje de target del rango
+    como la proporción entre la suma del target y la cantidad de clientes.
+
+    Args:
+        i: Índice del rango dentro de las agregaciones calculadas.
+        stats: Fila de agregaciones con los valores mínimos, máximos, conteos
+            de clientes y sumas del target por rango.
+
+    Returns:
+        Tupla con el límite inferior, el límite superior y el porcentaje de
+        target correspondiente al rango indicado.
+    """
     min_val = stats[f"min_{i}"]
     max_val = stats[f"max_{i}"]
     cli_sum = stats[f"cli_{i}"] or 0
@@ -132,6 +240,17 @@ def _get_range_data(i: int, stats) -> tuple[float, float, float]:
 
 
 class BinRange(NamedTuple):
+    """Rango inclusivo de bines que se agrupan en un mismo valor.
+
+    Representa un intervalo cerrado sobre la numeración de bines generada por
+    el análisis bivariado. Los bines comprendidos entre ambos extremos reciben
+    el mismo porcentaje de target durante la transformación.
+
+    Attributes:
+        start: Número de bin inicial del intervalo.
+        end: Número de bin final del intervalo.
+    """
+
     start: float
     end: float
 
@@ -142,18 +261,23 @@ def _group_bins_by_ranges(
     table: pl.DataFrame,
     settings: Settings | None = None,
 ) -> pl.Expr:
-    """Construye una cadena de expresiones de Polars para agrupar
-    valores en bins definidos por rangos de Bins (bin_min, bin_max),
-    calculando dinámicamente los valores por rango y el valor por defecto desde la tabla resumen.
+    """Construye una expresión de transformación por rangos de bines.
+
+    Agrupa las estadísticas de la tabla de análisis bivariado según los rangos
+    indicados y calcula el porcentaje de target de cada grupo. Los valores
+    fuera de todos los rangos reciben el porcentaje del grupo residual.
 
     Args:
-        column: Nombre de la columna a agrupar.
-        ranges: Lista de tuplas con los límites de los rangos (bin_min, bin_max).
-        table: DataFrame de Polars con las columnas 'Bin', 'Min', 'Max', 'Clients'
-        y 'settings.col_target'.
+        column: Columna a transformar.
+        bin_ranges: Rangos de bines que definen cada grupo de agregación.
+        table: Tabla de análisis bivariado de la columna, con las columnas de
+            bin, mínimo, máximo, clientes y target.
+        settings: Configuración con el nombre de la columna target. Si no se
+            indica, se obtiene la configuración global.
 
     Returns:
-        pl.Expr: Expresión de Polars con el agrupamiento aplicado.
+        Expresión de Polars que asigna a cada fila el porcentaje de target
+        del rango al que pertenece.
     """
     if settings is None:
         settings = get_settings()
@@ -203,11 +327,39 @@ def _group_bins_by_ranges(
 
 
 class BinTransformation(NamedTuple):
+    """Asociación entre una columna y sus rangos de bines.
+
+    Define cómo deben combinarse los bines de una variable analizada para
+    reemplazar sus valores originales por el porcentaje de target de cada grupo.
+
+    Attributes:
+        column: Nombre de la columna a transformar.
+        bin_ranges: Rangos de bines que conforman cada grupo.
+    """
+
     column: str
     bin_ranges: list[BinRange]
 
 
 class RedundantColumnFilter:
+    """Filtro secuencial de columnas redundantes con análisis bivariado.
+
+    Aplica tres etapas de reducción sobre los conjuntos de entrenamiento y prueba:
+    eliminación de columnas constantes, eliminación de columnas binarias
+    desbalanceadas y eliminación de columnas numéricas altamente correlacionadas.
+    Conserva los resultados intermedios para su inspección y acumula las tablas
+    de análisis bivariado para usarlas posteriormente en la transformación por bines.
+
+    Attributes:
+        constant_cols: Nombres de las columnas constantes detectadas.
+        reduced_train: Conjunto de entrenamiento sin columnas constantes.
+        imbalanced_binary_columns: Nombres de las columnas binarias desbalanceadas.
+        correlated_train: Conjunto de entrenamiento sin columnas desbalanceadas.
+        correlated_test: Conjunto de prueba sin columnas desbalanceadas.
+        uncorrelated_train: Conjunto de entrenamiento sin columnas correlacionadas.
+        uncorrelated_test: Conjunto de prueba sin columnas correlacionadas.
+    """
+
     def __init__(
         self,
         train: pl.DataFrame,
@@ -254,11 +406,13 @@ class RedundantColumnFilter:
         self._train_analysis: dict[str, pl.DataFrame] = {}
 
     def print_constant_cols(self) -> None:
+        """Muestra las columnas constantes y la forma del conjunto reducido."""
         mo.output.append(mo.md("### constant_cols:"))
         mo.output.append(self.constant_cols)
         mo.output.append(f"train without constant_cols: {self.reduced_train.shape}")
 
     def print_imbalanced_binary_columns(self) -> None:
+        """Muestra el conteo de las columnas binarias desbalanceadas."""
         mo.output.append(mo.md("### imbalanced_binary_columns:"))
         mo.output.append(
             low_cardinality_value_counts(
@@ -279,7 +433,17 @@ class RedundantColumnFilter:
         max_bins_quantity: int,
         save_analysis: bool = True,
     ) -> None:
-        """Helper privado para evitar duplicar código de generación de gráficos."""
+        """Construye tablas de análisis bivariado y genera los gráficos.
+
+        Args:
+            df: DataFrame base para el análisis bivariado.
+            columns: Columnas a analizar y graficar.
+            analysis_name: Nombre del análisis. Define el subdirectorio de salida
+                de las imágenes.
+            max_bins_quantity: Cantidad máxima de bines por variable.
+            save_analysis: Indica si las tablas generadas se guardan para su
+                uso posterior en transformaciones.
+        """
         temp_tables = _get_bivariate_tables(
             df, columns, max_bins_quantity, settings=self._settings
         )
@@ -292,6 +456,17 @@ class RedundantColumnFilter:
     def plot_uncorrelated(
         self, columns: list[str], analysis_name: str, max_bins_quantity: int = 20
     ) -> None:
+        """Genera gráficos de análisis bivariado de variables no correlacionadas.
+
+        Utiliza el conjunto de entrenamiento sin columnas redundantes y guarda
+        las tablas generadas para su reutilización en transformaciones por bines.
+
+        Args:
+            columns: Columnas del conjunto sin correlación a analizar.
+            analysis_name: Nombre del análisis. Define el subdirectorio de salida
+                de las imágenes.
+            max_bins_quantity: Cantidad máxima de bines por variable.
+        """
         self._build_tables_and_plot(
             self.uncorrelated_train, columns, analysis_name, max_bins_quantity
         )
@@ -302,6 +477,23 @@ class RedundantColumnFilter:
         analysis_name: str,
         max_bins_quantity: int = 20,
     ) -> None:
+        """Genera gráficos de análisis bivariado de variables correlacionadas eliminadas.
+
+        Utiliza el conjunto previo a la eliminación por correlación, lo que permite
+        comparar variables descartadas con sus equivalentes conservadas y evaluar
+        posibles reemplazos más interpretables.
+
+        Args:
+            correlated_columns: Columnas eliminadas por correlación a analizar.
+                No deben pertenecer al conjunto sin correlación.
+            analysis_name: Nombre del análisis. Define el subdirectorio de salida
+                de las imágenes.
+            max_bins_quantity: Cantidad máxima de bines por variable.
+
+        Raises:
+            ValueError: Si alguna columna indicada aún existe en el conjunto sin
+                correlación.
+        """
         overlapping = [
             col for col in correlated_columns if col in self.uncorrelated_train.columns
         ]
@@ -324,6 +516,19 @@ class RedundantColumnFilter:
         analysis_name: str,
         max_bins_quantity: int = 20,
     ) -> None:
+        """Genera gráficos de análisis bivariado de forma puntual sin guardarlo.
+
+        Permite visualizar variables de un DataFrame arbitrario, como el conjunto
+        final transformado, sin modificar las tablas acumuladas para
+        transformaciones posteriores.
+
+        Args:
+            df: DataFrame arbitrario a analizar.
+            columns: Columnas a analizar y graficar.
+            analysis_name: Nombre del análisis. Define el subdirectorio de salida
+                de las imágenes.
+            max_bins_quantity: Cantidad máxima de bines por variable.
+        """
         self._build_tables_and_plot(
             df, columns, analysis_name, max_bins_quantity, save_analysis=False
         )
@@ -331,6 +536,17 @@ class RedundantColumnFilter:
     def _get_correlations_for(
         self, column: str, threshold: float = 0.80
     ) -> pl.DataFrame:
+        """Obtiene las variables correlacionadas con una columna dada.
+
+        Args:
+            column: Nombre de la columna de referencia presente en la matriz
+                de correlación.
+            threshold: Umbral mínimo de correlación para incluir una variable
+                en el resultado.
+
+        Returns:
+            Nuevo DataFrame con las columnas de nombre de variable y correlación.
+        """
         return (
             self._corr_df.select(
                 pl.Series("feature_name", self._corr_df.columns),
@@ -344,6 +560,11 @@ class RedundantColumnFilter:
         )
 
     def print_correlations_for_each(self, columns: list[str]) -> None:
+        """Muestra las variables correlacionadas de cada columna indicada.
+
+        Args:
+            columns: Columnas de referencia para buscar correlaciones altas.
+        """
         for column in columns:
             mo.output.append(mo.md(f"###  Columns correlated with {column}:"))
             mo.output.append(self._get_correlations_for(column))
@@ -351,6 +572,20 @@ class RedundantColumnFilter:
     def apply_bin_transformations(
         self, bins_transformations: list[BinTransformation]
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        """Aplica transformaciones por bines a los conjuntos de entrenamiento y prueba.
+
+        Reemplaza los valores originales de cada columna indicada por el porcentaje
+        de target del grupo de bines al que pertenecen, según el análisis bivariado
+        previamente acumulado. La misma lógica se aplica en forma consistente a
+        ambos conjuntos de entrenamiento y prueba.
+
+        Args:
+            bins_transformations: Lista con las columnas con los rangos de bines que
+                definen cada transformación.
+
+        Returns:
+            Tupla con los conjuntos de entrenamiento y prueba transformados.
+        """
         expr = [
             _group_bins_by_ranges(
                 column,
