@@ -11,7 +11,7 @@ Funciones exportadas:
 
 Constantes exportadas:
     PROJECT_DIR: Directorio base del proyecto.
-    IMAGES_DIR: Directorio base donde se guardan las imágenes.
+    IMAGES_DIR: Directorio base donde se guardan las imágenes por defecto.
 """
 
 import io
