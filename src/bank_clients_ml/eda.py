@@ -3,7 +3,7 @@
 Las funciones están pensadas para uso interactivo en cuadernos Marimo,
 donde algunos resultados se anexan directamente a la salida visible.
 
-Funciones exportadas:
+## Funciones exportadas:
     print_describe: Muestra el resumen estadístico del DataFrame en la salida de Marimo.
     inspect_dataframe: Inspecciona la estructura y la calidad general del DataFrame.
     count_row_matches: Cuenta, por columna, las filas que cumplen una condición.
@@ -13,7 +13,7 @@ Funciones exportadas:
     columns_with_zeros: Identifica columnas numéricas que contienen valores iguales a cero.
     filter_nonzero: Filtra las filas donde todas las columnas indicadas son distintas de cero.
 
-Constantes exportadas:
+## Constantes exportadas:
     OPERATORS: funciones del módulo `operator` asociadas a símbolos de comparación.
 """
 
@@ -34,7 +34,7 @@ def print_describe(df: pl.DataFrame) -> None:
     Transpone el resultado de `df.describe()` para facilitar la lectura de las
     estadísticas por columna y las anexa a la salida actual del cuaderno.
 
-    Args:
+    ## Args:
         df: DataFrame a analizar.
     """
     return mo.output.append(
@@ -48,10 +48,10 @@ def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
     Revisa `df.shape`, columnas con valores nulos, NaN, infinitos, columnas
     no numéricas y posibles restos de joins con sufijos `_x`, `_y` o `_right`.
 
-    Args:
+    ## Args:
         df: DataFrame a inspeccionar.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame con las columnas `metric`, `total` y `values`, donde cada fila
         describe una métrica encontrada y las columnas involucradas.
     """
@@ -117,13 +117,13 @@ OPERATORS: Final[Mapping[ConditionSymbol, ComparisonFunction]] = {
 def _get_operator(condition: ConditionSymbol) -> ComparisonFunction:
     """Obtiene la función de comparación asociada a un símbolo condicional.
 
-    Args:
+    ## Args:
         condition: Símbolo de comparación a resolver.
 
-    Returns:
+    ## Returns:
         Función de comparación correspondiente del módulo `operator`.
 
-    Raises:
+    ## Raises:
         ValueError: Si el símbolo no es uno de los valores permitidos.
     """
     if condition not in OPERATORS:
@@ -142,7 +142,7 @@ def count_row_matches(
 ) -> pl.DataFrame:
     """Cuenta, por columna, las filas que cumplen una condición respecto a un umbral.
 
-    Args:
+    ## Args:
         df: DataFrame sobre el que se realiza el conteo.
         columns: Columna o secuencia de columnas a evaluar.
         threshold: Valor umbral contra el que se compara cada celda.
@@ -154,7 +154,7 @@ def count_row_matches(
             "==" para igual que,
             "!=" para distinto que.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame con el nombre de cada columna y la cantidad de filas que
         cumplen la condición indicada.
     """
@@ -174,12 +174,12 @@ def filter_columns_by_cardinality(
 ) -> pl.DataFrame:
     """Filtra columnas según su cantidad de valores únicos.
 
-    Args:
+    ## Args:
         df: DataFrame con las columnas sobre las que se calcula la cardinalidad.
         condition: Símbolo de comparación aplicado sobre el conteo de valores únicos.
         threshold: Umbral de valores únicos para filtrar las columnas.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame con las columnas que cumplen la condición y su cantidad de
         valores únicos.
     """
@@ -200,11 +200,11 @@ def low_cardinality_value_counts(
     Filtra las columnas cuya cantidad de valores únicos cumple el límite
     indicado y cuenta las ocurrencias de cada valor.
 
-    Args:
+    ## Args:
         df: DataFrame con las columnas a analizar.
         max_unique_values: Cantidad máxima de valores únicos que debe tener una columna.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame con las columnas `column`, `value` y `count`, ordenado por
         columna y frecuencia descendente. Si ninguna columna cumple el criterio,
         retorna un DataFrame vacío con dicho esquema.
@@ -234,12 +234,12 @@ def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.Data
     resulta útil para detectar valores cercanos a cero o posibles residuos de
     normalizaciones.
 
-    Args:
+    ## Args:
         df: DataFrame a analizar.
         low: Límite inferior exclusivo del rango.
         high: Límite superior exclusivo del rango.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame con las columnas que cumplen el criterio y su valor mínimo.
     """
     return (
@@ -255,10 +255,10 @@ def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.Data
 def columns_with_zeros(df: pl.DataFrame) -> pl.DataFrame:
     """Identifica columnas numéricas que contienen valores iguales a cero.
 
-    Args:
+    ## Args:
         df: DataFrame a analizar.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame con las columnas que contienen al menos un cero y la cantidad
         de ceros encontrados en cada una.
     """
@@ -277,13 +277,13 @@ def filter_nonzero(
     Conserva la columna identificadora configurada, cuando existe en el
     DataFrame, junto con las columnas evaluadas.
 
-    Args:
+    ## Args:
         df: DataFrame a filtrar.
         columns: Columnas de `df` a analizar.
         settings: Configuración con el nombre de la columna identificadora.
             Si no se indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame filtrado con la columna identificadora y las columnas que cumplen la
         condición evaluada.
     """

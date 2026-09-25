@@ -14,7 +14,7 @@ def format_commit_body(file_path: str) -> None:
     el mensaje. Si el archivo no existe, está vacío o no contiene cuerpo,
     el archivo se deja sin modificar.
 
-    Args:
+    ## Args:
         file_path: Ruta al archivo temporal con el mensaje de commit.
     """
     commit_file = Path(file_path)

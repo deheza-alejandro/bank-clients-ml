@@ -1,6 +1,6 @@
 """Feature Engineering con Polars para el modelo de "bank_clients_ml".
 
-Funciones exportadas:
+## Funciones exportadas:
     target_encode_columns: Reemplaza columnas categóricas por su porcentaje respecto al target.
     with_transformations: Genera variables transformadas mensuales.
     aggregate_monthly_to_client: Genera agregaciones a una fila por cliente.
@@ -22,17 +22,17 @@ def target_encode_columns(
     registros con target igual a 1.0 sobre el total de registros con target 0.0 o 1.0,
     la multiplica por 100 y sustituye la categoría por dicho valor redondeado a tres decimales.
 
-    Args:
+    ## Args:
         df: DataFrame que contiene la columna target y las columnas categóricas a codificar.
         columns: Nombres de las columnas categóricas a codificar.
         settings: Configuración con el nombre de la columna target.
             Si no se indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame con las mismas filas de entrada donde cada columna indicada
         contiene el porcentaje de target.
 
-    Raises:
+    ## Raises:
         ZeroDivisionError: Si alguna categoría no tiene registros con target 0.0 o 1.0
             y el denominador del calculo resulta cero.
     """
@@ -68,12 +68,12 @@ def _safe_denominator(
     Reemplaza el valor buscado por un valor alternativo en la expresión del denominador
     para evitar divisiones por cero en cálculos posteriores.
 
-    Args:
+    ## Args:
         denominator: Nombre de columna o expresión de Polars que actúa como denominador.
         search: Valor a buscar y reemplazar en el denominador.
         replace_with: Valor de reemplazo.
 
-    Returns:
+    ## Returns:
         Nueva Expresión de Polars con el denominador modificado.
     """
     expr_denominator = (
@@ -90,11 +90,11 @@ def _compute_percentage(
     Divide la expresión del numerador por el denominador (evitando división por cero)
     y multiplica el resultado por 100.0.
 
-    Args:
+    ## Args:
         numerator: Nombre de columna o expresión de Polars que actúa como numerador.
         denominator: Nombre de columna o expresión de Polars que actúa como denominador.
 
-    Returns:
+    ## Returns:
         Nueva Expresión de Polars con el porcentaje calculado.
     """
     numerator_expr = pl.col(numerator) if isinstance(numerator, str) else numerator
@@ -107,10 +107,10 @@ def _min_max_normalize(column: str) -> pl.Expr:
     Resta el mínimo de la columna y divide por el rango entre el máximo y el mínimo
     (evitando división por cero).
 
-    Args:
+    ## Args:
         column: Nombre de la columna a normalizar.
 
-    Returns:
+    ## Returns:
         Nueva Expresión de Polars con los valores normalizados.
     """
     column_expr = pl.col(column)
@@ -125,11 +125,11 @@ def _min_max_normalize_weighted(column: str, weight: str) -> pl.Expr:
 
     Normaliza la columna indicada y multiplica el resultado por los valores de la columna de peso.
 
-    Args:
+    ## Args:
         column: Nombre de la columna a normalizar.
         weight: Nombre de la columna que pondera el valor normalizado.
 
-    Returns:
+    ## Returns:
         Nueva Expresión de Polars con el valor normalizado y ponderado.
     """
     return _min_max_normalize(column) * pl.col(weight)
@@ -140,10 +140,10 @@ def with_transformations(df: pl.DataFrame) -> pl.DataFrame:
 
     Todas las divisiones utilizan denominadores protegidos contra ceros.
 
-    Args:
+    ## Args:
         df: DataFrame mensual con columnas base
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame con las columnas originales más las variables transformadas mensuales.
     """
     result = df.with_columns(
@@ -521,7 +521,7 @@ def aggregate_monthly_to_client(
     diferencia entre valor máximo y valor mínimo, diferencia entre último y primer mes,
     diferencia relativa (último / primero) y variación porcentual (1 - diferencia relativa).
 
-    Args:
+    ## Args:
         saving_account_cols: Nombres de las columnas monetarias de caja de ahorro.
         credit_card_cols: Nombres de las columnas monetarias de tarjeta de crédito.
         training_data: DataFrame ya transformado con la historia por cliente y mes.
@@ -530,7 +530,7 @@ def aggregate_monthly_to_client(
         settings: Configuración con los nombres de identificador y target.
             Si no se indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame agregado a nivel de cliente con una fila por identificador y
         columnas con sufijos de estadísticas.
     """
@@ -596,10 +596,10 @@ def with_extra_transformations(df: pl.DataFrame) -> pl.DataFrame:
 
     Combina variables agregadas a nivel de cliente.
 
-    Args:
+    ## Args:
         df: Tabla analítica a nivel de cliente con variables agregadas.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame con las columnas originales más las transformaciones adicionales.
     """
     result = df.with_columns(
@@ -651,13 +651,13 @@ def standardize(
     Resta la media y divide por el desvío estándar para todas las columnas, excepto las
     de identificador y target, que se conservan sin modificar.
 
-    Args:
+    ## Args:
         df: DataFrame a estandarizar.
         ddof: Grados de libertad para el cálculo del desvío estándar.
         settings: Configuración con los nombres de identificador y target a excluir.
             Si no se indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Nuevo DataFrame con las variables numéricas estandarizadas.
     """
     if settings is None:

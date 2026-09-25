@@ -3,7 +3,7 @@
 Centraliza el ajuste de hiperparámetros con RandomizedSearchCV y StratifiedKFold,
 el cálculo de deciles de probabilidad y la evaluación sobre el conjunto de prueba.
 
-Clases exportadas:
+## Clases exportadas:
     LGBMTrainer: Entrenador de un modelo LightGBM, expone métricas y gráficos.
     GroupsLGBMTrainer: Entrenador de modelos LightGBM por grupos de variables (usa LGBMTrainer).
 """
@@ -46,7 +46,7 @@ def _fit_lgbm_random_search(
     búsqueda capturando los registros de salida y construye la tabla de
     importancias ordenada de mayor a menor.
 
-    Args:
+    ## Args:
         train: Datos de entrenamiento que incluyen la variable target.
         columns: Columnas utilizadas para el entrenamiento. No debe tener la columna target.
         n_iter: Cantidad de combinaciones de hiperparámetros a evaluar al azar
@@ -56,7 +56,7 @@ def _fit_lgbm_random_search(
         settings: Configuración con semilla, nivel de detalle y nombres de
             columnas. Si no se indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Tupla con el buscador entrenado, la tabla de importancias ordenada de
             forma descendente y los registros capturados durante el entrenamiento.
     """
@@ -131,13 +131,13 @@ def _with_rename_columns(
     Reemplaza los valores de la columna feature según el diccionario de
     renombres y conserva el valor original cuando no existe correspondencia.
 
-    Args:
+    ## Args:
         importances: Tabla de importancias ordenada de mayor a menor.
         renames: Nombre nuevo asociado al nombre original de una feature.
         settings: Configuración con el nombre de la columna feature. Si no
             se indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Nueva tabla de importancias con los valores de la columna feature
         renombrada.
     """
@@ -162,7 +162,7 @@ def _compute_prediction_deciles(
     conteo de clientes, la tasa de la clase positiva, la ganancia acumulada,
     el lift y la estadística KS.
 
-    Args:
+    ## Args:
         df: Datos que incluyen la variable target.
         probabilities: Probabilidades predichas por el modelo para la clase positiva.
         bins: bins para segmentar las probabilidades (util para test).
@@ -170,7 +170,7 @@ def _compute_prediction_deciles(
         settings: Configuración con el nombre de la columna target. Si no se
             indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Tabla por decil con conteos, probabilidades mínima y máxima, tasa de
             la clase positiva, ganancia acumulada, lift y KS, ordenada de
             forma descendente por decil.
@@ -236,7 +236,7 @@ def _evaluate(
     construye las tablas de deciles. Los bins de los deciles de prueba se
     derivan de los bins de las probabilidades de entrenamiento.
 
-    Args:
+    ## Args:
         searcher: Buscador entrenado cuyo mejor estimador se desea evaluar.
         train: Datos de entrenamiento utilizados para definir los bins.
         test: Datos de prueba sobre los que se calculan las métricas.
@@ -244,7 +244,7 @@ def _evaluate(
         settings: Configuración con el nombre de la columna target. Si no se
             indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Tupla con ROC AUC, exactitud, tasas de falsos positivos y de
             verdaderos positivos de la curva ROC, y tablas de deciles de
             entrenamiento y de prueba.
@@ -287,7 +287,7 @@ def _evaluate(
 class LGBMTrainer:
     """Entrenador de un modelo LightGBM, expone métricas y gráficos.
 
-    Attributes:
+    ## Attributes:
         columns: Columnas utilizadas de `train`.
         searcher: Buscador entrenado con la mejor combinación encontrada.
         search_logs: Registros capturados durante el entrenamiento.
@@ -310,7 +310,7 @@ class LGBMTrainer:
         un conjunto de prueba, calcula métricas de evaluación y tablas de
         deciles sobre el mejor modelo
 
-        Args:
+        ## Args:
             train: Datos de entrenamiento que incluyen la variable target.
             columns: Columnas utilizadas de `train`.
             top_n: Cantidad de variables consideradas al consultar el ranking.
@@ -359,7 +359,7 @@ class LGBMTrainer:
     ) -> None:
         """Genera el gráfico con las variables más importantes del modelo.
 
-        Args:
+        ## Args:
             plot_name: Nombre base del archivo SVG a generar, sin extensión.
             renames: Nombre nuevo asociado al nombre original de una feature.
                 Si no se indica, se conservan los nombres originales.
@@ -393,7 +393,7 @@ class LGBMTrainer:
     def _ensure_testable(self) -> None:
         """Verifica que el entrenador disponga de conjunto de prueba.
 
-        Raises:
+        ## Raises:
             RuntimeError: Si el entrenador se inicializó sin conjunto de
                 prueba y no es posible evaluar ni graficar métricas.
         """
@@ -408,10 +408,10 @@ class LGBMTrainer:
         Las métricas incluyen: ROC AUC, accuracy, Tasas de falsos positivos,
         Tasas de verdaderos positivos
 
-        Args:
+        ## Args:
             plot_name: Nombre base del archivo SVG a generar, sin extensión.
 
-        Raises:
+        ## Raises:
             RuntimeError: Si el entrenador se inicializó sin conjunto de prueba.
         """
         self._ensure_testable()
@@ -422,10 +422,10 @@ class LGBMTrainer:
     def plot_deciles(self, plot_name: str) -> None:
         """Genera el gráfico con las tablas de deciles de entrenamiento y prueba.
 
-        Args:
+        ## Args:
             plot_name: Nombre base del archivo SVG a generar, sin extensión.
 
-        Raises:
+        ## Raises:
             RuntimeError: Si el entrenador se inicializó sin conjunto de prueba.
         """
         self._ensure_testable()
@@ -443,10 +443,10 @@ class GroupsLGBMTrainer:
     independiente por cada grupo. Permite comparar la importancia de las
     variables dentro de cada fuente antes de la selección final.
 
-    Attributes:
+    ## Attributes:
         trainers: Instancias de `LGBMTrainer` indexados por nombre de grupo.
 
-    Example:
+    ## Example:
         from bank_clients_ml.training import GroupsLGBMTrainer
 
         groups_trainer = GroupsLGBMTrainer(uncorrelated_train)
@@ -461,7 +461,7 @@ class GroupsLGBMTrainer:
     ) -> None:
         """Entrena cada grupo de variables con un LGBMTrainer distinto.
 
-        Args:
+        ## Args:
             uncorrelated_train: Datos de entrenamiento sin columnas redundantes,
                 que incluyen la variable target.
             n_iter: Cantidad de combinaciones de hiperparámetros a evaluar en
@@ -511,7 +511,7 @@ class GroupsLGBMTrainer:
         Combina las variables mejor posicionadas de todos los grupos, con
         excepción del grupo de referencia que contiene todas las columnas.
 
-        Returns:
+        ## Returns:
             Nombres de las variables seleccionadas por grupo.
         """
         return [

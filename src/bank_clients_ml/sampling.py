@@ -2,7 +2,7 @@
 
 Centraliza las funciones de muestreo del proyecto basadas en Polars
 
-Funciones exportadas:
+## Funciones exportadas:
     get_date_windows: Divide en ventanas de entrenamiento y predicción.
     stratified_train_test_split: Divide en entrenamiento y prueba de forma estratificada.
     oversample_with_unique_ids: Realiza oversampling con identificadores únicos.
@@ -26,12 +26,12 @@ def get_date_windows(
     del inicio de la predicción, de modo que siempre queda un mes intermedio de
     separación (Lead Window) que evita la fuga de información entre ambas ventanas.
 
-    Args:
+    ## Args:
         df: DataFrame con todos los meses.
         date_column: Nombre de la columna con las fechas mensuales.
         prediction_window_size: Cantidad de meses reservados para predicción.
 
-    Returns:
+    ## Returns:
         Tupla con la lista de meses de entrenamiento seguida de la lista de
         meses de predicción, ambas en orden cronológico ascendente.
     """
@@ -66,13 +66,13 @@ def stratified_train_test_split(
     Mezcla las filas con la semilla configurada.
     Se conserva la proporción original del target en ambos conjuntos.
 
-    Args:
+    ## Args:
         df: Dataframe a dividir.
         test_ratio: Fracción de cada clase destinada al conjunto de prueba.
         settings: Configuración con el nombre de la columna target y la
             semilla aleatoria. Si no se indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Tupla con el DataFrame de entrenamiento seguido del DataFrame de
         prueba.
     """
@@ -112,7 +112,7 @@ def oversample_with_unique_ids(
     solo sobre los datos de entrenamiento de cada fold de StratifiedKFold,
     dejando intactos los datos de validación de cada fold.
 
-    Args:
+    ## Args:
         train: Conjunto de entrenamiento con el target binario.
         target_proportion: Proporción de target de la clase minoritaria en el
             resultado, expresada como un valor entre 0 y 1 sin incluir los
@@ -121,11 +121,11 @@ def oversample_with_unique_ids(
             identificador y target, y la semilla aleatoria.
             Si no se indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         DataFrame balanceado según la proporción solicitada, con
         identificadores únicos y filas mezcladas.
 
-    Raises:
+    ## Raises:
         ValueError: Si la proporción de target no está en el intervalo abierto
             entre 0 y 1.
     """

@@ -3,13 +3,13 @@
 Centraliza las reglas de agrupamiento utilizadas durante la exploración y
 la selección de variables con LightGBM.
 
-Funciones exportadas:
+## Funciones exportadas:
     get_saving_account_cols: Retorna las columnas monetarias asociadas a la caja de ahorro.
     get_binary_identity_features_cols: Retorna las identity features binarias.
     get_credit_card_cols: Retorna las columnas monetarias asociadas a la tarjeta de crédito.
     group_columns_by_source: Agrupa las columnas de un dataframe según su fuente de negocio.
 
-Constantes exportadas:
+## Constantes exportadas:
     CREDIT_CARD_EXCLUDED: Columnas asociadas a la tarjeta de crédito excluidas del grupo monetario.
     GROUP_WEIGHTS: Ponderación aplicada a cada grupo en la selección.
 """
@@ -46,7 +46,7 @@ def get_binary_identity_features_cols() -> list[str]:
 
     Representan la foto del cliente en el último mes de entrenamiento.
 
-    Returns:
+    ## Returns:
         Nombres de las columnas binarias.
     """
     return [
@@ -114,13 +114,13 @@ def _classify_column(col: str) -> str:
     grupos definidos en GROUP_WEIGHTS. Las columnas incluidas
     en CREDIT_CARD_EXCLUDED se derivan al grupo residual "others".
 
-    Args:
+    ## Args:
         col: Nombre de la columna a clasificar.
 
-    Returns:
+    ## Returns:
         Nombre del grupo al que pertenece la columna.
 
-    Example:
+    ## Example:
         group = _classify_column("Operations_total_mean")
         # group == "operations"
         group = _classify_column("CreditCard_Balance_ARG")
@@ -154,12 +154,12 @@ def _validate_groups(columns: list[str], groups: Mapping[str, list[str]]) -> Non
     garantiza que ninguna variable se pierda o se duplique antes de la
     selección por grupos.
 
-    Args:
+    ## Args:
         columns: Columnas que debieron agruparse.
         groups: Agrupamiento propuesto, donde cada clave es un grupo y cada
             valor contiene sus columnas asignadas.
 
-    Raises:
+    ## Raises:
         ValueError: Si existen columnas faltantes o sobrantes en el
             agrupamiento, con el detalle de ambos conjuntos y los conteos.
     """
@@ -195,20 +195,20 @@ def group_columns_by_source(
     todas las columnas consideradas y ponderación cero como referencia para
     el entrenamiento base.
 
-    Args:
+    ## Args:
         df: DataFrame de entrada cuyas columnas se desean agrupar.
         settings: Configuración con los nombres del identificador y del
             target. Si no se indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Agrupamiento por fuente, donde cada grupo se asocia con sus columnas
         y su ponderación para la selección. Incluye la clave `all_columns`
         con todas las variables consideradas con ponderación cero.
 
-    Raises:
+    ## Raises:
         ValueError: Si la validación detecta columnas faltantes o sobrantes.
 
-    Example:
+    ## Example:
         columns_groups = group_columns_by_source(df, settings)
         operation_cols, weight = columns_groups["operations"]
     """

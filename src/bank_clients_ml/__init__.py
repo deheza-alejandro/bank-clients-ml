@@ -4,7 +4,7 @@ Reúne los módulos de configuración, exploración de datos, feature engineerin
 muestreo, filtrado de variables redundantes, entrenamiento
 con LightGBM y visualización utilizados en el proyecto.
 
-Módulos disponibles:
+## Módulos disponibles:
     config: Configuración global y acceso a la instancia singleton.
     column_groups: Agrupamiento de columnas según su fuente de negocio.
     eda: Análisis exploratorio de datos con Polars y Marimo.

@@ -9,7 +9,7 @@ El flujo habitual consiste en crear `RedundantColumnFilter` con los conjuntos de
 entrenamiento y prueba, inspeccionar los descartes, graficar el análisis bivariado
 y finalmente aplicar transformaciones de bines con `apply_bin_transformations`.
 
-Clases exportadas:
+## Clases exportadas:
     BinRange: Rango inclusivo de bines que se agrupan en un mismo valor.
     BinTransformation: Asociación entre una columna y sus rangos de bines.
     RedundantColumnFilter: Filtro secuencial de columnas redundantes con análisis bivariado.
@@ -29,11 +29,11 @@ from bank_clients_ml.visualization import plot_bivariate_charts
 def _get_true_column_names(df: pl.DataFrame) -> list[str]:
     """Obtiene los nombres de las columnas que contienen valores verdaderos.
 
-    Args:
+    ## Args:
         df: DataFrame booleano donde cada celda indica si una columna cumple
             una condición evaluada previamente.
 
-    Returns:
+    ## Returns:
         Lista con los nombres de las columnas cuyo valor es verdadero.
     """
     return df.unpivot().filter(pl.col("value")).get_column("variable").to_list()
@@ -42,10 +42,10 @@ def _get_true_column_names(df: pl.DataFrame) -> list[str]:
 def _get_constant_columns(df: pl.DataFrame) -> list[str]:
     """Retorna las columnas con un único valor.
 
-    Args:
+    ## Args:
         df: DataFrame sobre el que se evalúa la cardinalidad.
 
-    Returns:
+    ## Returns:
         Lista con los nombres de las columnas constantes, las cuales no aportan
         información para el modelado.
     """
@@ -64,14 +64,14 @@ def _get_imbalanced_binary_columns(
     cuando cae fuera del intervalo definido por el `threshold` y su complemento.
     La columna target se excluye del análisis.
 
-    Args:
+    ## Args:
         df: DataFrame sobre el que se buscan columnas binarias desbalanceadas.
         threshold: Proporción mínima aceptada para la clase minoritaria. Debe
             encontrarse entre 0 y 0.5.
         settings: Configuración con el nombre de la columna target. Si no se
             indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Lista con los nombres de las columnas binarias desbalanceadas,
         las cuales no aportan información para el modelado.
     """
@@ -102,12 +102,12 @@ def _get_redundant_correlated_columns(
     El triángulo inferior y la diagonal quedan en 0.0,
     lo que no afecta al max() ya que |r| >= 0
 
-    Args:
+    ## Args:
         corr_df: Matriz de correlación cuadrada entre variables numéricas.
         threshold: Umbral de correlación absoluta a partir del cual una columna
             se considera redundante.
 
-    Returns:
+    ## Returns:
         Lista con los nombres de las columnas redundantes a eliminar.
     """
     abs_corr_np = np.abs(corr_df.to_numpy())
@@ -130,7 +130,7 @@ def _get_bivariate_tables(
 ) -> dict[str, pl.DataFrame]:
     """Construye tablas de análisis bivariado por variable.
 
-    Args:
+    ## Args:
         df: DataFrame con la variable target y las columnas a analizar.
         Cada fila representa a un cliente
         columns: Columnas para las cuales se generan las tablas de análisis bivariado.
@@ -140,7 +140,7 @@ def _get_bivariate_tables(
         settings: Configuración con el nombre de la columna target. Si no se
             indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Diccionario que asocia cada nombre de columna con su tabla de análisis
         bivariado, con las columnas de bin, mínimo, máximo, clientes, target
         y porcentaje de target, numerando los bines en forma secuencial.
@@ -191,14 +191,14 @@ def _merge_without_duplicates(
     diccionarios, para preservar el análisis ya almacenado y evitar
     sobrescrituras accidentales.
 
-    Args:
+    ## Args:
         dict_1: Diccionario base con las tablas ya acumuladas.
         dict_2: Diccionario con las nuevas tablas a incorporar.
 
-    Returns:
+    ## Returns:
         Nuevo diccionario con la unión de ambos contenidos.
 
-    Raises:
+    ## Raises:
         KeyError: Si ambos diccionarios comparten una o más claves.
     """
     common_keys = dict_1.keys() & dict_2.keys()
@@ -219,12 +219,12 @@ def _get_range_data(i: int, stats) -> tuple[float, float, float]:
     la inclusión de los bordes, y calcula el porcentaje de target del rango
     como la proporción entre la suma del target y la cantidad de clientes.
 
-    Args:
+    ## Args:
         i: Índice del rango dentro de las agregaciones calculadas.
         stats: Fila de agregaciones con los valores mínimos, máximos, conteos
             de clientes y sumas del target por rango.
 
-    Returns:
+    ## Returns:
         Tupla con el límite inferior, el límite superior y el porcentaje de
         target correspondiente al rango indicado.
     """
@@ -246,7 +246,7 @@ class BinRange(NamedTuple):
     el análisis bivariado. Los bines comprendidos entre ambos extremos reciben
     el mismo porcentaje de target durante la transformación.
 
-    Attributes:
+    ## Attributes:
         start: Número de bin inicial del intervalo.
         end: Número de bin final del intervalo.
     """
@@ -267,7 +267,7 @@ def _group_bins_by_ranges(
     indicados y calcula el porcentaje de target de cada grupo. Los valores
     fuera de todos los rangos reciben el porcentaje del grupo residual.
 
-    Args:
+    ## Args:
         column: Columna a transformar.
         bin_ranges: Rangos de bines que definen cada grupo de agregación.
         table: Tabla de análisis bivariado de la columna, con las columnas de
@@ -275,7 +275,7 @@ def _group_bins_by_ranges(
         settings: Configuración con el nombre de la columna target. Si no se
             indica, se obtiene la configuración global.
 
-    Returns:
+    ## Returns:
         Expresión de Polars que asigna a cada fila el porcentaje de target
         del rango al que pertenece.
     """
@@ -332,7 +332,7 @@ class BinTransformation(NamedTuple):
     Define cómo deben combinarse los bines de una variable analizada para
     reemplazar sus valores originales por el porcentaje de target de cada grupo.
 
-    Attributes:
+    ## Attributes:
         column: Nombre de la columna a transformar.
         bin_ranges: Rangos de bines que conforman cada grupo.
     """
@@ -350,7 +350,7 @@ class RedundantColumnFilter:
     Conserva los resultados intermedios para su inspección y acumula las tablas
     de análisis bivariado para usarlas posteriormente en la transformación por bines.
 
-    Attributes:
+    ## Attributes:
         constant_cols: Nombres de las columnas constantes detectadas.
         reduced_train: Conjunto de entrenamiento sin columnas constantes.
         imbalanced_binary_columns: Nombres de las columnas binarias desbalanceadas.
@@ -374,7 +374,7 @@ class RedundantColumnFilter:
         correlacionadas, y genera las versiones reducidas de los conjuntos de
         entrenamiento y prueba.
 
-        Args:
+        ## Args:
             train: Conjunto de entrenamiento sobre el que se detectan las columnas
                 a eliminar.
             test: Conjunto de prueba al que se aplican las mismas eliminaciones.
@@ -435,7 +435,7 @@ class RedundantColumnFilter:
     ) -> None:
         """Construye tablas de análisis bivariado y genera los gráficos.
 
-        Args:
+        ## Args:
             df: DataFrame base para el análisis bivariado.
             columns: Columnas a analizar y graficar.
             analysis_name: Nombre del análisis. Define el subdirectorio de salida
@@ -461,7 +461,7 @@ class RedundantColumnFilter:
         Utiliza el conjunto de entrenamiento sin columnas redundantes y guarda
         las tablas generadas para su reutilización en transformaciones por bines.
 
-        Args:
+        ## Args:
             columns: Columnas del conjunto sin correlación a analizar.
             analysis_name: Nombre del análisis. Define el subdirectorio de salida
                 de las imágenes.
@@ -483,14 +483,14 @@ class RedundantColumnFilter:
         comparar variables descartadas con sus equivalentes conservadas y evaluar
         posibles reemplazos más interpretables.
 
-        Args:
+        ## Args:
             correlated_columns: Columnas eliminadas por correlación a analizar.
                 No deben pertenecer al conjunto sin correlación.
             analysis_name: Nombre del análisis. Define el subdirectorio de salida
                 de las imágenes.
             max_bins_quantity: Cantidad máxima de bines por variable.
 
-        Raises:
+        ## Raises:
             ValueError: Si alguna columna indicada aún existe en el conjunto sin
                 correlación.
         """
@@ -522,7 +522,7 @@ class RedundantColumnFilter:
         final transformado, sin modificar las tablas acumuladas para
         transformaciones posteriores.
 
-        Args:
+        ## Args:
             df: DataFrame arbitrario a analizar.
             columns: Columnas a analizar y graficar.
             analysis_name: Nombre del análisis. Define el subdirectorio de salida
@@ -538,13 +538,13 @@ class RedundantColumnFilter:
     ) -> pl.DataFrame:
         """Obtiene las variables correlacionadas con una columna dada.
 
-        Args:
+        ## Args:
             column: Nombre de la columna de referencia presente en la matriz
                 de correlación.
             threshold: Umbral mínimo de correlación para incluir una variable
                 en el resultado.
 
-        Returns:
+        ## Returns:
             Nuevo DataFrame con las columnas de nombre de variable y correlación.
         """
         return (
@@ -562,7 +562,7 @@ class RedundantColumnFilter:
     def print_correlations_for_each(self, columns: list[str]) -> None:
         """Muestra las variables correlacionadas de cada columna indicada.
 
-        Args:
+        ## Args:
             columns: Columnas de referencia para buscar correlaciones altas.
         """
         for column in columns:
@@ -579,11 +579,11 @@ class RedundantColumnFilter:
         previamente acumulado. La misma lógica se aplica en forma consistente a
         ambos conjuntos de entrenamiento y prueba.
 
-        Args:
+        ## Args:
             bins_transformations: Lista con las columnas con los rangos de bines que
                 definen cada transformación.
 
-        Returns:
+        ## Returns:
             Tupla con los conjuntos de entrenamiento y prueba transformados.
         """
         expr = [

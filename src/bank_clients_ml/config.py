@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     Los nombres de columnas permiten mantener una referencia única y
     consistente en todos los módulos que consumen esta configuración.
 
-    Attributes:
+    ## Attributes:
         debug: Indica si el modo de depuración está activado.
         random_state: Semilla utilizada para garantizar reproducibilidad.
         col_id: Nombre de la columna identificadora del cliente.
@@ -51,10 +51,10 @@ def get_settings() -> Settings:
 
     Devuelve una instancia única de `Settings` almacenada en caché (Singleton).
 
-    Returns:
+    ## Returns:
         Instancia compartida de la configuración global.
 
-    Example:
+    ## Example:
         from bank_clients_ml.config import get_settings
 
         settings = get_settings()

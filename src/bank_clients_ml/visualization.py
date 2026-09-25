@@ -3,13 +3,13 @@
 Este módulo centraliza las visualizaciones utilizadas en el notebook.
 Todas las figuras se guardan como archivos SVG optimizados con SVGO a través de Bun.
 
-Funciones exportadas:
+## Funciones exportadas:
     plot_top_features: Genera un gráfico con las variables más importantes.
     plot_bivariate_charts: Genera gráficos bivariados para un conjunto de variables.
     plot_evaluation_metrics: Genera una curva ROC con métricas de evaluación.
     plot_deciles: Genera un gráfico con tablas de deciles de entrenamiento y prueba.
 
-Constantes exportadas:
+## Constantes exportadas:
     PROJECT_DIR: Directorio base del proyecto.
     IMAGES_DIR: Directorio base donde se guardan las imágenes por defecto.
 """
@@ -48,13 +48,13 @@ def _save_fig_as_svg(
 
     El resultado se exporta a {images_dir}/{images_sub_dir}/{plot_name}.svg
 
-    Args:
+    ## Args:
         fig: Figura de Matplotlib a guardar. Queda cerrada tras la operación.
         plot_name: Nombre base del archivo, sin extensión.
         images_dir: Directorio base donde se guardan las imágenes.
         images_sub_dir: Subdirectorio opcional dentro del directorio base.
 
-    Raises:
+    ## Raises:
         RuntimeError: Si el ejecutable de Bun no se encuentra en el PATH y no
             es posible optimizar el SVG con SVGO.
     """
@@ -106,7 +106,7 @@ def plot_top_features(
 
     El resultado se exporta a {images_dir}/plot_top_features/{plot_name}.svg
 
-    Args:
+    ## Args:
         variables_to_plot: DataFrame con las variables y sus importancias,
             ordenado de mayor a menor importancia.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
@@ -169,7 +169,7 @@ def _plot_single_bivariate_chart(
 
     El resultado se exporta a {images_dir}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
 
-    Args:
+    ## Args:
         table: Tabla de análisis bivariado con las columnas de intervalo,
             conteo de clientes y porcentaje de la variable target.
         variable_to_plot: Nombre de la variable analizada. Se usa como título
@@ -229,7 +229,7 @@ def plot_bivariate_charts(
 
     Las imágenes se exportan a {images_dir}/bivariate_analysis/{analysis_name}/
 
-    Args:
+    ## Args:
         tables: Diccionario que asocia cada nombre de variable con su tabla de
             análisis bivariado.
         analysis_name: Nombre del análisis. Define el subdirectorio de salida.
@@ -286,7 +286,7 @@ def plot_evaluation_metrics(
 
     El resultado se exporta a {images_dir}/plot_evaluation_metrics/{plot_name}.svg
 
-    Args:
+    ## Args:
         roc_auc: Métrica ROC AUC del modelo evaluado.
         accuracy: Exactitud del modelo evaluado.
         fpr: Tasas de falsos positivos de la curva ROC.
@@ -324,7 +324,7 @@ def _plot_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
     oscuro y texto blanco en negrita, alterna el color de fondo de las filas y
     asigna el título indicado al eje.
 
-    Args:
+    ## Args:
         ax: Eje de Matplotlib donde se dibuja la tabla.
         deciles: Tabla de deciles con las métricas por decil.
         title: Título a mostrar sobre la tabla.
@@ -380,7 +380,7 @@ def plot_deciles(
 
     El resultado se exporta a {images_dir}/plot_evaluation_metrics/{plot_name}.svg
 
-    Args:
+    ## Args:
         train_deciles: Tabla de deciles calculada sobre el conjunto de
             entrenamiento.
         test_deciles: Tabla de deciles calculada sobre el conjunto de prueba.
