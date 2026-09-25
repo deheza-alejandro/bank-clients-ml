@@ -130,8 +130,8 @@ def plot_top_features(
     fig, ax = plt.subplots(figsize=(8, max(6, top_n * 0.7)))
 
     bars = ax.barh(
-        top_vars[settings.col_feature],
-        top_vars[settings.col_importance],
+        top_vars.get_column(settings.col_feature),
+        top_vars.get_column(settings.col_importance),
         color="#4a90e2",
         edgecolor="black",
     )

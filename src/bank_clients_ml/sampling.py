@@ -50,8 +50,8 @@ def get_date_windows(
         ).implode(),
     )
 
-    prediction_months = windows["prediction_months"][0].to_list()
-    training_months = windows["training_months"][0].to_list()
+    prediction_months = windows.get_column("prediction_months").item(0).to_list()
+    training_months = windows.get_column("training_months").item(0).to_list()
 
     return training_months, prediction_months
 

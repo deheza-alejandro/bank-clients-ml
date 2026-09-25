@@ -152,7 +152,7 @@ def _get_bivariate_tables(
     tables: dict[str, pl.DataFrame] = {}
 
     for column in columns:
-        if df[column].n_unique() > max_bins_quantity:
+        if df.get_column(column).n_unique() > max_bins_quantity:
             group_expr = pl.col(column).qcut(
                 quantiles=max_bins_quantity, allow_duplicates=True
             )

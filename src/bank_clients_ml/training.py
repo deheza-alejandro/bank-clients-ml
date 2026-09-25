@@ -100,7 +100,7 @@ def _fit_lgbm_random_search(
     )
 
     X_train = train.select(columns)
-    y_train = train[settings.col_target]
+    y_train = train.get_column(settings.col_target)
 
     log_buffer = io.StringIO()
     with (

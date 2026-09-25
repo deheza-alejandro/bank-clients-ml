@@ -166,7 +166,9 @@ def _():
 @app.cell
 def _(clean_data):
     month_count_by_client = clean_data.group_by(settings.col_id).len(name="month_count")
-    mo.output.append(month_count_by_client["month_count"].value_counts(sort=True))
+    mo.output.append(
+        month_count_by_client.get_column("month_count").value_counts(sort=True)
+    )
     return
 
 
@@ -213,8 +215,8 @@ def _(clean_data, last_training_month, prediction_months, training_months):
 
     print(f"universe_and_target.shape: {universe_and_target.shape} \n")
     print(f"prediction_data.shape: {prediction_data.shape} \n")
-    mo.output.append(mo.md("### training_data['Month'].value_counts():"))
-    mo.output.append(training_data["Month"].value_counts())
+    mo.output.append(mo.md("### training_data.get_column('Month').value_counts():"))
+    mo.output.append(training_data.get_column("Month").value_counts())
     inspect_dataframe(training_data)
     return prediction_data, training_data, universe_and_target_data
 
@@ -306,8 +308,8 @@ def _(prediction_data, training_data_1, universe_and_target_data):
 
     print(f"{clients_region.shape} \n")
     print(f"{training_data_2.shape} \n")
-    mo.output.append(clients_region["Region"].value_counts(sort=True))
-    mo.output.append(training_data_2["Region"].value_counts(sort=True))
+    mo.output.append(clients_region.get_column("Region").value_counts(sort=True))
+    mo.output.append(training_data_2.get_column("Region").value_counts(sort=True))
     print_describe(universe_and_target_data.select("Region"))
     print_describe(clients_region)
     print_describe(training_data_2.select("Region"))
@@ -356,9 +358,13 @@ def _(
         )
     )
     mo.output.append(
-        clients_credit_card_product["CreditCard_Product"].value_counts(sort=True)
+        clients_credit_card_product.get_column("CreditCard_Product").value_counts(
+            sort=True
+        )
     )
-    mo.output.append(training_data_3["CreditCard_Product"].value_counts(sort=True))
+    mo.output.append(
+        training_data_3.get_column("CreditCard_Product").value_counts(sort=True)
+    )
     print_describe(universe_and_target_data.select("CreditCard_Product"))
     print_describe(clients_credit_card_product)
     print_describe(training_data_3.select("CreditCard_Product"))

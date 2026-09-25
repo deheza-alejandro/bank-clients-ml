@@ -209,9 +209,11 @@ def low_cardinality_value_counts(
         columna y frecuencia descendente. Si ninguna columna cumple el criterio,
         retorna un DataFrame vacío con dicho esquema.
     """
-    cols_to_keep = filter_columns_by_cardinality(df, "<=", max_unique_values)[
-        "column"
-    ].to_list()
+    cols_to_keep = (
+        filter_columns_by_cardinality(df, "<=", max_unique_values)
+        .get_column("column")
+        .to_list()
+    )
 
     if not cols_to_keep:
         return pl.DataFrame(
