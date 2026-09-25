@@ -123,6 +123,10 @@ def _():
         pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date(),
         pl.col(settings.col_id).cast(pl.Int64),
     )
+    month_count_by_client = clean_data.group_by(settings.col_id).len(name="month_count")
+    mo.output.append(
+        month_count_by_client.get_column("month_count").value_counts(sort=True)
+    )
     return (clean_data,)
 
 
@@ -159,22 +163,7 @@ def _(clean_data):
 def _():
     mo.md(r"""
     ## Definir Universo y Target
-    """)
-    return
 
-
-@app.cell
-def _(clean_data):
-    month_count_by_client = clean_data.group_by(settings.col_id).len(name="month_count")
-    mo.output.append(
-        month_count_by_client.get_column("month_count").value_counts(sort=True)
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _():
-    mo.md(r"""
     Mantengo en el universo los clientes que:
     - tienen 9 meses de historia
     - no tienen 'Package_Active' y 'CreditCard_CoBranding' en el ultimo mes de la ventana de entrenamiento
