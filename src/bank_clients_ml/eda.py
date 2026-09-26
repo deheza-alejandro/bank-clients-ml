@@ -4,7 +4,7 @@ Las funciones están pensadas para uso interactivo en cuadernos Marimo,
 donde algunos resultados se anexan directamente a la salida visible.
 
 ## Funciones exportadas:
-    print_describe: Muestra el resumen estadístico del DataFrame en la salida de Marimo.
+    describe: Retorna el resumen estadístico del DataFrame.
     inspect_dataframe: Inspecciona la estructura y la calidad general del DataFrame.
     count_row_matches: Cuenta, por columna, las filas que cumplen una condición.
     filter_columns_by_cardinality: Filtra columnas según su cantidad de valores únicos.
@@ -30,18 +30,16 @@ import polars.selectors as cs
 from bank_clients_ml.config import Settings, get_settings
 
 
-def print_describe(df: pl.DataFrame) -> None:
-    """Muestra el resumen estadístico del DataFrame en la salida de Marimo.
+def describe(df: pl.DataFrame) -> pl.DataFrame:
+    """Retorna el resumen estadístico del DataFrame.
 
     Transpone el resultado de `df.describe()` para facilitar la lectura de las
-    estadísticas por columna y las anexa a la salida actual del cuaderno.
+    estadísticas por columna.
 
     ## Args:
         df: DataFrame a analizar.
     """
-    return mo.output.append(
-        df.describe().transpose(include_header=True, column_names="statistic")
-    )
+    return df.describe().transpose(include_header=True, column_names="statistic")
 
 
 def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
