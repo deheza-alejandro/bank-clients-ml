@@ -12,6 +12,7 @@ donde algunos resultados se anexan directamente a la salida visible.
     mins_in_range: Identifica columnas numéricas cuyo mínimo cae dentro de un rango abierto.
     columns_with_zeros: Identifica columnas numéricas que contienen valores iguales a cero.
     filter_nonzero: Filtra las filas donde todas las columnas indicadas son distintas de cero.
+    build_plot_tabs: Crea un componente de pestañas en Marimo mostrando imágenes.
 
 ## Constantes exportadas:
     OPERATORS: funciones del módulo `operator` asociadas a símbolos de comparación.
@@ -19,6 +20,7 @@ donde algunos resultados se anexan directamente a la salida visible.
 
 import operator
 from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
 from typing import Any, Final, Literal
 
 import marimo as mo
@@ -295,3 +297,28 @@ def filter_nonzero(
     keep = [settings.col_id, *columns] if settings.col_id in df.columns else columns
 
     return df.filter(pl.all_horizontal(pl.col(columns) != 0)).select(keep)
+
+
+def build_plot_tabs(
+    names: Mapping[str, str],
+    subdirectory: Path,
+    orientation: Literal["horizontal", "vertical"] = "horizontal",
+) -> mo.Html:
+    """Crea un componente de pestañas en Marimo mostrando imágenes.
+
+    ## Args:
+        names: Mapeo de títulos de pestañas a nombres de archivo.
+        subdirectory: Directorio donde se encuentran las imágenes.
+        orientation: Orientación de las pestañas ('horizontal' o 'vertical').
+            Por defecto es 'horizontal'.
+
+    ## Returns:
+        Componente interactivo de marimo con las imágenes renderizadas.
+    """
+    return mo.ui.tabs(
+        {
+            title: mo.image(src=subdirectory / f"{filename}.svg")
+            for filename, title in names.items()
+        },
+        orientation=orientation,
+    )
