@@ -54,7 +54,7 @@ with app.setup:
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # EDA (Exploratory Data Analysis)
+    # 1. EDA (Exploratory Data Analysis)
     """)
     return
 
@@ -118,7 +118,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Limpieza inicial
+    Realizo una limpieza inicial
     """)
     return
 
@@ -147,7 +147,8 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Obtener meses relevantes
+    # 2. Universe and Target
+    Obtengo meses relevantes
     """)
     return
 
@@ -175,8 +176,6 @@ def _(clean_data):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Definir Universo y Target
-
     Mantengo en el universo los clientes que:
     - tienen 9 meses de historia
     - no tienen 'Package_Active' y 'CreditCard_CoBranding' en el ultimo mes de la ventana de entrenamiento
@@ -231,8 +230,8 @@ def _(clean_data, last_training_month, prediction_months, training_months):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # Feature Engineering
-    ## Valores Nulos
+    # 3. Feature Engineering
+    ## 3.1. Missing value imputation
     """)
     return
 
@@ -251,7 +250,7 @@ def _(training_data):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### Completando 'SavingAccount_Balance_Average'
+    ### 3.1.1. SavingAccount_Balance_Average
     Primero se analizan registros con nulos en SavingAccount_Balance_Average y valores monetarios de SavingAccount sin nulos:
     """)
     return
@@ -307,7 +306,7 @@ def _(training_data):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### Completando 'Region'
+    ### 3.1.2. Region
     Traigo las regiones de los clientes desde la ventana de predicción y pongo la Region mas común para llenar los nulos restantes
     """)
     return
@@ -351,7 +350,7 @@ def _(prediction_data, training_data_1, universe_and_target_data):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### Completando 'CreditCard_Product'
+    ### 3.1.3. CreditCard_Product
 
     Traigo los CreditCard_Product de la ventana de predicción.
 
@@ -416,7 +415,7 @@ def _(
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Identity Features
+    ## 3.2. Identity Features
     """)
     return
 
@@ -461,7 +460,7 @@ def _(last_training_month, training_data_3):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Variables Categóricas
+    ## 3.3. Categorical Variables
     """)
     return
 
@@ -491,7 +490,7 @@ def _(categorical_cols, identity_features, training_data_4):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Fechas
+    ## 3.4. Dates
     """)
     return
 
@@ -524,7 +523,7 @@ def _(identity_features_1, last_training_month):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Transform features
+    ## 3.5. Transform features
     Primero analizo:
     - valores mínimos y ceros
     - valores monetarios de CreditCard
@@ -550,7 +549,7 @@ def _(training_data_5):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### Generando transformaciones
+    Realizo las transformaciones
     """)
     return
 
@@ -596,7 +595,7 @@ def _(training_data_5):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Aggregate Features
+    ## 3.6 Aggregate Features
     """)
     return
 
@@ -618,7 +617,7 @@ def _(
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # ABT (analytical base table) and Train/Test split
+    # 4. ABT (analytical base table) and Train/Test split
     - Agrego transformadas extras luego de generar la ABT
     - Divido los datos es train y test
     """)
@@ -647,8 +646,8 @@ def _(data_agg, identity_features_2):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # Feature Selection
-    ## Reducción de dimensionalidad
+    # 5. Feature Selection
+    ## 5.1. Dimensionality reduction
     Elimino:
     - columnas con valores únicos
     - columnas binarias con baja representatividad
@@ -685,7 +684,7 @@ def _(test, train):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Ordeno las variables por fuente según importancia usando lightGBM para quedarme con las mas importantes
+    ## 5.2. Agrupo las variables por fuente y luego las ordeno según importancia usando lightGBM
 
     No estandarizo el dataframe por que lightGBM no lo necesita
 
@@ -753,7 +752,7 @@ def _(groups_trainer, uncorrelated_train):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Análisis Bivariado
+    ## 5.3. Bivariate Analysis
     """)
     return
 
@@ -783,7 +782,7 @@ def _(column_filter, top_grouped_features):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### Buscando variables correlacionadas eliminadas anteriormente
+    ## 5.4. Buscando variables correlacionadas eliminadas anteriormente
     Para poder intercambiar las variables mas importantes por variables mas fáciles de interpretar, si es que existen.
     """)
     return
@@ -819,12 +818,11 @@ def _(column_filter):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### Transformando mejores variables según análisis bivariado y LightGBM
+    ## 5.5. Transformando mejores variables
 
-    Transformo variables agregándoles el porcentaje de target y agrupo los valores.
-    A las variables categóricas solo las agrupo (ya las transforme anteriormente)
+    Elijo variables según importancias y análisis bivariado, las transformo agregándoles el porcentaje de target y agrupo los valores en bins. A las variables categóricas solo las agrupo (ya las transforme anteriormente)
 
-    variables a modificar:
+    variables elegidas:
     - Client_Age_grp
         - agrupo "Entre 50 y 59 años" + "Entre 60 y 64 años" + "Entre 65 y 69 años" (final: "Entre 50 y 69 años")
         - default -> junto todas las demás edades ("Entre 18 y 29 años" + "Entre 30 y 39 años" + "Entre 40 y 49 años" + "Mayor a 70 años")
@@ -903,9 +901,8 @@ def _(best_features, best_features_names, column_filter, final_train):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # Final Training and Performance
-    ## Entreno con las mejores features y mejores hiperparámetros
-    No realizo ningún balanceo porque la proporción del target ya es del 30%
+    # 6. Final Training and Performance
+    Entreno con las mejores features y evalúo los mejores hiperparámetros encontrados. No realizo ningún balanceo porque la proporción del target ya es del 30%
     """)
     return
 
@@ -939,19 +936,19 @@ def _():
     {mo.image(src=notebook_dir / "images" / "plot_evaluation_metrics" / "deciles.svg")}
 
     ### Training
-    - ordena todos los deciles bien
-    - deciles más o menos parejos
-    - lift del primer decil = 2,4
+    - Ordena todos los deciles bien
+    - Deciles más o menos parejos
+    - Lift del primer decil = 2,4
     - KS = 47.04 en el 5to decil
 
     ### Testing
-    - ordena todos los deciles bien
-    - deciles más o menos parejos
-    - lift del primer decil = 2,36
+    - Ordena todos los deciles bien
+    - Deciles más o menos parejos
+    - Lift del primer decil = 2,36
     - KS = 47.22 en el 4to decil
 
     ### Diferencias
-    - lift -> 0,4
+    - Lift -> 0,4
     - ~~KS -> 0,2~~
     """)
     return
