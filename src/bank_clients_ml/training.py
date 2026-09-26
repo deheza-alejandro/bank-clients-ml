@@ -430,7 +430,12 @@ class LGBMTrainer:
         """
         self._ensure_testable()
         plot_evaluation_metrics(
-            self._roc_auc, self._accuracy, self._fpr, self._tpr, plot_name
+            self._roc_auc,
+            self._accuracy,
+            self._fpr,
+            self._tpr,
+            plot_name,
+            self._settings,
         )
 
     def plot_deciles(self, plot_name: str) -> None:
@@ -447,6 +452,7 @@ class LGBMTrainer:
             self._train_deciles.drop("min_prob", "max_prob"),
             self._test_deciles.drop("min_prob", "max_prob"),
             plot_name,
+            settings=self._settings,
         )
 
 

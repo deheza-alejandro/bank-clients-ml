@@ -9,6 +9,9 @@ almacenada en caché (Singleton).
 """
 
 from functools import cache
+from pathlib import Path
+
+from pydantic import computed_field
 
 # from pydantic import SecretStr
 from pydantic_settings import BaseSettings  # , SettingsConfigDict
@@ -36,6 +39,7 @@ class Settings(BaseSettings):
     col_target: str = "Target"
     col_feature: str = "Feature"
     col_importance: str = "Importance"
+    project_dir: Path = Path(__file__).parent.parent.parent
     # api_key: SecretStr  # Keeps the secret hidden in logs and print statements.
 
     # model_config = SettingsConfigDict(
@@ -43,6 +47,18 @@ class Settings(BaseSettings):
     #     env_file_encoding="utf-8",
     #     extra="ignore",
     # )
+
+    @computed_field
+    @property
+    def data_dir(self) -> Path:
+        """Directorio de datos calculado dinámicamente de project_dir."""
+        return self.project_dir / "data"
+
+    @computed_field
+    @property
+    def images_dir(self) -> Path:
+        """Directorio de imágenes calculado dinámicamente de project_dir."""
+        return self.project_dir / "notebooks" / "images"
 
 
 @cache

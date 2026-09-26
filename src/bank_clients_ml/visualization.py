@@ -8,10 +8,6 @@ Todas las figuras se guardan como archivos SVG optimizados con SVGO a través de
     plot_bivariate_charts: Genera gráficos bivariados para un conjunto de variables.
     plot_evaluation_metrics: Genera una curva ROC con métricas de evaluación.
     plot_deciles: Genera un gráfico con tablas de deciles de entrenamiento y prueba.
-
-## Constantes exportadas:
-    PROJECT_DIR: Directorio base del proyecto.
-    IMAGES_DIR: Directorio base donde se guardan las imágenes por defecto.
 """
 
 import io
@@ -46,7 +42,8 @@ def _save_fig_as_svg(
     Canaliza el contenido SVG a través de SVGO mediante Bun para optimizarlo
     antes de escribirlo en disco. Crea la carpeta de destino si no existe.
 
-    El resultado se exporta a {images_dir}/{images_sub_dir}/{plot_name}.svg
+    El resultado se exporta a:
+    {images_dir}/{images_sub_dir}/{plot_name}.svg
 
     ## Args:
         fig: Figura de Matplotlib a guardar. Queda cerrada tras la operación.
@@ -85,16 +82,11 @@ def _save_fig_as_svg(
         ) from err
 
 
-PROJECT_DIR: Path = Path(__file__).parent.parent.parent
-IMAGES_DIR: Path = PROJECT_DIR / "notebooks" / "images"
-
-
 def plot_top_features(
     variables_to_plot: pl.DataFrame,
     plot_name: str,
     roc_auc: float,
     top_n: int = 20,
-    images_dir: Path = IMAGES_DIR,
     settings: Settings | None = None,
 ) -> None:
     """Genera un gráfico de barras horizontales con las variables más importantes.
@@ -104,7 +96,8 @@ def plot_top_features(
     título incluye el nombre del gráfico y el valor de ROC AUC. Los tamaños de
     fuente y de figura se ajustan según la cantidad de variables a mostrar.
 
-    El resultado se exporta a {images_dir}/plot_top_features/{plot_name}.svg
+    El resultado se exporta a:
+    {settings.images_dir}/plot_top_features/{plot_name}.svg
 
     ## Args:
         variables_to_plot: DataFrame con las variables y sus importancias,
@@ -112,8 +105,8 @@ def plot_top_features(
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
         roc_auc: Métrica ROC AUC a mostrar en el título del gráfico.
         top_n: Cantidad máxima de variables a incluir en el gráfico.
-        images_dir: Directorio base donde se guarda la imagen.
-        settings: Configuración con los nombres de columnas de variable e importancia.
+        settings: Configuración con los nombres de columnas de variable e importancia,
+            y el directorio base donde se guarda la imagen.
             Si no se indica, se obtiene la configuración global.
     """
     if settings is None:
@@ -150,13 +143,12 @@ def plot_top_features(
         fontsize=label_fontsize,
     )
 
-    _save_fig_as_svg(fig, plot_name, images_dir, "plot_top_features")
+    _save_fig_as_svg(fig, plot_name, settings.images_dir, "plot_top_features")
 
 
 def _plot_single_bivariate_chart(
     table: pl.DataFrame,
     variable_to_plot: str,
-    images_dir: Path,
     analysis_name: str,
     settings: Settings | None = None,
 ) -> None:
@@ -167,17 +159,18 @@ def _plot_single_bivariate_chart(
     clientes por bin junto con una línea del porcentaje de la variable
     target en un eje secundario.
 
-    El resultado se exporta a {images_dir}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
+    El resultado se exporta a:
+    {settings.images_dir}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
 
     ## Args:
         table: Tabla de análisis bivariado con las columnas de intervalo,
             conteo de clientes y porcentaje de la variable target.
         variable_to_plot: Nombre de la variable analizada. Se usa como título
             y como nombre del archivo generado.
-        images_dir: Directorio base donde se guarda la imagen.
         analysis_name: Nombre del análisis. Define el subdirectorio de salida.
-        settings: Configuración con el nombre de la columna target. Si no se
-            indica, se obtiene la configuración global.
+        settings: Configuración con el nombre de la columna target y el directorio
+            base donde se guarda la imagen. Si no se indica, se obtiene la
+            configuración global.
     """
     if settings is None:
         settings = get_settings()
@@ -209,14 +202,16 @@ def _plot_single_bivariate_chart(
 
     fig.tight_layout()
     _save_fig_as_svg(
-        fig, variable_to_plot, images_dir, f"bivariate_analysis/{analysis_name}"
+        fig,
+        variable_to_plot,
+        settings.images_dir,
+        f"bivariate_analysis/{analysis_name}",
     )
 
 
 def plot_bivariate_charts(
     tables: Mapping[str, pl.DataFrame],
     analysis_name: str,
-    images_dir: Path = IMAGES_DIR,
     max_workers: int | None = None,
     settings: Settings | None = None,
 ) -> None:
@@ -227,18 +222,19 @@ def plot_bivariate_charts(
     hay pocas tablas, y ejecución en paralelo con procesos separados en caso
     contrario para acelerar la generación de una gran cantidad de gráficos.
 
-    Las imágenes se exportan a {images_dir}/bivariate_analysis/{analysis_name}/
+    Las imágenes se exportan a:
+    {settings.images_dir}/bivariate_analysis/{analysis_name}/
 
     ## Args:
         tables: Diccionario que asocia cada nombre de variable con su tabla de
             análisis bivariado.
         analysis_name: Nombre del análisis. Define el subdirectorio de salida.
-        images_dir: Directorio base donde se guardan las imágenes.
         max_workers: Cantidad máxima de procesos en paralelo. Si no se indica,
             se usan todos los núcleos disponibles. si len(tables) < 20 se usa
             1 solo proceso. El valor 1 fuerza la ejecución secuencial.
-        settings: Configuración con el nombre de la columna target. Si no se
-            indica, se obtiene la configuración global.
+        settings: Configuración con el nombre de la columna target y el
+            directorio base donde se guardan las imágenes. Si no se indica,
+            se obtiene la configuración global.
     """
     if settings is None:
         settings = get_settings()
@@ -248,7 +244,6 @@ def plot_bivariate_charts(
             _plot_single_bivariate_chart(
                 table,
                 variable_to_plot,
-                images_dir,
                 analysis_name,
                 settings,
             )
@@ -259,7 +254,6 @@ def plot_bivariate_charts(
                     _plot_single_bivariate_chart,
                     table,
                     variable_to_plot,
-                    images_dir,
                     analysis_name,
                     settings,
                 )
@@ -276,7 +270,7 @@ def plot_evaluation_metrics(
     fpr: np.ndarray,
     tpr: np.ndarray,
     plot_name: str,
-    images_dir: Path = IMAGES_DIR,
+    settings: Settings | None = None,
 ) -> None:
     """Genera una curva ROC con las métricas resumidas de evaluación.
 
@@ -284,7 +278,8 @@ def plot_evaluation_metrics(
     junto con la línea de referencia diagonal de un clasificador aleatorio.
     Incluye una anotación con los valores de accuracy y ROC AUC.
 
-    El resultado se exporta a {images_dir}/plot_evaluation_metrics/{plot_name}.svg
+    El resultado se exporta a:
+    {settings.images_dir}/plot_evaluation_metrics/{plot_name}.svg
 
     ## Args:
         roc_auc: Métrica ROC AUC del modelo evaluado.
@@ -292,8 +287,12 @@ def plot_evaluation_metrics(
         fpr: Tasas de falsos positivos de la curva ROC.
         tpr: Tasas de verdaderos positivos de la curva ROC.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
-        images_dir: Directorio base donde se guarda la imagen.
+        settings: Configuración con el directorio base donde se guarda la imagen.
+            Si no se indica, se obtiene la configuración global.
     """
+    if settings is None:
+        settings = get_settings()
+
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.plot(fpr, tpr)
     ax.plot([0, 1], [0, 1], color="gray", linestyle="--", alpha=0.7)
@@ -313,7 +312,7 @@ def plot_evaluation_metrics(
     ax.set_ylim(0, 1)
     ax.grid(True, linestyle=":", alpha=0.6)
 
-    _save_fig_as_svg(fig, plot_name, images_dir, "plot_evaluation_metrics")
+    _save_fig_as_svg(fig, plot_name, settings.images_dir, "plot_evaluation_metrics")
 
 
 def _plot_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
@@ -370,7 +369,7 @@ def plot_deciles(
     plot_name: str,
     title_train_deciles: str = "Train Deciles",
     title_test_deciles: str = "Test Deciles",
-    images_dir: Path = IMAGES_DIR,
+    settings: Settings | None = None,
 ) -> None:
     """Genera un gráfico con tablas de deciles de entrenamiento y prueba.
 
@@ -378,7 +377,8 @@ def plot_deciles(
     entrenamiento y otra para el conjunto de prueba, y guarda el resultado como
     un único archivo SVG optimizado.
 
-    El resultado se exporta a {images_dir}/plot_evaluation_metrics/{plot_name}.svg
+    El resultado se exporta a:
+    {settings.images_dir}/plot_evaluation_metrics/{plot_name}.svg
 
     ## Args:
         train_deciles: Tabla de deciles calculada sobre el conjunto de
@@ -387,12 +387,16 @@ def plot_deciles(
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
         title_train_deciles: Título de la tabla de entrenamiento.
         title_test_deciles: Título de la tabla de prueba.
-        images_dir: Directorio base donde se guarda la imagen.
+        settings: Configuración con el directorio base donde se guarda la imagen.
+            Si no se indica, se obtiene la configuración global.
     """
+    if settings is None:
+        settings = get_settings()
+
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8), dpi=300)
 
     _plot_single_deciles_table(ax1, train_deciles, title_train_deciles)
     _plot_single_deciles_table(ax2, test_deciles, title_test_deciles)
 
     plt.tight_layout()
-    _save_fig_as_svg(fig, plot_name, images_dir, "plot_evaluation_metrics")
+    _save_fig_as_svg(fig, plot_name, settings.images_dir, "plot_evaluation_metrics")

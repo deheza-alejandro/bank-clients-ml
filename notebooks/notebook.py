@@ -4,8 +4,6 @@ __generated_with = "0.24.2"
 app = marimo.App(width="full")
 
 with app.setup:
-    from pathlib import Path
-
     import marimo as mo
     import polars as pl
 
@@ -47,8 +45,7 @@ with app.setup:
     )
 
     settings = get_settings()
-    notebook_dir = Path(__file__).parent
-    raw_data = pl.read_parquet(notebook_dir.parent / "data" / "data.parquet")
+    raw_data = pl.read_parquet(settings.data_dir / "data.parquet")
 
 
 @app.cell(hide_code=True)
@@ -724,7 +721,7 @@ def _():
     }
     build_plot_tabs(
         groups_names,
-        notebook_dir / "images" / "plot_top_features",
+        settings.images_dir / "plot_top_features",
         orientation="vertical",
     )
     return
@@ -738,8 +735,7 @@ def _(groups_trainer, uncorrelated_train):
     mo.ui.tabs(
         {
             "Top grouped features importances": mo.image(
-                src=notebook_dir
-                / "images"
+                src=settings.images_dir
                 / "plot_top_features"
                 / "top_grouped_features.svg"
             ),
@@ -773,7 +769,7 @@ def _(column_filter, top_grouped_features):
     }
     build_plot_tabs(
         uncorrelated_names,
-        notebook_dir / "images" / "bivariate_analysis" / "uncorrelated",
+        settings.images_dir / "bivariate_analysis" / "uncorrelated",
         orientation="vertical",
     )
     return
@@ -809,7 +805,7 @@ def _(column_filter):
     column_filter.plot_correlated(list(correlated_names.keys()), "correlated")
     build_plot_tabs(
         correlated_names,
-        notebook_dir / "images" / "bivariate_analysis" / "correlated",
+        settings.images_dir / "bivariate_analysis" / "correlated",
         orientation="vertical",
     )
     return
@@ -892,7 +888,7 @@ def _(best_features, best_features_names, column_filter, final_train):
     column_filter.plot_adhoc(final_train, best_features, "best_features")
     build_plot_tabs(
         best_features_names,
-        notebook_dir / "images" / "bivariate_analysis" / "best_features",
+        settings.images_dir / "bivariate_analysis" / "best_features",
         orientation="vertical",
     )
     return
@@ -918,7 +914,7 @@ def _(best_features, best_features_names, final_test, final_train):
     mo.ui.tabs(
         {
             "Best features importances": mo.image(
-                src=notebook_dir / "images" / "plot_top_features" / "best_features.svg"
+                src=settings.images_dir / "plot_top_features" / "best_features.svg"
             ),
             "Best features searcher": final_trainer.get_searcher_view(
                 include_logs=True
@@ -932,8 +928,8 @@ def _(best_features, best_features_names, final_test, final_train):
 def _():
     mo.md(rf"""
     ## Metrics results
-    {mo.image(src=notebook_dir / "images" / "plot_evaluation_metrics" / "lightgbm.svg")}
-    {mo.image(src=notebook_dir / "images" / "plot_evaluation_metrics" / "deciles.svg")}
+    {mo.image(src=settings.images_dir / "plot_evaluation_metrics" / "lightgbm.svg")}
+    {mo.image(src=settings.images_dir / "plot_evaluation_metrics" / "deciles.svg")}
 
     ### Training
     - Ordena todos los deciles bien
