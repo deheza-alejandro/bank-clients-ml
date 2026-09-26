@@ -11,7 +11,7 @@ el cálculo de deciles de probabilidad y la evaluación sobre el conjunto de pru
 import io
 from collections.abc import Mapping
 from contextlib import redirect_stderr, redirect_stdout
-from typing import cast
+from typing import Any, cast
 
 import lightgbm as lgb
 import marimo as mo
@@ -346,13 +346,27 @@ class LGBMTrainer:
             ) = _evaluate(self.searcher, train, test, self.columns, self._settings)
             self.is_testable = True
 
-    def print_search_logs(self) -> None:
-        """Muestra los registros de la búsqueda en la salida del notebook."""
-        mo.output.append(mo.md(f"```text\n{self.search_logs}\n```"))
+    def get_searcher_view(
+        self, include_logs: bool = False
+    ) -> mo.Html | RandomizedSearchCV:
+        """Retorna componentes de marimo para visualizar el buscador entrenado.
 
-    def print_searcher(self) -> None:
-        """Muestra el objeto de búsqueda entrenado en la salida del notebook."""
-        mo.output.append(self.searcher)
+        ## Args:
+            include_logs: Si es True, incluye los logs de búsqueda en formato de texto.
+
+        ## Returns:
+            elementos visuales de marimo listos para mostrarse en el notebook.
+        """
+        if include_logs:
+            return mo.vstack(
+                [
+                    self.searcher,
+                    mo.md("### Search logs"),
+                    mo.md(f"```text\n{self.search_logs}\n```"),
+                ]
+            )
+        else:
+            return self.searcher
 
     def plot_top_features(
         self, plot_name: str, renames: Mapping[str, str] | None = None
@@ -480,30 +494,38 @@ class GroupsLGBMTrainer:
             for group_name, (cols, top_n) in columns_groups.items()
         }
 
-    def print_groups_lengths(self) -> None:
-        """Muestra la cantidad de columnas de cada grupo en el notebook."""
+    def get_groups_lengths_views(self) -> mo.Html:
+        """Retorna componentes de marimo con la cantidad de columnas de cada grupo."""
+        lengths = []
         for group_name, trainer in self.trainers.items():
-            mo.output.append(f"{group_name}: {len(trainer.columns)}")
+            lengths.append(f"{group_name}: {len(trainer.columns)}")
 
-        mo.output.append(mo.md("\n\n### others:"))
-        mo.output.append(self.trainers["others"].columns)
+        return mo.vstack(lengths)
 
-    def print_searchers(self) -> None:
-        """Muestra los buscadores entrenados de cada grupo en el notebook."""
+    def get_searcher_views(self, include_logs: bool = False) -> dict[str, Any]:
+        """Retorna componentes de marimo para visualizar los buscadores de cada grupo.
+
+        ## Args:
+            include_logs: Si es True, incluye los logs de búsqueda
+                junto a cada buscador en formato de texto.
+
+        ## Returns:
+            Un diccionario con elementos visuales de marimo organizados por
+            nombre de grupo, listos para mostrarse en el notebook.
+        """
+        searchers: dict[str, Any] = {}
+
         for group_name, trainer in self.trainers.items():
-            mo.output.append(mo.md(f"### {group_name}:"))
-            trainer.print_searcher()
+            searchers[f"{group_name} searcher"] = trainer.get_searcher_view(
+                include_logs
+            )
+
+        return searchers
 
     def plot_top_features(self) -> None:
         """Genera el gráfico de variables importantes para cada grupo."""
         for group_name, trainer in self.trainers.items():
             trainer.plot_top_features(group_name)
-
-    def print_search_logs(self) -> None:
-        """Muestra los registros de búsqueda de cada grupo en el notebook."""
-        for group_name, trainer in self.trainers.items():
-            mo.output.append(mo.md(f"### {group_name}:"))
-            trainer.print_search_logs()
 
     def get_top_grouped_features(self) -> list[str]:
         """Retorna las mejores variables de cada grupo, sin el grupo base.
