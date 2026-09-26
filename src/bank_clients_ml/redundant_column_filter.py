@@ -15,9 +15,8 @@ y finalmente aplicar transformaciones de bines con `apply_bin_transformations`.
     RedundantColumnFilter: Filtro secuencial de columnas redundantes con análisis bivariado.
 """
 
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
-import marimo as mo
 import numpy as np
 import polars as pl
 
@@ -405,24 +404,18 @@ class RedundantColumnFilter:
         self.uncorrelated_test = self.correlated_test.drop(to_delete)
         self._train_analysis: dict[str, pl.DataFrame] = {}
 
-    def print_constant_cols(self) -> None:
-        """Muestra las columnas constantes y la forma del conjunto reducido."""
-        mo.output.append(mo.md("### constant_cols:"))
-        mo.output.append(self.constant_cols)
-        mo.output.append(f"train without constant_cols: {self.reduced_train.shape}")
+    def get_imbalanced_binary_counts(self) -> pl.DataFrame:
+        """Calcula la frecuencia de cada valor en las columnas binarias desbalanceadas.
 
-    def print_imbalanced_binary_columns(self) -> None:
-        """Muestra el conteo de las columnas binarias desbalanceadas."""
-        mo.output.append(mo.md("### imbalanced_binary_columns:"))
-        mo.output.append(
-            low_cardinality_value_counts(
-                self.reduced_train.select(self.imbalanced_binary_columns)
-            )
-        )
-        mo.output.append(
-            mo.md(
-                f"train without imbalanced_binary_columns: {self.correlated_train.shape}"
-            )
+        Filtra y cuenta las ocurrencias de los valores presentes en las columnas
+        definidas en `imbalanced_binary_columns`.
+
+        ## Returns:
+            DataFrame con la distribución de frecuencias conteniendo las columnas
+            `column`, `value` y `count`.
+        """
+        return low_cardinality_value_counts(
+            self.reduced_train.select(self.imbalanced_binary_columns)
         )
 
     def _build_tables_and_plot(
@@ -559,15 +552,25 @@ class RedundantColumnFilter:
             .sort(pl.col("correlation").abs(), descending=True)
         )
 
-    def print_correlations_for_each(self, columns: list[str]) -> None:
-        """Muestra las variables correlacionadas de cada columna indicada.
+    def correlations_for_each(self, columns: list[str]) -> dict[str, Any]:
+        """Obtiene las variables correlacionadas de cada columna indicada.
 
         ## Args:
-            columns: Columnas de referencia para buscar correlaciones altas.
+            target_columns: Nombres de las columnas sobre las cuales se buscan
+                correlaciones altas.
+
+        ## Returns:
+            Diccionario que mapea cada columna con sus resultados de
+            correlación correspondientes.
         """
+        correlations_dict: dict[str, Any] = {}
+
         for column in columns:
-            mo.output.append(mo.md(f"###  Columns correlated with {column}:"))
-            mo.output.append(self._get_correlations_for(column))
+            correlations_dict[f'Correlated with "{column}"'] = (
+                self._get_correlations_for(column)
+            )
+
+        return correlations_dict
 
     def apply_bin_transformations(
         self, bins_transformations: list[BinTransformation]
