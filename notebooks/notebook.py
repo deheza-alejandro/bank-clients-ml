@@ -51,7 +51,12 @@ with app.setup:
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # 1. EDA (Exploratory Data Analysis)
+    # 1. Exploratory Data Analysis (EDA)
+
+    Se analiza:
+    - Valores atípicos de variables de montos y de días
+    - Cardinalidad de todas las variables.
+    - (En la siguiente celda) Se buscan valores nulos
     """)
     return
 
@@ -115,7 +120,9 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    Realizo una limpieza inicial
+    ## 1.1 Initial Data Cleaning
+
+    Se elimina el registro identificado en la celda anterior, el cual solo tenia valores nulos. También se modifican los tipos de las variables de fechas y la variable id para evitar que se propaguen errores de tipo.
     """)
     return
 
@@ -144,8 +151,9 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # 2. Universe and Target
-    Obtengo meses relevantes
+    # 2. Universe and Target Definition
+
+    Se obtienen los meses de las ventanas de entrenamiento y predicción, con una lead window de 1 mes.
     """)
     return
 
@@ -173,11 +181,13 @@ def _(clean_data):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    Mantengo en el universo los clientes que:
-    - tienen 9 meses de historia
-    - no tienen 'Package_Active' y 'CreditCard_CoBranding' en el ultimo mes de la ventana de entrenamiento
+    ## 2.1 Universe Filtering Criteria
 
-    y para cada cliente del universo mantengo la columna de target de la ventana de predicción
+    Se conservan en el universo los clientes que:
+    - Tienen 9 meses de historia
+    - No tienen en el último mes de la ventana de entrenamiento:
+        - `Package_Active`, para que el modelo aprenda a predecir la primera compra y no la renovación o el uso ya existente.
+        - `CreditCard_CoBranding`, por regla de negocio ya se sabe que estos clientes no suelen comprar, esta inversamente correlacionada con el target.
     """)
     return
 
@@ -228,7 +238,7 @@ def _(clean_data, last_training_month, prediction_months, training_months):
 def _():
     mo.md(r"""
     # 3. Feature Engineering
-    ## 3.1. Missing value imputation
+    ## 3.1 Missing Value Imputation
     """)
     return
 
@@ -247,8 +257,9 @@ def _(training_data):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 3.1.1. SavingAccount_Balance_Average
-    Primero se analizan registros con nulos en SavingAccount_Balance_Average y valores monetarios de SavingAccount sin nulos:
+    ### 3.1.1 Saving Account Balance (Average)
+
+    Primero se analizan registros con nulos en `SavingAccount_Balance_Average` y valores monetarios de `SavingAccount` sin nulos.
     """)
     return
 
@@ -272,8 +283,7 @@ def _(training_data):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    Luego saco el promedio entre "SavingAccount_Balance_FirstDate" y "SavingAccount_Balance_LastDate".
-    Este no es el calculo correcto para "SavingAccount_Balance_Average", pero no va a afectar tanto al modelo porque son solo 4 registros con nulos ademas de que no hay una forma sencilla de calcular el "SavingAccount_Balance_Average" con los datos que tenemos
+    Ante la imposibilidad de recalcular el promedio diario exacto con los datos disponibles, se aproxima como el promedio entre el saldo inicial y final (`SavingAccount_Balance_FirstDate` y `SavingAccount_Balance_LastDate`). Son solo cuatro registros, por lo que el impacto en el modelo es mínimo.
     """)
     return
 
@@ -303,8 +313,9 @@ def _(training_data):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 3.1.2. Region
-    Traigo las regiones de los clientes desde la ventana de predicción y pongo la Region mas común para llenar los nulos restantes
+    ### 3.1.2 Region
+
+    `Region` es una variable estable del cliente, por lo que un nulo en entrenamiento suele deberse a un vacío de carga y no a un cambio real. Por lo tanto, se obtienen estos datos desde la ventana de predicción, y para los nulos restantes, se los llena con la Region mas común (`BUENOS AIRES`).
     """)
     return
 
@@ -347,15 +358,13 @@ def _(prediction_data, training_data_1, universe_and_target_data):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 3.1.3. CreditCard_Product
+    ### 3.1.3 CreditCard Product
 
-    Traigo los CreditCard_Product de la ventana de predicción.
+    Se traen los tipos de tarjeta de crédito (`CreditCard_Product`) de la ventana de predicción.
 
-    Hay algunos clientes que tienen un CreditCard_Product en el primer mes de predicción y otro CreditCard_Product en el segundo mes de predicción
+    Hay algunos clientes que tienen un tipo de tarjeta en el primer mes de predicción y otro tipo de tarjeta en el segundo mes de predicción. Por lo tanto se obtiene el valor del primer mes de la ventana de predicción y, si este es null o no existe, se toma el valor del segundo mes como fallback, incluso si también es null.
 
-    Por lo tanto se obtiene el valor del primer mes de la ventana de predicción y, si este es null o no existe, toma el valor del segundo mes como fallback, incluso si también es null
-
-    Luego para llenar los nulos restantes, pongo la CreditCard_Product mas común cuando el cliente no tiene `CreditCard_Active` en la ventana de predicción pero si tiene `CreditCard_Active` en la ventana de entrenamiento. en los demás casos lleno los nulls con "0" (cuando no tiene `CreditCard_Active` en la ventana de predicción ni en la ventana de entrenamiento o cuando no tiene `CreditCard_Active` en la ventana de entrenamiento, por mas que lo tenga en la ventana de predicción)
+    Luego para llenar los nulos restantes, se usa el tipo de tarjeta (`CreditCard_Product`) mas común cuando el cliente no tiene tarjeta activa (`CreditCard_Active`) en la ventana de predicción pero si tiene tarjeta activa en la ventana de entrenamiento. En los demás casos se llenan los nulls con "0" (cuando no tiene tarjeta activa en la ventana de predicción ni en la ventana de entrenamiento o cuando no tiene tarjeta activa en la ventana de entrenamiento, por mas que lo tenga en la ventana de predicción).
     """)
     return
 
@@ -412,7 +421,9 @@ def _(
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 3.2. Identity Features
+    ## 3.2 Identity Features
+
+    Las Identity Features se toman del último mes de la ventana de entrenamiento. Ademas, las variables con valores `Yes/No` y `M/F` se pasan a valores binarios (0 ó 1).
     """)
     return
 
@@ -457,7 +468,9 @@ def _(last_training_month, training_data_3):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 3.3. Categorical Variables
+    ## 3.3 Categorical Features Encoding
+
+    Las variables `Client_Age_grp`, `Region` y `CreditCard_Product` se codifican con su porcentaje respecto al target, para capturar su relación con el target sin expandir la dimensionalidad con técnicas como "one hot encoding".
     """)
     return
 
@@ -487,7 +500,9 @@ def _(categorical_cols, identity_features, training_data_4):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 3.4. Dates
+    ## 3.4 Date-Derived Features
+
+    Las fechas absolutas se reemplazan por "diferencia entre primer y último producto" y por "recencia" desde el último producto, que expresan lo mismo en una escala relativa y estable en el tiempo.
     """)
     return
 
@@ -520,10 +535,10 @@ def _(identity_features_1, last_training_month):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 3.5. Transform features
-    Primero analizo:
-    - valores mínimos y ceros
-    - valores monetarios de CreditCard
+    ## 3.5 Feature Transformation
+    Se analizan:
+    - Valores mínimos y ceros
+    - Valores monetarios de CreditCard
     """)
     return
 
@@ -546,7 +561,7 @@ def _(training_data_5):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    Realizo las transformaciones
+    Se aplican transformaciones.
     """)
     return
 
@@ -593,6 +608,8 @@ def _(training_data_5):
 def _():
     mo.md(r"""
     ## 3.6 Aggregate Features
+
+    La historia de nueve meses debe convertirse en una tabla con un registro por cliente para el entrenamiento supervisado (ABT). En esta parte se realizan las agregaciones para poder conseguir esto.
     """)
     return
 
@@ -614,9 +631,9 @@ def _(
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # 4. ABT (analytical base table) and Train/Test split
-    - Agrego transformadas extras luego de generar la ABT
-    - Divido los datos es train y test
+    # 4. Analytical Base Table (ABT) and Train-Test Split
+
+    Luego de obtener la ABT se aplican algunas transformaciones adicionales. Luego se realiza una partición estratificada para obtener el set de "train" y el set de "test", preservando la tasa del target en ambos conjuntos.
     """)
     return
 
@@ -644,11 +661,9 @@ def _(data_agg, identity_features_2):
 def _():
     mo.md(r"""
     # 5. Feature Selection
-    ## 5.1. Dimensionality reduction
-    Elimino:
-    - columnas con valores únicos
-    - columnas binarias con baja representatividad
-    - columnas correlacionadas entre si
+    ## 5.1 Dimensionality Reduction
+
+    Se eliminan columnas constantes, columnas binarias desbalanceadas y columnas altamente correlacionadas, para disminuir el costo computacional antes del ranking con LightGBM.
     """)
     return
 
@@ -681,13 +696,10 @@ def _(test, train):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 5.2. Agrupo las variables por fuente y luego las ordeno según importancia usando lightGBM
+    ## 5.2 Group-Wise Importance Ranking
+    Para poder ordenar las variables según su importancia, se agrupan las variables por fuente de negocio y se entrena un modelo LightGBM por grupo, además de un modelo con todas las variables. Esta comparación permite identificar qué origen aporta más. Luego se entrena un modelo con las mejores variables de todos los grupos.
 
-    No estandarizo el dataframe por que lightGBM no lo necesita
-
-    - primero entreno con todas las variables, para tener roc de referencia:
-    - luego entreno con cada grupo por separado
-    - luego entreno con los mejores de cada grupo al mismo tiempo
+    No se estandariza el dataframe porque los algoritmos basados en arboles como lightGBM no lo necesitan.
     """)
     return
 
@@ -748,7 +760,9 @@ def _(groups_trainer, uncorrelated_train):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 5.3. Bivariate Analysis
+    ## 5.3 Bivariate Analysis
+
+    Se realiza análisis bivariado sobre las variables mas relevantes.
     """)
     return
 
@@ -778,8 +792,9 @@ def _(column_filter, top_grouped_features):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 5.4. Buscando variables correlacionadas eliminadas anteriormente
-    Para poder intercambiar las variables mas importantes por variables mas fáciles de interpretar, si es que existen.
+    ## 5.4 Review of Correlated Features
+
+    Se revisan las variables descartadas por correlación para poder intercambiar las variables mas importantes por variables mas fáciles de interpretar, si es que existen.
     """)
     return
 
@@ -814,21 +829,18 @@ def _(column_filter):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 5.5. Transformando mejores variables
+    ## 5.5 Feature Binning
 
-    Elijo variables según importancias y análisis bivariado, las transformo agregándoles el porcentaje de target y agrupo los valores en bins. A las variables categóricas solo las agrupo (ya las transforme anteriormente)
+    Las features mas relevantes se agrupan en bines y se codifican con su porcentaje respecto al target. A las features categóricas solo se las agrupa en bines (ya se codificaron anteriormente).
 
-    variables elegidas:
-    - Client_Age_grp
-        - agrupo "Entre 50 y 59 años" + "Entre 60 y 64 años" + "Entre 65 y 69 años" (final: "Entre 50 y 69 años")
-        - default -> junto todas las demás edades ("Entre 18 y 29 años" + "Entre 30 y 39 años" + "Entre 40 y 49 años" + "Mayor a 70 años")
-    - Operations_total_mean
-    - Operations_total_median
-    - CreditCard_Product
-        - mantengo tipo tarjeta 202 y 104 separados
-        - default ->  junto los demás tipos de tarjetas de bajo porcentaje de target y los tipos de tarjetas poco representativas en un solo bin (sin tarjeta de crédito + 102 + 123 + 124 + 702 + 1002)
-    - CreditCard_Active (no hace falta transformar)
-    - Quantity_Active_Products_min
+
+    Features mas relevantes:
+
+    - `Client_Age_grp`: se fusionan los tramos de 50 a 69 años; el resto se fusionan en un solo bin ("Entre 18 y 49 años" + "Mayor a 70 años").
+    - `Operations_total_mean` y `Operations_total_median`.
+    - `CreditCard_Product`: se conservan los bines de los tipos de tarjeta 202 y 104 por separado; los demás tipos de tarjetas, que tienen bajo porcentaje de target o son tipos de tarjetas poco representativas, se consolidan en un solo bin (sin tarjeta de crédito + 102 + 123 + 124 + 702 + 1002).
+    - `CreditCard_Active` (no hace falta codificar ni agrupar en bines).
+    - `Quantity_Active_Products_min`.
     """)
     return
 
@@ -897,8 +909,9 @@ def _(best_features, best_features_names, column_filter, final_train):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # 6. Final Training and Performance
-    Entreno con las mejores features y evalúo los mejores hiperparámetros encontrados. No realizo ningún balanceo porque la proporción del target ya es del 30%
+    # 6. Final Training and Performance Evaluation
+
+    El modelo final se entrena solo con las 4 features finales seleccionadas luego del binning y se evalúa el mejor modelo con los mejores hiperparámetros encontrados. No se aplica balanceo sobre los datos porque la proporción del target, cercana al 30%, ya es suficiente.
     """)
     return
 
@@ -927,25 +940,24 @@ def _(best_features, best_features_names, final_test, final_train):
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    ## Metrics results
+    ## 6.1 Performance Metrics
     {mo.image(src=settings.images_dir / "plot_evaluation_metrics" / "lightgbm.svg")}
     {mo.image(src=settings.images_dir / "plot_evaluation_metrics" / "deciles.svg")}
 
     ### Training
-    - Ordena todos los deciles bien
-    - Deciles más o menos parejos
-    - Lift del primer decil = 2,4
-    - KS = 47.04 en el 5to decil
+
+    - Ordenamiento correcto en todos los deciles, con una distribución relativamente homogénea.
+    - Lift del 1er decil de 2,4 y KS de 47,04 en el 5to decil.
 
     ### Testing
-    - Ordena todos los deciles bien
-    - Deciles más o menos parejos
-    - Lift del primer decil = 2,36
-    - KS = 47.22 en el 4to decil
 
-    ### Diferencias
-    - Lift -> 0,4
-    - ~~KS -> 0,2~~
+    - Ordenamiento correcto en todos los deciles, con una distribución relativamente homogénea.
+    - Lift del 1er decil de 2,36 y KS de 47,22 en el 4to decil.
+
+    ### Stability Gap
+
+    - Diferencia de lift de 0,04 en el mismo decil.
+    - Diferencia de KS de 0,18, con 1 decil de diferencia.
     """)
     return
 
