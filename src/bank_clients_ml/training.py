@@ -346,10 +346,13 @@ class LGBMTrainer:
             ) = _evaluate(self.searcher, train, test, self.columns, self._settings)
             self.is_testable = True
 
-    def get_searcher_view(
-        self, include_logs: bool = False
-    ) -> mo.Html | RandomizedSearchCV:
-        """Retorna componentes de marimo para visualizar el buscador entrenado.
+    def get_searcher_view(self, include_logs: bool = False) -> mo.Html:
+        """Retorna componentes de marimo para visualizar los modelos entrenados.
+
+        Permite visualizar las combinaciones de hiperparámetros de los modelos
+        probados con validación cruzada, ordenados por la métrica obtenida
+        (`rank_test_score`). Ademas permite ver el mejor modelo y opcionalmente
+        los logs.
 
         ## Args:
             include_logs: Si es True, incluye los logs de búsqueda en formato de texto.
@@ -357,16 +360,25 @@ class LGBMTrainer:
         ## Returns:
             elementos visuales de marimo listos para mostrarse en el notebook.
         """
-        if include_logs:
-            return mo.vstack(
+        cross_validation_results = (
+            pl.DataFrame(self.searcher.cv_results_)
+            .select(
                 [
-                    self.searcher,
-                    mo.md("### Search logs"),
-                    mo.md(f"```text\n{self.search_logs}\n```"),
+                    pl.col("rank_test_score"),
+                    pl.all().exclude(["rank_test_score", "params"]),
                 ]
             )
-        else:
-            return self.searcher
+            .sort("rank_test_score")
+        )
+        marimo_items: list[object] = [
+            cross_validation_results,
+            self.searcher,
+        ]
+        if include_logs:
+            marimo_items.extend(
+                [mo.md("### Search logs"), mo.md(f"```text\n{self.search_logs}\n```")]
+            )
+        return mo.vstack(marimo_items)
 
     def plot_top_features(
         self, plot_name: str, renames: Mapping[str, str] | None = None
@@ -508,8 +520,8 @@ class GroupsLGBMTrainer:
 
         return mo.vstack(lengths)
 
-    def get_searcher_views(self, include_logs: bool = False) -> dict[str, Any]:
-        """Retorna componentes de marimo para visualizar los buscadores de cada grupo.
+    def get_searcher_views(self, include_logs: bool = False) -> dict[str, mo.Html]:
+        """Retorna componentes de marimo con las combinaciones de cada grupo.
 
         ## Args:
             include_logs: Si es True, incluye los logs de búsqueda
