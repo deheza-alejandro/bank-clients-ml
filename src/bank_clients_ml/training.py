@@ -68,7 +68,7 @@ def _fit_lgbm_random_search(
     classifier = lgb.LGBMClassifier(
         random_state=settings.random_state,
         n_jobs=1,
-        verbose=verbose,
+        verbose=-1,
         metric="auc",
     )
 
