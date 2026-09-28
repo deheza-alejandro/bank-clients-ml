@@ -391,22 +391,18 @@ class LGBMTrainer:
                 Si no se indica, se conservan los nombres originales.
         """
         if renames is not None:
-            importances_renamed = _with_rename_columns(
+            temp_importances = _with_rename_columns(
                 self._importances, renames, self._settings
             )
-            plot_top_features(
-                importances_renamed,
-                plot_name,
-                self.searcher.best_score_,
-                settings=self._settings,
-            )
         else:
-            plot_top_features(
-                self._importances,
-                plot_name,
-                self.searcher.best_score_,
-                settings=self._settings,
-            )
+            temp_importances = self._importances
+
+        plot_top_features(
+            temp_importances,
+            plot_name,
+            self.searcher.best_score_,
+            settings=self._settings,
+        )
 
     def get_top_ranked_features(self) -> list[str]:
         """Retorna los nombres de las variables mas relevantes según importancia."""
