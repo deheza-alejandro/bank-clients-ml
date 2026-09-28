@@ -712,8 +712,8 @@ def _(uncorrelated_train):
         {
             "Groups lengths": groups_trainer.get_groups_lengths_views(),
             '"Others" Columns': groups_trainer.trainers["others"].columns,
-            "Groups searchers": mo.accordion(
-                groups_trainer.get_searcher_views(include_logs=True)
+            "Groups Cross Validation Results": mo.accordion(
+                groups_trainer.get_cv_results(include_logs=True)
             ),
         }
     )
@@ -751,7 +751,7 @@ def _(groups_trainer, uncorrelated_train):
                 / "plot_top_features"
                 / "top_grouped_features.svg"
             ),
-            "Searcher": trainer.get_searcher_view(include_logs=True),
+            "Cross Validation Results": trainer.get_cv_results(include_logs=True),
         }
     )
     return top_grouped_features, trainer
@@ -926,10 +926,10 @@ def _(best_features, best_features_names, final_test, final_train):
     final_trainer.plot_deciles(plot_name="deciles")
     mo.ui.tabs(
         {
-            "Best features importances": mo.image(
+            "Best Features Importances": mo.image(
                 src=settings.images_dir / "plot_top_features" / "best_features.svg"
             ),
-            "Best features searcher": final_trainer.get_searcher_view(
+            "Best Features Cross Validation Results": final_trainer.get_cv_results(
                 include_logs=True
             ),
         }

@@ -346,13 +346,12 @@ class LGBMTrainer:
             ) = _evaluate(self.searcher, train, test, self.columns, self._settings)
             self.is_testable = True
 
-    def get_searcher_view(self, include_logs: bool = False) -> mo.Html:
-        """Retorna componentes de marimo para visualizar los modelos entrenados.
+    def get_cv_results(self, include_logs: bool = False) -> mo.Html:
+        """Retorna componentes de marimo para visualizar los resultados del entrenamiento.
 
         Permite visualizar las combinaciones de hiperparámetros de los modelos
         probados con validación cruzada, ordenados por la métrica obtenida
-        (`rank_test_score`). Ademas permite ver el mejor modelo y opcionalmente
-        los logs.
+        (`rank_test_score`). Opcionalmente permite ver los logs.
 
         ## Args:
             include_logs: Si es True, incluye los logs de búsqueda en formato de texto.
@@ -370,10 +369,7 @@ class LGBMTrainer:
             )
             .sort("rank_test_score")
         )
-        marimo_items: list[object] = [
-            cross_validation_results,
-            self.searcher,
-        ]
+        marimo_items: list[object] = [cross_validation_results]
         if include_logs:
             marimo_items.extend(
                 [mo.md("### Search logs"), mo.md(f"```text\n{self.search_logs}\n```")]
@@ -516,7 +512,7 @@ class GroupsLGBMTrainer:
 
         return mo.vstack(lengths)
 
-    def get_searcher_views(self, include_logs: bool = False) -> dict[str, mo.Html]:
+    def get_cv_results(self, include_logs: bool = False) -> dict[str, mo.Html]:
         """Retorna componentes de marimo con las combinaciones de cada grupo.
 
         ## Args:
@@ -527,14 +523,12 @@ class GroupsLGBMTrainer:
             Un diccionario con elementos visuales de marimo organizados por
             nombre de grupo, listos para mostrarse en el notebook.
         """
-        searchers: dict[str, Any] = {}
+        results: dict[str, Any] = {}
 
         for group_name, trainer in self.trainers.items():
-            searchers[f"{group_name} searcher"] = trainer.get_searcher_view(
-                include_logs
-            )
+            results[f"{group_name} searcher"] = trainer.get_cv_results(include_logs)
 
-        return searchers
+        return results
 
     def plot_top_features(self) -> None:
         """Genera el gráfico de variables importantes para cada grupo."""
