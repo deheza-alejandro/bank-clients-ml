@@ -31,6 +31,9 @@ class Settings(BaseSettings):
         col_target: Nombre de la columna target del modelo.
         col_feature: Nombre genérico de la columna de feature.
         col_importance: Nombre genérico de la columna de importancia de variable.
+        project_dir: Directorio base del proyecto.
+        data_dir: Directorio de datos calculado dinámicamente de project_dir.
+        images_dir: Directorio de imágenes calculado dinámicamente de project_dir.
     """
 
     debug: bool = False
