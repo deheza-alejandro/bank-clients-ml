@@ -544,9 +544,12 @@ class GroupsLGBMTrainer:
         ## Returns:
             Nombres de las variables seleccionadas por grupo.
         """
-        return [
-            feature
-            for group_name, trainer in self.trainers.items()
-            if group_name != "all_columns"
-            for feature in trainer.get_top_ranked_features()
-        ]
+        top_grouped_features = []
+
+        for group_name, trainer in self.trainers.items():
+            if group_name == "all_columns":
+                continue
+
+            top_grouped_features.extend(trainer.get_top_ranked_features())
+
+        return top_grouped_features

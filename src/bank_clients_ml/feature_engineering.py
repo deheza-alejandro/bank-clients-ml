@@ -543,19 +543,18 @@ def aggregate_monthly_to_client(
         *[c for c in credit_card_cols if c != "CreditCard_Total_Limit"],
     ]
 
+    columns_without_quantities = {
+        *columns_with_monetary_values,
+        *identity_features.columns,
+        "Month",
+        "First_product_dt",
+        "Last_product_dt",
+        settings.col_id,
+        settings.col_target,
+    }
+
     columns_with_quantities = [
-        c
-        for c in training_data.columns
-        if c
-        not in {
-            *columns_with_monetary_values,
-            *identity_features.columns,
-            "Month",
-            "First_product_dt",
-            "Last_product_dt",
-            settings.col_id,
-            settings.col_target,
-        }
+        c for c in training_data.columns if c not in columns_without_quantities
     ]
 
     cols = pl.col([*columns_with_quantities, *columns_with_monetary_values])

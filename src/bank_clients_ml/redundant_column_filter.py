@@ -113,10 +113,9 @@ def _get_redundant_correlated_columns(
     upper_triangle = np.triu(abs_corr_np, k=1)
 
     maximums_per_column = upper_triangle.max(axis=0)
+    columns_and_maximums = zip(corr_df.columns, maximums_per_column, strict=True)
     correlated_columns = [
-        col
-        for col, max_val in zip(corr_df.columns, maximums_per_column, strict=True)
-        if max_val > threshold
+        col for col, max_val in columns_and_maximums if max_val > threshold
     ]
     return correlated_columns
 
