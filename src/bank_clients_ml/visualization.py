@@ -68,7 +68,7 @@ def _save_fig_as_svg(
     cmd = ["bun", "run", "svgo", "--multipass", "-i", "-", "-o", "-"]
 
     try:
-        with Path.open(svg_path, "wb") as out_file:
+        with svg_path.open("wb") as out_file:
             subprocess.run(  # noqa: S603
                 cmd,
                 input=buffer.getvalue(),
