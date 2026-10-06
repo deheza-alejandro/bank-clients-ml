@@ -8,29 +8,20 @@ el cálculo de deciles de probabilidad y la evaluación sobre el conjunto de pru
     GroupsLGBMTrainer: Entrenador de modelos LightGBM por grupos de variables (usa LGBMTrainer).
 """
 
+import contextlib
 import io
 from collections.abc import Mapping
-from contextlib import redirect_stderr, redirect_stdout
 from typing import Any, cast
 
 import lightgbm as lgb
 import marimo as mo
 import numpy as np
 import polars as pl
-from scipy.stats import uniform as sp_uniform
-from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
-from sklearn.model_selection import (
-    RandomizedSearchCV,
-    StratifiedKFold,
-)
+import scipy.stats
+import sklearn.metrics
+import sklearn.model_selection
 
-from bank_clients_ml.column_groups import group_columns_by_source
-from bank_clients_ml.config import Settings, get_settings
-from bank_clients_ml.visualization import (
-    plot_deciles,
-    plot_evaluation_metrics,
-    plot_top_features,
-)
+from bank_clients_ml import column_groups, config, visualization
 
 
 def _fit_lgbm_random_search(
@@ -38,8 +29,8 @@ def _fit_lgbm_random_search(
     columns: list[str],
     n_iter: int,
     splits_cross_validation: int,
-    settings: Settings | None = None,
-) -> tuple[RandomizedSearchCV, pl.DataFrame, str]:
+    settings: config.Settings | None = None,
+) -> tuple[sklearn.model_selection.RandomizedSearchCV, pl.DataFrame, str]:
     """Entrena un modelo clasificador LightGBM con RandomizedSearchCV y StratifiedKFold.
 
     Configura el modelo clasificador con StratifiedKFold, ejecuta la
@@ -61,7 +52,7 @@ def _fit_lgbm_random_search(
             forma descendente y los registros capturados durante el entrenamiento.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     verbose: int = 3 if settings.debug else 1
 
@@ -78,19 +69,19 @@ def _fit_lgbm_random_search(
             4, 10, 1
         ),  # [4, 5, 6, 7, 8, 9] from 4 to (10-1) increasing by 1
         "num_leaves": np.arange(3, 20, 1),
-        "subsample": sp_uniform(loc=0.2, scale=0.8),
+        "subsample": scipy.stats.uniform(loc=0.2, scale=0.8),
         "learning_rate": [0.01, 0.05, 0.1, 0.2],
         "min_child_samples": np.arange(1000, 3000, 100),
     }
 
-    searcher = RandomizedSearchCV(
+    searcher = sklearn.model_selection.RandomizedSearchCV(
         estimator=classifier,
         param_distributions=param_distributions,
         n_iter=n_iter,
         scoring="roc_auc",
         n_jobs=-1,
         refit=True,
-        cv=StratifiedKFold(
+        cv=sklearn.model_selection.StratifiedKFold(
             n_splits=splits_cross_validation,
             shuffle=True,
             random_state=settings.random_state,
@@ -104,8 +95,8 @@ def _fit_lgbm_random_search(
 
     log_buffer = io.StringIO()
     with (
-        redirect_stdout(log_buffer),
-        redirect_stderr(log_buffer),
+        contextlib.redirect_stdout(log_buffer),
+        contextlib.redirect_stderr(log_buffer),
     ):
         searcher.fit(X_train, y_train)
 
@@ -124,7 +115,7 @@ def _fit_lgbm_random_search(
 def _with_rename_columns(
     importances: pl.DataFrame,
     renames: Mapping[str, str],
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> pl.DataFrame:
     """Aplica nombres distintos a la tabla de importancias de variables.
 
@@ -141,7 +132,7 @@ def _with_rename_columns(
         Nueva tabla de importancias con los valores de la columna feature
         renombrada.
     """
-    settings = settings or get_settings()
+    settings = settings or config.get_settings()
 
     return importances.with_columns(
         pl.col(settings.col_feature)
@@ -154,7 +145,7 @@ def _compute_prediction_deciles(
     df: pl.DataFrame,
     probabilities: np.ndarray,
     bins: list[float] | None = None,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> pl.DataFrame:
     """Calcula métricas de desempeño por decil de probabilidad predicha.
 
@@ -176,7 +167,7 @@ def _compute_prediction_deciles(
             forma descendente por decil.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     decile_labels = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
     decile_dtype = pl.Enum(decile_labels)
@@ -223,11 +214,11 @@ def _compute_prediction_deciles(
 
 
 def _evaluate(
-    searcher: RandomizedSearchCV,
+    searcher: sklearn.model_selection.RandomizedSearchCV,
     train: pl.DataFrame,
     test: pl.DataFrame,
     columns: list[str],
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> tuple[float, float, np.ndarray, np.ndarray, pl.DataFrame, pl.DataFrame]:
     """Evalúa el mejor modelo sobre el conjunto de prueba.
 
@@ -249,7 +240,7 @@ def _evaluate(
             verdaderos positivos de la curva ROC, y tablas de deciles de
             entrenamiento y de prueba.
     """
-    settings = settings or get_settings()
+    settings = settings or config.get_settings()
 
     best_model: lgb.LGBMClassifier = searcher.best_estimator_
     X_train = train.select(columns)
@@ -260,9 +251,9 @@ def _evaluate(
     y_true_arr = test.get_column(settings.col_target).to_numpy()
     y_pred = (probabilities_test >= 0.5).astype(int)
 
-    roc_auc = float(roc_auc_score(y_true_arr, probabilities_test))
-    accuracy = float(accuracy_score(y_true_arr, y_pred))
-    fpr, tpr, _ = roc_curve(y_true_arr, probabilities_test)
+    roc_auc = float(sklearn.metrics.roc_auc_score(y_true_arr, probabilities_test))
+    accuracy = float(sklearn.metrics.accuracy_score(y_true_arr, y_pred))
+    fpr, tpr, _ = sklearn.metrics.roc_curve(y_true_arr, probabilities_test)
 
     quantiles = np.linspace(0.1, 0.9, 9)
     train_based_bins = np.quantile(probabilities_train, quantiles).tolist()
@@ -302,7 +293,7 @@ class LGBMTrainer:
         n_iter: int = 2,
         splits_cross_validation: int = 3,
         test: pl.DataFrame | None = None,
-        settings: Settings | None = None,
+        settings: config.Settings | None = None,
     ) -> None:
         """Entrena el modelo LightGBM con las columnas indicadas.
 
@@ -321,7 +312,7 @@ class LGBMTrainer:
             settings: Configuración global del proyecto. Si no se indica, se
                 obtiene la configuración global.
         """
-        self._settings = settings or get_settings()
+        self._settings = settings or config.get_settings()
 
         self.columns = columns
         self._top_n = top_n
@@ -393,7 +384,7 @@ class LGBMTrainer:
         else:
             temp_importances = self._importances
 
-        plot_top_features(
+        visualization.plot_top_features(
             temp_importances,
             plot_name,
             self.searcher.best_score_,
@@ -433,7 +424,7 @@ class LGBMTrainer:
             RuntimeError: Si el entrenador se inicializó sin conjunto de prueba.
         """
         self._ensure_testable()
-        plot_evaluation_metrics(
+        visualization.plot_evaluation_metrics(
             self._roc_auc,
             self._accuracy,
             self._fpr,
@@ -452,7 +443,7 @@ class LGBMTrainer:
             RuntimeError: Si el entrenador se inicializó sin conjunto de prueba.
         """
         self._ensure_testable()
-        plot_deciles(
+        visualization.plot_deciles(
             self._train_deciles.drop("min_prob", "max_prob"),
             self._test_deciles.drop("min_prob", "max_prob"),
             plot_name,
@@ -471,9 +462,9 @@ class GroupsLGBMTrainer:
         trainers: Instancias de `LGBMTrainer` indexados por nombre de grupo.
 
     ## Example:
-        from bank_clients_ml.training import GroupsLGBMTrainer
+        from bank_clients_ml import training
 
-        groups_trainer = GroupsLGBMTrainer(uncorrelated_train)
+        groups_trainer = training.GroupsLGBMTrainer(uncorrelated_train)
         selected = groups_trainer.get_top_grouped_features()
     """
 
@@ -481,7 +472,7 @@ class GroupsLGBMTrainer:
         self,
         uncorrelated_train: pl.DataFrame,
         n_iter: int = 2,
-        settings: Settings | None = None,
+        settings: config.Settings | None = None,
     ) -> None:
         """Entrena cada grupo de variables con un LGBMTrainer distinto.
 
@@ -493,9 +484,11 @@ class GroupsLGBMTrainer:
             settings: Configuración global del proyecto. Si no se indica, se
                 obtiene la configuración global.
         """
-        settings = settings or get_settings()
+        settings = settings or config.get_settings()
 
-        columns_groups = group_columns_by_source(uncorrelated_train, settings)
+        columns_groups = column_groups.group_columns_by_source(
+            uncorrelated_train, settings
+        )
 
         self.trainers: dict[str, LGBMTrainer] = {
             group_name: LGBMTrainer(

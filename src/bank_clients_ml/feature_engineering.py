@@ -10,11 +10,11 @@
 
 import polars as pl
 
-from bank_clients_ml.config import Settings, get_settings
+from bank_clients_ml import config
 
 
 def target_encode_columns(
-    df: pl.DataFrame, columns: list[str], settings: Settings | None = None
+    df: pl.DataFrame, columns: list[str], settings: config.Settings | None = None
 ) -> pl.DataFrame:
     """Reemplaza columnas categóricas por su porcentaje respecto al target.
 
@@ -37,7 +37,7 @@ def target_encode_columns(
             y el denominador del calculo resulta cero.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     expressions = []
 
@@ -509,7 +509,7 @@ def aggregate_monthly_to_client(
     credit_card_cols: list[str],
     training_data: pl.DataFrame,
     identity_features: pl.DataFrame,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> pl.DataFrame:
     """Genera agregaciones para la historia mensual a una fila por cliente.
 
@@ -535,7 +535,7 @@ def aggregate_monthly_to_client(
         columnas con sufijos de estadísticas.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     columns_with_monetary_values = [
         *saving_account_cols,
@@ -643,7 +643,7 @@ def with_extra_transformations(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def standardize(
-    df: pl.DataFrame, ddof: int = 0, settings: Settings | None = None
+    df: pl.DataFrame, ddof: int = 0, settings: config.Settings | None = None
 ) -> pl.DataFrame:
     """Estandariza las variables numéricas.
 
@@ -660,7 +660,7 @@ def standardize(
         Nuevo DataFrame con las variables numéricas estandarizadas.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     cols_to_standardize = pl.exclude(settings.col_id, settings.col_target)
 

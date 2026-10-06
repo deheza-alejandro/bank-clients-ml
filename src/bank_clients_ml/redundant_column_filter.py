@@ -20,9 +20,7 @@ from typing import Any, NamedTuple
 import numpy as np
 import polars as pl
 
-from bank_clients_ml.config import Settings, get_settings
-from bank_clients_ml.eda import low_cardinality_value_counts
-from bank_clients_ml.visualization import plot_bivariate_charts
+from bank_clients_ml import config, eda, visualization
 
 
 def _get_true_column_names(df: pl.DataFrame) -> list[str]:
@@ -54,7 +52,7 @@ def _get_constant_columns(df: pl.DataFrame) -> list[str]:
 def _get_imbalanced_binary_columns(
     df: pl.DataFrame,
     threshold: float,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> list[str]:
     """Retorna las columnas binarias desbalanceadas.
 
@@ -75,7 +73,7 @@ def _get_imbalanced_binary_columns(
         las cuales no aportan información para el modelado.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     c_threshold = 1.0 - threshold
     is_binary = pl.all().n_unique() == 2
@@ -124,7 +122,7 @@ def _get_bivariate_tables(
     df: pl.DataFrame,
     columns: list[str],
     max_bins_quantity: int,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> dict[str, pl.DataFrame]:
     """Construye tablas de análisis bivariado por variable.
 
@@ -144,7 +142,7 @@ def _get_bivariate_tables(
         y porcentaje de target, numerando los bines en forma secuencial.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     target_pct_col = f"{settings.col_target}_pct"
     tables: dict[str, pl.DataFrame] = {}
@@ -257,7 +255,7 @@ def _group_bins_by_ranges(
     column: str,
     bin_ranges: list[BinRange],
     table: pl.DataFrame,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> pl.Expr:
     """Construye una expresión de transformación por rangos de bines.
 
@@ -278,7 +276,7 @@ def _group_bins_by_ranges(
         del rango al que pertenece.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     range_conditions = [
         (pl.col("Bin") >= b_min) & (pl.col("Bin") <= b_max)
@@ -364,7 +362,7 @@ class RedundantColumnFilter:
         test: pl.DataFrame,
         imbalanced_binary_threshold: float = 0.10,
         correlation_threshold: float = 0.80,
-        settings: Settings | None = None,
+        settings: config.Settings | None = None,
     ) -> None:
         """Ejecuta las etapas de reducción.
 
@@ -383,7 +381,7 @@ class RedundantColumnFilter:
             settings: Configuración con los nombres de las columnas identificadora
                 y target. Si no se indica, se obtiene la configuración global.
         """
-        self._settings = settings or get_settings()
+        self._settings = settings or config.get_settings()
 
         self.constant_cols = _get_constant_columns(train)
         self.reduced_train = train.drop(self.constant_cols)
@@ -413,7 +411,7 @@ class RedundantColumnFilter:
             DataFrame con la distribución de frecuencias conteniendo las columnas
             `column`, `value` y `count`.
         """
-        return low_cardinality_value_counts(
+        return eda.low_cardinality_value_counts(
             self.reduced_train.select(self.imbalanced_binary_columns)
         )
 
@@ -443,7 +441,9 @@ class RedundantColumnFilter:
             self._train_analysis = _merge_without_duplicates(
                 self._train_analysis, temp_tables
             )
-        plot_bivariate_charts(temp_tables, analysis_name, settings=self._settings)
+        visualization.plot_bivariate_charts(
+            temp_tables, analysis_name, settings=self._settings
+        )
 
     def plot_uncorrelated(
         self, columns: list[str], analysis_name: str, max_bins_quantity: int = 20

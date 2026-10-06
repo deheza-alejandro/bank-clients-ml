@@ -8,16 +8,16 @@ Centraliza las funciones de muestreo del proyecto basadas en Polars
     oversample_with_unique_ids: Realiza oversampling con identificadores únicos.
 """
 
-from datetime import date
+import datetime
 
 import polars as pl
 
-from bank_clients_ml.config import Settings, get_settings
+from bank_clients_ml import config
 
 
 def get_date_windows(
     df: pl.DataFrame, date_column: str, prediction_window_size: int
-) -> tuple[list[date], list[date]]:
+) -> tuple[list[datetime.date], list[datetime.date]]:
     """Divide en ventanas de entrenamiento y predicción.
 
     Toma el mes mínimo y el mes máximo de la columna de fechas y reserva los
@@ -59,7 +59,7 @@ def get_date_windows(
 def stratified_train_test_split(
     df: pl.DataFrame,
     test_ratio: float = 0.3,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Divide un DataFrame en entrenamiento y prueba de forma estratificada.
 
@@ -77,7 +77,7 @@ def stratified_train_test_split(
         prueba.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     df_flagged = df.sample(
         fraction=1.0, shuffle=True, seed=settings.random_state
@@ -97,7 +97,7 @@ def stratified_train_test_split(
 def oversample_with_unique_ids(
     train: pl.DataFrame,
     target_proportion: float = 0.5,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> pl.DataFrame:
     """Realiza oversampling con identificadores únicos.
 
@@ -135,7 +135,7 @@ def oversample_with_unique_ids(
         )
 
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     df_majority = train.filter(pl.col(settings.col_target) == 0)
     df_minority = train.filter(pl.col(settings.col_target) == 1)

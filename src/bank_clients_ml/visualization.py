@@ -10,11 +10,11 @@ Todas las figuras se guardan como archivos SVG optimizados con SVGO a través de
     plot_deciles: Genera un gráfico con tablas de deciles de entrenamiento y prueba.
 """
 
+import concurrent.futures
 import io
+import pathlib
 import subprocess
 from collections.abc import Mapping
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from pathlib import Path
 
 import matplotlib
 import polars.selectors as cs
@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 
-from bank_clients_ml.config import Settings, get_settings
+from bank_clients_ml import config
 
 matplotlib.rcParams["svg.hashsalt"] = "fixed_seed_for_this_project"
 matplotlib.rcParams["svg.fonttype"] = "path"
@@ -34,7 +34,7 @@ matplotlib.rcParams["svg.fonttype"] = "path"
 def _save_fig_as_svg(
     fig: Figure,
     plot_name: str,
-    images_dir: Path,
+    images_dir: pathlib.Path,
     images_sub_dir: str = "",
 ) -> None:
     """Guarda una figura de Matplotlib como archivo SVG optimizado con SVGO.
@@ -87,7 +87,7 @@ def plot_top_features(
     plot_name: str,
     roc_auc: float,
     top_n: int = 20,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> None:
     """Genera un gráfico de barras horizontales con las variables más importantes.
 
@@ -110,7 +110,7 @@ def plot_top_features(
             Si no se indica, se obtiene la configuración global.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     top_n = min(top_n, variables_to_plot.height)
 
@@ -150,7 +150,7 @@ def _plot_single_bivariate_chart(
     table: pl.DataFrame,
     variable_to_plot: str,
     analysis_name: str,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> None:
     """Genera el gráfico bivariado individual para una variable.
 
@@ -173,7 +173,7 @@ def _plot_single_bivariate_chart(
             configuración global.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     fig, (ax_table, ax_graph) = plt.subplots(
         2, 1, figsize=(9, 8), gridspec_kw={"height_ratios": [1, 1]}
@@ -213,7 +213,7 @@ def plot_bivariate_charts(
     tables: Mapping[str, pl.DataFrame],
     analysis_name: str,
     max_workers: int | None = None,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> None:
     """Genera gráficos bivariados para un conjunto de variables.
 
@@ -237,7 +237,7 @@ def plot_bivariate_charts(
             se obtiene la configuración global.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     if max_workers == 1 or len(tables) < 20:
         for variable_to_plot, table in tables.items():
@@ -248,7 +248,7 @@ def plot_bivariate_charts(
                 settings,
             )
     else:
-        with ProcessPoolExecutor(max_workers) as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers) as executor:
             futures = [
                 executor.submit(
                     _plot_single_bivariate_chart,
@@ -260,7 +260,7 @@ def plot_bivariate_charts(
                 for variable_to_plot, table in tables.items()
             ]
 
-            for future in as_completed(futures):
+            for future in concurrent.futures.as_completed(futures):
                 future.result()
 
 
@@ -270,7 +270,7 @@ def plot_evaluation_metrics(
     fpr: np.ndarray,
     tpr: np.ndarray,
     plot_name: str,
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> None:
     """Genera una curva ROC con las métricas resumidas de evaluación.
 
@@ -291,7 +291,7 @@ def plot_evaluation_metrics(
             Si no se indica, se obtiene la configuración global.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.plot(fpr, tpr)
@@ -369,7 +369,7 @@ def plot_deciles(
     plot_name: str,
     title_train_deciles: str = "Train Deciles",
     title_test_deciles: str = "Test Deciles",
-    settings: Settings | None = None,
+    settings: config.Settings | None = None,
 ) -> None:
     """Genera un gráfico con tablas de deciles de entrenamiento y prueba.
 
@@ -391,7 +391,7 @@ def plot_deciles(
             Si no se indica, se obtiene la configuración global.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8), dpi=300)
 

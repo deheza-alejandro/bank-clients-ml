@@ -8,16 +8,14 @@ ella con la función `get_settings`, que devuelve una instancia única
 almacenada en caché (Singleton).
 """
 
-from functools import cache
-from pathlib import Path
+import functools
+import pathlib
 
-from pydantic import computed_field
-
-# from pydantic import SecretStr
-from pydantic_settings import BaseSettings  # , SettingsConfigDict
+import pydantic
+import pydantic_settings
 
 
-class Settings(BaseSettings):
+class Settings(pydantic_settings.BaseSettings):
     """Parámetros globales de configuración del proyecto.
 
     Define los valores por defecto utilizados en el proceso de modelado.
@@ -42,29 +40,29 @@ class Settings(BaseSettings):
     col_target: str = "Target"
     col_feature: str = "Feature"
     col_importance: str = "Importance"
-    project_dir: Path = Path(__file__).parent.parent.parent
-    # api_key: SecretStr  # Keeps the secret hidden in logs and print statements.
+    project_dir: pathlib.Path = pathlib.Path(__file__).parent.parent.parent
+    # api_key: pydantic.SecretStr  # Keeps the secret hidden in logs and print statements.
 
-    # model_config = SettingsConfigDict(
+    # model_config = pydantic_settings.SettingsConfigDict(
     #     env_file=".env",
     #     env_file_encoding="utf-8",
     #     extra="ignore",
     # )
 
-    @computed_field
+    @pydantic.computed_field
     @property
-    def data_dir(self) -> Path:
+    def data_dir(self) -> pathlib.Path:
         """Directorio de datos calculado dinámicamente de project_dir."""
         return self.project_dir / "data"
 
-    @computed_field
+    @pydantic.computed_field
     @property
-    def images_dir(self) -> Path:
+    def images_dir(self) -> pathlib.Path:
         """Directorio de imágenes calculado dinámicamente de project_dir."""
         return self.project_dir / "notebooks" / "images"
 
 
-@cache
+@functools.cache
 def get_settings() -> Settings:
     """Obtiene la configuración global del proyecto.
 
@@ -74,9 +72,9 @@ def get_settings() -> Settings:
         Instancia compartida de la configuración global.
 
     ## Example:
-        from bank_clients_ml.config import get_settings
+        from bank_clients_ml import config
 
-        settings = get_settings()
+        settings = config.get_settings()
         print(settings.col_id)
         print(settings.col_target)
     """

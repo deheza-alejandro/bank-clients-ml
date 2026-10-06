@@ -19,15 +19,15 @@ donde algunos resultados se anexan directamente a la salida visible.
 """
 
 import operator
+import pathlib
 from collections.abc import Callable, Mapping, Sequence
-from pathlib import Path
 from typing import Any, Final, Literal
 
 import marimo as mo
 import polars as pl
 import polars.selectors as cs
 
-from bank_clients_ml.config import Settings, get_settings
+from bank_clients_ml import config
 
 
 def describe(df: pl.DataFrame) -> pl.DataFrame:
@@ -272,7 +272,7 @@ def columns_with_zeros(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def filter_nonzero(
-    df: pl.DataFrame, columns: list[str], settings: Settings | None = None
+    df: pl.DataFrame, columns: list[str], settings: config.Settings | None = None
 ) -> pl.DataFrame:
     """Filtra las filas donde todas las columnas indicadas son distintas de cero.
 
@@ -290,7 +290,7 @@ def filter_nonzero(
         condición evaluada.
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     keep = [settings.col_id, *columns] if settings.col_id in df.columns else columns
 
@@ -299,7 +299,7 @@ def filter_nonzero(
 
 def build_plot_tabs(
     names: Mapping[str, str],
-    subdirectory: Path,
+    subdirectory: pathlib.Path,
     orientation: Literal["horizontal", "vertical"] = "horizontal",
 ) -> mo.Html:
     """Crea un componente de pestañas en Marimo mostrando imágenes.

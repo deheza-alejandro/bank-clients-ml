@@ -19,7 +19,7 @@ from typing import Final
 
 import polars as pl
 
-from bank_clients_ml.config import Settings, get_settings
+from bank_clients_ml import config
 
 
 def get_saving_account_cols() -> list[str]:
@@ -185,7 +185,7 @@ def _validate_groups(columns: list[str], groups: Mapping[str, list[str]]) -> Non
 
 
 def group_columns_by_source(
-    df: pl.DataFrame, settings: Settings | None = None
+    df: pl.DataFrame, settings: config.Settings | None = None
 ) -> dict[str, tuple[list[str], int]]:
     """Agrupa las columnas de un DataFrame según su fuente de negocio.
 
@@ -213,7 +213,7 @@ def group_columns_by_source(
         operation_cols, weight = columns_groups["operations"]
     """
     if settings is None:
-        settings = get_settings()
+        settings = config.get_settings()
 
     excluded_cols = {settings.col_id, settings.col_target}
     all_columns = [col for col in df.columns if col not in excluded_cols]
