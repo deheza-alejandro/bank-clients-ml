@@ -15,6 +15,7 @@ y finalmente aplicar transformaciones de bines con `apply_bin_transformations`.
     RedundantColumnFilter: Filtro secuencial de columnas redundantes con análisis bivariado.
 """
 
+import dataclasses
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -243,7 +244,8 @@ def _get_range_data(i: int, stats) -> tuple[float, float, float]:
     return low, high, val
 
 
-class BinRange(NamedTuple):
+@dataclasses.dataclass(frozen=True)
+class BinRange:
     """Rango inclusivo de bines que se agrupan en un mismo valor.
 
     Representa un intervalo cerrado sobre la numeración de bines generada por
@@ -253,10 +255,22 @@ class BinRange(NamedTuple):
     ## Attributes:
         start: Número de bin inicial del intervalo.
         end: Número de bin final del intervalo.
+
+    ## Raises:
+        ValueError: Si `start` o `end` son menores a 1, o si `start` es mayor que `end`.
     """
 
     start: int
     end: int
+
+    def __post_init__(self):
+        """Valida los extremos del rango."""
+        if self.start < 1 or self.end < 1:
+            msg = f"Both 'start' and 'end' must be >= 1. start: {self.start}, end: {self.end}"
+            raise ValueError(msg)
+        if self.start > self.end:
+            msg = f"'start' must be <= 'end'. start: {self.start}, end: {self.end}"
+            raise ValueError(msg)
 
 
 def _group_bins_by_ranges(
@@ -287,8 +301,8 @@ def _group_bins_by_ranges(
         settings = config.get_settings()
 
     range_conditions = [
-        (pl.col("Bin") >= b_min) & (pl.col("Bin") <= b_max)
-        for b_min, b_max in bin_ranges
+        (pl.col("Bin") >= bin_range.start) & (pl.col("Bin") <= bin_range.end)
+        for bin_range in bin_ranges
     ]
 
     aggregations = []
