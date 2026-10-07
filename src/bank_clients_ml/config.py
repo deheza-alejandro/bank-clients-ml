@@ -27,8 +27,17 @@ class Settings(pydantic_settings.BaseSettings):
         random_state: Semilla utilizada para garantizar reproducibilidad.
         col_id: Nombre de la columna identificadora del cliente.
         col_target: Nombre de la columna target del modelo.
+        col_month: Nombre de la columna que indica el mes.
+        col_first_product_date: Nombre de la columna que indica la fecha de
+            registro del primer producto.
+        col_last_product_date: Nombre de la columna que indica la fecha de
+            registro del ultimo producto.
         col_feature: Nombre genérico de la columna de feature.
         col_importance: Nombre genérico de la columna de importancia de variable.
+        col_bin: Nombre genérico de la columna de Bin.
+        col_clients: Nombre genérico de la columna de clientes.
+        col_target_pct: Nombre genérico de la columna de porcentaje de target,
+            calculado dinámicamente de col_target.
         project_dir: Directorio base del proyecto.
         data_dir: Directorio de datos calculado dinámicamente de project_dir.
         images_dir: Directorio de imágenes calculado dinámicamente de project_dir.
@@ -43,6 +52,8 @@ class Settings(pydantic_settings.BaseSettings):
     col_last_product_date: str = "Last_product_dt"
     col_feature: str = "Feature"
     col_importance: str = "Importance"
+    col_bin: str = "Bin"
+    col_clients: str = "Clients"
     project_dir: pathlib.Path = pathlib.Path(__file__).parent.parent.parent
     # api_key: pydantic.SecretStr  # Keeps the secret hidden in logs and print statements.
 
@@ -63,6 +74,12 @@ class Settings(pydantic_settings.BaseSettings):
     def images_dir(self) -> pathlib.Path:
         """Directorio de imágenes calculado dinámicamente de project_dir."""
         return self.project_dir / "notebooks" / "images"
+
+    @pydantic.computed_field
+    @property
+    def col_target_pct(self) -> str:
+        """Nombre de columna de porcentaje de target calculado dinámicamente."""
+        return f"{self.col_target}_pct"
 
 
 @functools.cache

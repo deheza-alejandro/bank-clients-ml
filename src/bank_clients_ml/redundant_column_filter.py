@@ -152,7 +152,6 @@ def _get_bivariate_tables(
     if settings is None:
         settings = config.get_settings()
 
-    target_pct_col = f"{settings.col_target}_pct"
     tables: dict[str, pl.DataFrame] = {}
 
     for column in columns:
@@ -169,18 +168,25 @@ def _get_bivariate_tables(
             .agg(
                 pl.col(column).min().round(2).alias("Min"),
                 pl.col(column).max().round(2).alias("Max"),
-                pl.len().alias("Clients"),
+                pl.len().alias(settings.col_clients),
                 pl.col(settings.col_target).sum().alias(settings.col_target),
             )
             .sort(by="Min", descending=False, nulls_last=True)
             .with_columns(
-                pl.int_range(1, pl.len() + 1).alias("Bin"),
-                ((pl.col(settings.col_target) / pl.col("Clients")) * 100)
+                pl.int_range(1, pl.len() + 1).alias(settings.col_bin),
+                ((pl.col(settings.col_target) / pl.col(settings.col_clients)) * 100)
                 .round()
                 .cast(pl.Int64)
-                .alias(target_pct_col),
+                .alias(settings.col_target_pct),
             )
-            .select("Bin", "Min", "Max", "Clients", settings.col_target, target_pct_col)
+            .select(
+                settings.col_bin,
+                "Min",
+                "Max",
+                settings.col_clients,
+                settings.col_target,
+                settings.col_target_pct,
+            )
         )
 
     return tables
@@ -301,7 +307,8 @@ def _group_bins_by_ranges(
         settings = config.get_settings()
 
     range_conditions = [
-        (pl.col("Bin") >= bin_range.start) & (pl.col("Bin") <= bin_range.end)
+        (pl.col(settings.col_bin) >= bin_range.start)
+        & (pl.col(settings.col_bin) <= bin_range.end)
         for bin_range in bin_ranges
     ]
 
@@ -311,7 +318,7 @@ def _group_bins_by_ranges(
             [
                 pl.col("Min").filter(cond).min().alias(f"min_{i}"),
                 pl.col("Max").filter(cond).max().alias(f"max_{i}"),
-                pl.col("Clients").filter(cond).sum().alias(f"cli_{i}"),
+                pl.col(settings.col_clients).filter(cond).sum().alias(f"cli_{i}"),
                 pl.col(settings.col_target).filter(cond).sum().alias(f"tgt_{i}"),
             ]
         )
@@ -319,7 +326,10 @@ def _group_bins_by_ranges(
     out_of_range_cond = ~pl.any_horizontal(range_conditions)
     aggregations.extend(
         [
-            pl.col("Clients").filter(out_of_range_cond).sum().alias("cli_def"),
+            pl.col(settings.col_clients)
+            .filter(out_of_range_cond)
+            .sum()
+            .alias("cli_def"),
             pl.col(settings.col_target)
             .filter(out_of_range_cond)
             .sum()

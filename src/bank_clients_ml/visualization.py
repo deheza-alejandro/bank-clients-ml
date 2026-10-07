@@ -192,13 +192,17 @@ def _plot_single_bivariate_chart(
 
     x_indices = range(len(table))
 
-    ax_graph.bar(x_indices, table.to_series(3), width=0.35)
-    ax_graph.set_ylabel("Clients")
+    ax_graph.bar(x_indices, table.get_column(settings.col_clients), width=0.35)
+    ax_graph.set_ylabel(settings.col_clients)
     ax_graph.set_xticks(x_indices)
-    ax_graph.set_xticklabels(table.to_series(0), rotation=0, ha="center")
+    ax_graph.set_xticklabels(
+        table.get_column(settings.col_bin), rotation=0, ha="center"
+    )
 
     ax_graph_target_pct = ax_graph.twinx()
-    ax_graph_target_pct.plot(x_indices, table.to_series(-1), marker="o", color="green")
+    ax_graph_target_pct.plot(
+        x_indices, table.get_column(settings.col_target_pct), marker="o", color="green"
+    )
     ax_graph_target_pct.set_ylabel(f"{settings.col_target} pct (%)")
 
     fig.tight_layout()
