@@ -918,7 +918,6 @@ def _(best_features, best_features_names, final_test, final_train):
         final_train,
         best_features,
         n_iter=20,
-        splits_cross_validation=5,
         test=final_test,
     )
     _final_trainer.plot_top_features(
