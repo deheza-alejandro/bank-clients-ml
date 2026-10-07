@@ -39,15 +39,17 @@ project-includes = [
 min-severity = "warn"
 
 [tool.ruff]
-extend-exclude = [".env", ".venv"]
+extend-exclude = [".env", ".venv", "data/", "notebooks/images/"]
 
 [tool.ruff.lint]
 extend-select = [
     "C901",    # mccabe: cyclomatic complexity
     "PLR0911", # pylint: too-many-return-statements
+    "PLR0912",
     "PLR0913", # pylint: too-many-arguments
     "PLR0915", # pylint: too-many-statements
     "E", "W",  # pycodestyle
+    "EM",
     "F",       # Pyflakes
     "I",       # isort
     "UP",      # pyupgrade
@@ -56,6 +58,7 @@ extend-select = [
     "PTH",     # flake8-use-pathlib
     "S",       # flake8-bandit
     "RUF",     # Ruff-specific rules
+    "PERF",
     "D",       # pydocstyle
 ]
 
