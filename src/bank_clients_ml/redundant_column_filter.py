@@ -349,11 +349,8 @@ class RedundantColumnFilter:
     ## Attributes:
         constant_cols: Nombres de las columnas constantes detectadas.
         reduced_train: Conjunto de entrenamiento sin columnas constantes.
+        reduced_test: Conjunto de prueba sin columnas constantes.
         imbalanced_binary_columns: Nombres de las columnas binarias desbalanceadas.
-        correlated_train: Conjunto de entrenamiento sin columnas desbalanceadas.
-        correlated_test: Conjunto de prueba sin columnas desbalanceadas.
-        uncorrelated_train: Conjunto de entrenamiento sin columnas correlacionadas.
-        uncorrelated_test: Conjunto de prueba sin columnas correlacionadas.
     """
 
     def __init__(
@@ -385,21 +382,37 @@ class RedundantColumnFilter:
 
         self.constant_cols = _get_constant_columns(train)
         self.reduced_train = train.drop(self.constant_cols)
-        reduced_test = test.drop(self.constant_cols)
+        self.reduced_test = test.drop(self.constant_cols)
         self.imbalanced_binary_columns = _get_imbalanced_binary_columns(
             self.reduced_train, imbalanced_binary_threshold, self._settings
         )
-        self.correlated_train = self.reduced_train.drop(self.imbalanced_binary_columns)
-        self.correlated_test = reduced_test.drop(self.imbalanced_binary_columns)
         self._corr_df = self.correlated_train.drop(
             self._settings.col_id, self._settings.col_target
         ).corr()
-        to_delete = _get_redundant_correlated_columns(
+        self._to_delete = _get_redundant_correlated_columns(
             self._corr_df, correlation_threshold
         )
-        self.uncorrelated_train = self.correlated_train.drop(to_delete)
-        self.uncorrelated_test = self.correlated_test.drop(to_delete)
         self._train_analysis: dict[str, pl.DataFrame] = {}
+
+    @property
+    def correlated_train(self) -> pl.DataFrame:
+        """Devuelve el conjunto de entrenamiento sin columnas desbalanceadas."""
+        return self.reduced_train.drop(self.imbalanced_binary_columns)
+
+    @property
+    def correlated_test(self) -> pl.DataFrame:
+        """Devuelve el conjunto de prueba sin columnas desbalanceadas."""
+        return self.reduced_test.drop(self.imbalanced_binary_columns)
+
+    @property
+    def uncorrelated_train(self) -> pl.DataFrame:
+        """Devuelve el conjunto de entrenamiento sin columnas correlacionadas."""
+        return self.correlated_train.drop(self._to_delete)
+
+    @property
+    def uncorrelated_test(self) -> pl.DataFrame:
+        """Devuelve el conjunto de prueba sin columnas correlacionadas."""
+        return self.correlated_test.drop(self._to_delete)
 
     def get_imbalanced_binary_counts(self) -> pl.DataFrame:
         """Calcula la frecuencia de cada valor en las columnas binarias desbalanceadas.
