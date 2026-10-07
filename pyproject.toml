@@ -75,6 +75,7 @@ max-line-length = 100
     "PLR0913",
     "PLR1711",
     "B018",     # Found useless expression. Either assign it to a variable or remove it
+    "F821",     # Checks for uses of undefined names
     "F841",     # Local variable name is assigned to but never used
     "E501",     # Line too long
     "D100",     # Missing docstring in public module
