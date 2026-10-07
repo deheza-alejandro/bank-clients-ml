@@ -71,6 +71,9 @@ def _get_imbalanced_binary_columns(
     ## Returns:
         Lista con los nombres de las columnas binarias desbalanceadas,
         las cuales no aportan información para el modelado.
+
+    ## Raises:
+        ValueError: Si threshold no está en el intervalo abierto entre 0.0 y 0.5.
     """
     if not (0.0 < threshold < 0.5):
         msg = f"Invalid threshold {threshold}: must satisfy 0.0 < threshold < 0.5"

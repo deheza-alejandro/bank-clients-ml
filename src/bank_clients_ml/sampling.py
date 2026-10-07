@@ -75,6 +75,9 @@ def stratified_train_test_split(
     ## Returns:
         Tupla con el DataFrame de entrenamiento seguido del DataFrame de
         prueba.
+
+    ## Raises:
+        ValueError: Si test_ratio no está en el intervalo abierto entre 0 y 1.
     """
     if not (0 < test_ratio < 1):
         msg = f"Invalid test_ratio {test_ratio}: must satisfy 0 < test_ratio < 1"
