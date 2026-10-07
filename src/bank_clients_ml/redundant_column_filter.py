@@ -73,9 +73,8 @@ def _get_imbalanced_binary_columns(
         las cuales no aportan información para el modelado.
     """
     if not (0.0 < threshold < 0.5):
-        raise ValueError(
-            f"Invalid threshold {threshold}: must satisfy 0.0 < threshold < 0.5"
-        )
+        msg = f"Invalid threshold {threshold}: must satisfy 0.0 < threshold < 0.5"
+        raise ValueError(msg)
 
     if settings is None:
         settings = config.get_settings()
@@ -204,11 +203,12 @@ def _merge_without_duplicates(
     """
     common_keys = dict_1.keys() & dict_2.keys()
     if common_keys:
-        raise KeyError(
+        msg = (
             f"Cannot merge tables to save analysis before plot: "
             f"Duplicate {len(common_keys)} keys on merge:"
             f"\n{sorted(common_keys)}"
         )
+        raise KeyError(msg)
 
     return dict_1 | dict_2
 
@@ -509,11 +509,12 @@ class RedundantColumnFilter:
         ]
 
         if overlapping:
-            raise ValueError(
+            msg = (
                 f"Correlated_columns must not overlap uncorrelated_train columns. "
                 f"Expected only removed columns, got overlap:"
                 f"\n{overlapping}"
             )
+            raise ValueError(msg)
 
         self._build_tables_and_plot(
             self.correlated_train, correlated_columns, analysis_name, max_bins_quantity

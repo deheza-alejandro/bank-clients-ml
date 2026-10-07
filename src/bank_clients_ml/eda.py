@@ -127,9 +127,10 @@ def _get_operator(condition: ConditionSymbol) -> ComparisonFunction:
         ValueError: Si el símbolo no es uno de los valores permitidos.
     """
     if condition not in OPERATORS:
-        raise ValueError(
+        msg = (
             f"Invalid condition {condition!r}. Must be one of {list(OPERATORS.keys())}"
         )
+        raise ValueError(msg)
 
     return OPERATORS[condition]
 

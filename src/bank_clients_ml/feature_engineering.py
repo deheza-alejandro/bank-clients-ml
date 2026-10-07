@@ -49,11 +49,12 @@ def target_encode_columns(
             categories_with_issue = (
                 df.filter(total == 0).get_column(column).unique().to_list()
             )
-            raise ZeroDivisionError(
+            msg = (
                 f"Division by zero while target-encoding {column!r} "
                 f"for categories: {categories_with_issue}.\n"
                 f"Ensure {settings.col_target!r} contains 0.0/1.0 for every category"
             )
+            raise ZeroDivisionError(msg)
 
         expressions.append(((count_1 / total) * 100).round(3).alias(column))
 

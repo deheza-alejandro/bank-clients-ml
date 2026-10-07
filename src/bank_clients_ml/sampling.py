@@ -77,9 +77,8 @@ def stratified_train_test_split(
         prueba.
     """
     if not (0 < test_ratio < 1):
-        raise ValueError(
-            f"Invalid test_ratio {test_ratio}: must satisfy 0 < test_ratio < 1"
-        )
+        msg = f"Invalid test_ratio {test_ratio}: must satisfy 0 < test_ratio < 1"
+        raise ValueError(msg)
 
     if settings is None:
         settings = config.get_settings()
@@ -135,9 +134,8 @@ def oversample_with_unique_ids(
             entre 0 y 1.
     """
     if not (0 < target_proportion < 1):
-        raise ValueError(
-            f"Invalid target_proportion {target_proportion}: must satisfy 0 < target_proportion < 1"
-        )
+        msg = f"Invalid target_proportion {target_proportion}: must satisfy 0 < proportion < 1"
+        raise ValueError(msg)
 
     if settings is None:
         settings = config.get_settings()

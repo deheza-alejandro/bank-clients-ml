@@ -407,9 +407,8 @@ class LGBMTrainer:
                 prueba y no es posible evaluar ni graficar métricas.
         """
         if not self.is_testable:
-            raise RuntimeError(
-                "Cannot plot: LGBMTrainer was initialized without a test set"
-            )
+            msg = "Cannot plot: LGBMTrainer was initialized without a test set"
+            raise RuntimeError(msg)
 
     def plot_evaluation_metrics(self, plot_name: str) -> None:
         """Genera la curva ROC con las métricas de evaluación sobre el set de prueba.

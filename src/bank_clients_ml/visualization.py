@@ -76,10 +76,11 @@ def _save_fig_as_svg(
                 check=True,
             )
     except FileNotFoundError as err:
-        raise RuntimeError(
+        msg = (
             f"Bun executable not found in PATH. "
             f"Ensure Bun is installed and available in PATH to optimize SVG with SVGO: \n{svg_path}"
-        ) from err
+        )
+        raise RuntimeError(msg) from err
 
 
 def plot_top_features(
