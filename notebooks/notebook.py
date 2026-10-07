@@ -12,7 +12,6 @@ with app.setup:
     from bank_clients_ml import redundant_column_filter as col_filter
 
     settings = config.get_settings()
-    raw_data = pl.read_parquet(settings.data_dir / "data.parquet")
 
 
 @app.cell(hide_code=True)
@@ -30,6 +29,8 @@ def _():
 
 @app.cell
 def _():
+    raw_data = pl.read_parquet(settings.data_dir / "data.parquet")
+
     _less_than_zero_columns = [
         "SavingAccount_Balance_Average",
         "CreditCard_Balance_ARG",
@@ -62,11 +63,11 @@ def _():
             ),
         }
     )
-    return
+    return (raw_data,)
 
 
 @app.cell
-def _():
+def _(raw_data):
     mo.ui.tabs(
         {
             "Inspect raw_data": eda.inspect_dataframe(raw_data),
@@ -95,7 +96,7 @@ def _():
 
 
 @app.cell
-def _():
+def _(raw_data):
     print("raw_data.shape:", raw_data.shape)
     clean_data = raw_data.filter(
         pl.col(settings.col_target).is_not_null()
@@ -106,6 +107,7 @@ def _():
     _month_count_by_client = clean_data.group_by(settings.col_id).len(
         name="month_count"
     )
+    del raw_data
     mo.ui.tabs(
         {
             "Inspect clean_data": eda.inspect_dataframe(clean_data),
@@ -114,7 +116,7 @@ def _():
             ).value_counts(sort=True),
         }
     )
-    return clean_data
+    return (clean_data,)
 
 
 @app.cell(hide_code=True)
@@ -189,6 +191,7 @@ def _(clean_data, last_training_month, prediction_months, training_months):
     prediction_data = universe_and_target_data.filter(
         pl.col("Month").is_in(prediction_months)
     )
+    del clean_data
 
     print(f"universe_and_target.shape: {_universe_and_target.shape} \n")
     print(f"prediction_data.shape: {prediction_data.shape} \n")
@@ -267,6 +270,7 @@ def _(training_data):
             / 2.0
         )
     )
+    del training_data
     mo.ui.tabs(
         {
             'Describe "Saving Account Balance (Average)"': eda.describe(
@@ -275,7 +279,7 @@ def _(training_data):
             "Inspect training_data": eda.inspect_dataframe(training_data_1),
         }
     )
-    return training_data_1
+    return (training_data_1,)
 
 
 @app.cell(hide_code=True)
@@ -297,6 +301,7 @@ def _(prediction_data, training_data_1, universe_and_target_data):
         on=settings.col_id,
         how="left",
     )
+    del training_data_1
 
     print(f"clients_region.shape: {_clients_region.shape} \n")
     print(f"training_data_2.shape: {training_data_2.shape} \n")
@@ -320,7 +325,7 @@ def _(prediction_data, training_data_1, universe_and_target_data):
             ),
         }
     )
-    return training_data_2
+    return (training_data_2,)
 
 
 @app.cell(hide_code=True)
@@ -339,7 +344,10 @@ def _():
 
 @app.cell
 def _(
-    first_prediction_month, prediction_data, training_data_2, universe_and_target_data
+    first_prediction_month,
+    prediction_data,
+    training_data_2,
+    universe_and_target_data,
 ):
     _clients_credit_card_product = (
         prediction_data.sort(pl.col("Month") == first_prediction_month, descending=True)
@@ -359,6 +367,8 @@ def _(
             .alias("CreditCard_Product")
         )
     )
+    del prediction_data
+    del training_data_2
     mo.ui.tabs(
         {
             "Credit Card Type (clients in prediction window)": _clients_credit_card_product.get_column(
@@ -380,7 +390,7 @@ def _(
             ),
         }
     )
-    return training_data_3
+    return (training_data_3,)
 
 
 @app.cell(hide_code=True)
@@ -394,7 +404,8 @@ def _():
 
 
 @app.cell
-def _(last_training_month, training_data_3):
+def _(last_training_month, training_data_3, universe_and_target_data):
+    del universe_and_target_data
     _binary_dict: dict[str, int] = {"Yes": 1, "No": 0, "M": 1, "F": 0}
 
     training_data_4 = training_data_3.with_columns(
@@ -407,6 +418,7 @@ def _(last_training_month, training_data_3):
         pl.col("Month") == last_training_month
     ).select(column_groups.get_identity_features_cols())
 
+    del training_data_3
     mo.ui.tabs(
         {
             "Low cardinality columns of identity_features": eda.low_cardinality_value_counts(
@@ -439,7 +451,7 @@ def _(identity_features, training_data_4):
         identity_features, _categorical_cols
     )
     training_data_5 = training_data_4.drop(_categorical_cols)
-
+    del identity_features
     mo.ui.tabs(
         {
             "Categorical columns before encode": _temp_value_counts,
@@ -464,7 +476,8 @@ def _():
 
 
 @app.cell
-def _(identity_features_1, last_training_month):
+def _(identity_features_1, last_training_month, training_data_4):
+    del training_data_4
     identity_features_2 = identity_features_1.with_columns(
         [
             (pl.col("Last_product_dt") - pl.col("First_product_dt"))
@@ -478,14 +491,14 @@ def _(identity_features_1, last_training_month):
             .alias("Recency_in_days"),
         ]
     ).drop(["First_product_dt", "Last_product_dt"])
-
+    del identity_features_1
     mo.ui.tabs(
         {
             "Inspect identity_features": eda.inspect_dataframe(identity_features_2),
             "Describe identity_features": eda.describe(identity_features_2),
         }
     )
-    return identity_features_2
+    return (identity_features_2,)
 
 
 @app.cell(hide_code=True)
@@ -533,7 +546,7 @@ def _(training_data_5):
     ]
 
     print(f"training_data shape before transformations {training_data_5.shape}")
-
+    del training_data_5
     mo.ui.tabs(
         {
             "Inspect training_data": eda.inspect_dataframe(training_data_6),
@@ -558,7 +571,7 @@ def _(training_data_5):
             ),
         }
     )
-    return training_data_6
+    return (training_data_6,)
 
 
 @app.cell(hide_code=True)
@@ -579,8 +592,9 @@ def _(identity_features_2, training_data_6):
         training_data_6,
         identity_features_2,
     )
+    del training_data_6
     eda.inspect_dataframe(data_agg)
-    return data_agg
+    return (data_agg,)
 
 
 @app.cell(hide_code=True)
@@ -599,6 +613,8 @@ def _(data_agg, identity_features_2):
     _temp_abt_inspect = eda.inspect_dataframe(_abt)
     _abt = feat.with_extra_transformations(_abt)
     train, test = sampling.stratified_train_test_split(_abt)
+    del identity_features_2
+    del data_agg
     mo.ui.tabs(
         {
             "Inspect ABT before extra transformations": _temp_abt_inspect,
@@ -627,6 +643,8 @@ def _(test, train):
     column_filter = col_filter.RedundantColumnFilter(
         train, test, imbalanced_binary_threshold=0.10, correlation_threshold=0.80
     )
+    del train
+    del test
     mo.ui.tabs(
         {
             "Constant columns removed": column_filter.constant_cols,
@@ -643,7 +661,7 @@ def _(test, train):
         },
         orientation="vertical",
     )
-    return column_filter
+    return (column_filter,)
 
 
 @app.cell(hide_code=True)
@@ -670,7 +688,7 @@ def _(column_filter):
             ),
         }
     )
-    return groups_trainer
+    return (groups_trainer,)
 
 
 @app.cell
@@ -693,8 +711,9 @@ def _():
 
 
 @app.cell
-def _(groups_trainer, column_filter):
+def _(column_filter, groups_trainer):
     top_grouped_features = groups_trainer.get_top_grouped_features()
+    del groups_trainer
     trainer = training.LGBMTrainer(
         column_filter.uncorrelated_train, top_grouped_features
     )
@@ -736,6 +755,7 @@ def _(column_filter, top_grouped_features):
         "SavingAccount_Transfer_In_Amount_max": "Savings Account Transfer-In Amount (Max)",
         "SavingAccount_Transfer_In_Transactions_pct_max": "Savings Account Transfer-In Transactions (Max %)",
     }
+    del top_grouped_features
     eda.build_plot_tabs(
         _uncorrelated_names,
         settings.images_dir / "bivariate_analysis" / "uncorrelated",
@@ -758,6 +778,7 @@ def _():
 def _(column_filter, trainer):
     _top_ranked_features = trainer.get_top_ranked_features()
     _correlations_dict = column_filter.correlations_for_each(_top_ranked_features)
+    del trainer
     mo.ui.tabs(_correlations_dict, orientation="vertical")
     return
 
@@ -863,6 +884,7 @@ def _(column_filter):
 @app.cell
 def _(best_features, best_features_names, column_filter, final_train):
     column_filter.plot_adhoc(final_train, best_features, "best_features")
+    del column_filter
     eda.build_plot_tabs(
         best_features_names,
         settings.images_dir / "bivariate_analysis" / "best_features",
@@ -891,6 +913,10 @@ def _(best_features, best_features_names, final_test, final_train):
     )
     _final_trainer.plot_evaluation_metrics(plot_name="lightgbm")
     _final_trainer.plot_deciles(plot_name="deciles")
+    del best_features
+    del best_features_names
+    del final_train
+    del final_test
     mo.ui.tabs(
         {
             "Best Features Importances": mo.image(
