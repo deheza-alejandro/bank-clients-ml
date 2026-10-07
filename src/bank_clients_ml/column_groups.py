@@ -5,7 +5,9 @@ la selección de variables con LightGBM.
 
 ## Funciones exportadas:
     get_saving_account_cols: Retorna las columnas monetarias asociadas a la caja de ahorro.
+    get_categorical_cols: Retorna los nombres de las categorical features del cliente.
     get_binary_identity_features_cols: Retorna las identity features binarias.
+    get_identity_features_cols: Retorna las identity features del cliente.
     get_credit_card_cols: Retorna las columnas monetarias asociadas a la tarjeta de crédito.
     group_columns_by_source: Agrupa las columnas de un dataframe según su fuente de negocio.
 
@@ -41,6 +43,11 @@ def get_saving_account_cols() -> list[str]:
     ]
 
 
+def get_categorical_cols() -> list[str]:
+    """Retorna los nombres de las categorical features del cliente."""
+    return ["Client_Age_grp", "Region", "CreditCard_Product"]
+
+
 def get_binary_identity_features_cols() -> list[str]:
     """Retorna las identity features binarias del cliente.
 
@@ -70,6 +77,26 @@ def get_binary_identity_features_cols() -> list[str]:
         "Sex",
         "Mobile",
         "Email",
+    ]
+
+
+def get_identity_features_cols(settings: config.Settings | None = None) -> list[str]:
+    """Retorna las identity features del cliente.
+
+    Representan la foto del cliente en el último mes de entrenamiento.
+
+    ## Returns:
+        Nombres de las columnas binarias.
+    """
+    settings = settings or config.get_settings()
+
+    return [
+        settings.col_id,
+        settings.col_target,
+        *get_categorical_cols(),
+        "First_product_dt",
+        "Last_product_dt",
+        *get_binary_identity_features_cols(),
     ]
 
 
