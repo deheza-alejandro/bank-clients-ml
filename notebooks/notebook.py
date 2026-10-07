@@ -101,7 +101,11 @@ def _(raw_data):
     clean_data = raw_data.filter(
         pl.col(settings.col_target).is_not_null()
     ).with_columns(
-        pl.col("Month", "First_product_dt", "Last_product_dt").str.to_date(),
+        pl.col(
+            settings.col_month,
+            settings.col_first_product_date,
+            settings.col_last_product_date,
+        ).str.to_date(),
         pl.col(settings.col_id).cast(pl.Int64),
     )
     _month_count_by_client = clean_data.group_by(settings.col_id).len(
@@ -132,7 +136,7 @@ def _():
 @app.cell
 def _(clean_data):
     training_months, prediction_months = sampling.get_date_windows(
-        clean_data, "Month", prediction_window_size=2
+        clean_data, settings.col_month, prediction_window_size=2
     )
     last_training_month = training_months[-1]
     first_prediction_month = prediction_months[0]
@@ -166,7 +170,7 @@ def _():
 @app.cell
 def _(clean_data, last_training_month, prediction_months, training_months):
     _is_valid_client = (
-        (pl.col("Month") == last_training_month)
+        (pl.col(settings.col_month) == last_training_month)
         & (pl.col("Package_Active") == "No")
         & (pl.col("CreditCard_CoBranding") == "No")
     )
@@ -175,7 +179,7 @@ def _(clean_data, last_training_month, prediction_months, training_months):
         clean_data.filter(
             (pl.len().over(settings.col_id) == 9)
             & _is_valid_client.any().over(settings.col_id)
-            & pl.col("Month").is_in(prediction_months)
+            & pl.col(settings.col_month).is_in(prediction_months)
         )
         .select(settings.col_id, settings.col_target)
         .unique()
@@ -186,10 +190,10 @@ def _(clean_data, last_training_month, prediction_months, training_months):
     )
 
     training_data = universe_and_target_data.filter(
-        pl.col("Month").is_in(training_months)
+        pl.col(settings.col_month).is_in(training_months)
     )
     prediction_data = universe_and_target_data.filter(
-        pl.col("Month").is_in(prediction_months)
+        pl.col(settings.col_month).is_in(prediction_months)
     )
     del clean_data
 
@@ -198,7 +202,7 @@ def _(clean_data, last_training_month, prediction_months, training_months):
     mo.ui.tabs(
         {
             "Number of clients per Month": training_data.get_column(
-                "Month"
+                settings.col_month
             ).value_counts(),
             "Inspect training_data": eda.inspect_dataframe(training_data),
         }
@@ -350,7 +354,9 @@ def _(
     universe_and_target_data,
 ):
     _clients_credit_card_product = (
-        prediction_data.sort(pl.col("Month") == first_prediction_month, descending=True)
+        prediction_data.sort(
+            pl.col(settings.col_month) == first_prediction_month, descending=True
+        )
         .group_by(settings.col_id)
         .agg(pl.col("CreditCard_Product").drop_nulls().first())
     )
@@ -415,7 +421,7 @@ def _(last_training_month, training_data_3, universe_and_target_data):
     )
 
     identity_features = training_data_4.filter(
-        pl.col("Month") == last_training_month
+        pl.col(settings.col_month) == last_training_month
     ).select(column_groups.get_identity_features_cols())
 
     del training_data_3
@@ -480,17 +486,20 @@ def _(identity_features_1, last_training_month, training_data_4):
     del training_data_4
     identity_features_2 = identity_features_1.with_columns(
         [
-            (pl.col("Last_product_dt") - pl.col("First_product_dt"))
+            (
+                pl.col(settings.col_last_product_date)
+                - pl.col(settings.col_first_product_date)
+            )
             .dt.total_days()
             .alias("Days_between_first_and_last_product"),
             (
                 pl.lit(last_training_month).dt.offset_by("1mo")
-                - pl.col("Last_product_dt")
+                - pl.col(settings.col_last_product_date)
             )
             .dt.total_days()
             .alias("Recency_in_days"),
         ]
-    ).drop(["First_product_dt", "Last_product_dt"])
+    ).drop([settings.col_first_product_date, settings.col_last_product_date])
     del identity_features_1
     mo.ui.tabs(
         {

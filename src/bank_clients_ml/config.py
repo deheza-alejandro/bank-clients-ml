@@ -38,6 +38,9 @@ class Settings(pydantic_settings.BaseSettings):
     random_state: int = 314
     col_id: str = "client_id"
     col_target: str = "Target"
+    col_month: str = "Month"
+    col_first_product_date: str = "First_product_dt"
+    col_last_product_date: str = "Last_product_dt"
     col_feature: str = "Feature"
     col_importance: str = "Importance"
     project_dir: pathlib.Path = pathlib.Path(__file__).parent.parent.parent

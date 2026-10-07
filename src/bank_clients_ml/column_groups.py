@@ -94,8 +94,8 @@ def get_identity_features_cols(settings: config.Settings | None = None) -> list[
         settings.col_id,
         settings.col_target,
         *get_categorical_cols(),
-        "First_product_dt",
-        "Last_product_dt",
+        settings.col_first_product_date,
+        settings.col_last_product_date,
         *get_binary_identity_features_cols(),
     ]
 

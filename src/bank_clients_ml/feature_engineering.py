@@ -546,11 +546,9 @@ def aggregate_monthly_to_client(
     columns_without_quantities = {
         *columns_with_monetary_values,
         *identity_features.columns,
-        "Month",
-        "First_product_dt",
-        "Last_product_dt",
-        settings.col_id,
-        settings.col_target,
+        settings.col_month,
+        settings.col_first_product_date,
+        settings.col_last_product_date,
     }
 
     columns_with_quantities = [
@@ -582,7 +580,7 @@ def aggregate_monthly_to_client(
     ]
 
     data_agg = (
-        training_data.sort([settings.col_id, "Month"])
+        training_data.sort([settings.col_id, settings.col_month])
         .group_by(settings.col_id)
         .agg(agg_exprs)
     )
