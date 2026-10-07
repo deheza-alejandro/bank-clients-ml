@@ -13,7 +13,7 @@ la selección de variables con LightGBM.
 
 ## Constantes exportadas:
     CREDIT_CARD_EXCLUDED: Columnas asociadas a la tarjeta de crédito excluidas del grupo monetario.
-    GROUP_WEIGHTS: Ponderación aplicada a cada grupo en la selección.
+    TOP_N_PER_GROUP: Ponderación aplicada a cada grupo en la selección.
 """
 
 from collections.abc import Mapping
@@ -124,7 +124,7 @@ CREDIT_CARD_EXCLUDED: Final[frozenset[str]] = frozenset(
     }
 )
 
-GROUP_WEIGHTS: Final[Mapping[str, int]] = {
+TOP_N_PER_GROUP: Final[Mapping[str, int]] = {
     "saving_account_days_transactions": 1,
     "saving_account_monetary": 1,
     "operations": 1,
@@ -138,7 +138,7 @@ def _classify_column(col: str) -> str:
     """Aplica reglas para determinar el grupo de una columna.
 
     Clasifica una columna según su prefijo y su contenido en uno de los
-    grupos definidos en GROUP_WEIGHTS. Las columnas incluidas
+    grupos definidos en TOP_N_PER_GROUP. Las columnas incluidas
     en CREDIT_CARD_EXCLUDED se derivan al grupo residual "others".
 
     ## Args:
@@ -244,7 +244,7 @@ def group_columns_by_source(
 
     excluded_cols = {settings.col_id, settings.col_target}
     all_columns = [col for col in df.columns if col not in excluded_cols]
-    grouped: dict[str, list[str]] = {group: [] for group in GROUP_WEIGHTS}
+    grouped: dict[str, list[str]] = {group: [] for group in TOP_N_PER_GROUP}
 
     for col in all_columns:
         group = _classify_column(col)
@@ -253,7 +253,7 @@ def group_columns_by_source(
     _validate_groups(all_columns, grouped)
 
     result: dict[str, tuple[list[str], int]] = {"all_columns": (all_columns, 0)}
-    for group_name, weight in GROUP_WEIGHTS.items():
-        result[group_name] = (grouped[group_name], weight)
+    for group_name, top_n in TOP_N_PER_GROUP.items():
+        result[group_name] = (grouped[group_name], top_n)
 
     return result
