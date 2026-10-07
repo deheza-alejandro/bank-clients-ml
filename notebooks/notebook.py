@@ -906,7 +906,11 @@ def _():
 @app.cell
 def _(best_features, best_features_names, final_test, final_train):
     _final_trainer = training.LGBMTrainer(
-        final_train, best_features, n_iter=20, test=final_test
+        final_train,
+        best_features,
+        n_iter=20,
+        splits_cross_validation=5,
+        test=final_test,
     )
     _final_trainer.plot_top_features(
         plot_name="best_features", renames=best_features_names
