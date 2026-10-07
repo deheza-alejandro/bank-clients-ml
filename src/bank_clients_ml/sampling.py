@@ -76,6 +76,11 @@ def stratified_train_test_split(
         Tupla con el DataFrame de entrenamiento seguido del DataFrame de
         prueba.
     """
+    if not (0 < test_ratio < 1):
+        raise ValueError(
+            f"Invalid test_ratio {test_ratio}: must satisfy 0 < test_ratio < 1"
+        )
+
     if settings is None:
         settings = config.get_settings()
 

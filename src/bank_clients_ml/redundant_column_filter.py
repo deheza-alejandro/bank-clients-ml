@@ -72,6 +72,11 @@ def _get_imbalanced_binary_columns(
         Lista con los nombres de las columnas binarias desbalanceadas,
         las cuales no aportan información para el modelado.
     """
+    if not (0.0 < threshold < 0.5):
+        raise ValueError(
+            f"Invalid threshold {threshold}: must satisfy 0.0 < threshold < 0.5"
+        )
+
     if settings is None:
         settings = config.get_settings()
 
