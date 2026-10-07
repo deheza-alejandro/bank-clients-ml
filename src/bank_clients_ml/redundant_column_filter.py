@@ -252,8 +252,8 @@ class BinRange(NamedTuple):
         end: Número de bin final del intervalo.
     """
 
-    start: float
-    end: float
+    start: int
+    end: int
 
 
 def _group_bins_by_ranges(
