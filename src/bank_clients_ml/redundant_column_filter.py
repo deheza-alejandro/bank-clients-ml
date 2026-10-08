@@ -174,10 +174,9 @@ def _get_bivariate_tables(
             .sort(by="Min", descending=False, nulls_last=True)
             .with_columns(
                 pl.int_range(1, pl.len() + 1).alias(settings.col_bin),
-                ((pl.col(settings.col_target) / pl.col(settings.col_clients)) * 100)
-                .round()
-                .cast(pl.Int64)
-                .alias(settings.col_target_pct),
+                (
+                    (pl.col(settings.col_target) / pl.col(settings.col_clients)) * 100
+                ).alias(settings.col_target_pct),
             )
             .select(
                 settings.col_bin,

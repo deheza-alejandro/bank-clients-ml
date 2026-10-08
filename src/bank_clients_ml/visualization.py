@@ -189,7 +189,9 @@ def _plot_single_bivariate_chart(
     if settings is None:
         settings = config.get_settings()
 
-    formatted_table = _format_floats(table)
+    formatted_table = _format_floats(
+        table.with_columns(pl.col(settings.col_target_pct).round().cast(pl.Int64))
+    )
 
     fig, (ax_table, ax_graph) = plt.subplots(
         2, 1, figsize=(9, 8), gridspec_kw={"height_ratios": [1, 1]}
