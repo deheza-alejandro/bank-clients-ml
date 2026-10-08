@@ -223,26 +223,28 @@ def _merge_without_duplicates(
     return dict_1 | dict_2
 
 
-def _get_range_data(i: int, stats) -> tuple[float | int, float | int, float]:
-    """Calcula los límites y el valor de reemplazo de un rango de bines.
+def _get_range_condition_and_value(column: str, i: int, stats) -> tuple[pl.Expr, float]:
+    """Construye la condición y el valor de reemplazo de un rango de bines.
 
-    Usa el mínimo y máximo de la tabla de análisis bivariado y calcula el
-    porcentaje de target del rango como la proporción entre la suma del target
-    y la cantidad de clientes.
+    Agrega los mínimos, máximos, conteos de clientes y sumas del target de la
+    tabla de análisis bivariado y calcula el porcentaje de target del rango
+    como la proporción entre la suma del target y la cantidad de clientes.
 
-    El intervalo resultante es cerrado en ambos extremos, coherente con los
-    bines que genera `_get_bivariate_tables`.
+    La condición resultante usa `is_between` con intervalo cerrado en ambos
+    extremos, coherente con los bines que genera `_get_bivariate_tables`.
 
     ## Args:
+        column: Columna sobre la que se construye la condición de pertenencia
+            al rango.
         i: Índice del rango dentro de las agregaciones calculadas.
         stats: Fila de agregaciones con los valores mínimos, máximos, conteos
             de clientes y sumas del target por rango.
 
     ## Returns:
-        Tupla con el límite inferior, el límite superior y el porcentaje de
-        target correspondiente al rango indicado. Los límites conservan el tipo
-        original de la columna y pueden ser `None` si el rango solo agrupa
-        bines sin `Min`/`Max` (por ejemplo, bines de nulos).
+        Tupla con la expresión de pertenencia al intervalo `[min, max]` del
+        rango indicado y el porcentaje de target correspondiente. La condición
+        es `False` si el rango solo agrupa bines sin `Min`/`Max` (por ejemplo,
+        bines de nulos).
     """
     low = stats[f"min_{i}"]
     high = stats[f"max_{i}"]
@@ -250,7 +252,13 @@ def _get_range_data(i: int, stats) -> tuple[float | int, float | int, float]:
     tgt_sum = stats[f"tgt_{i}"] or 0
 
     val = (float(tgt_sum) / float(cli_sum) * 100.0) if cli_sum > 0 else 0.0
-    return low, high, val
+
+    condition = (
+        pl.col(column).is_between(low, high, closed="both")
+        if low is not None and high is not None
+        else pl.lit(False)
+    )
+    return condition, val
 
 
 @dataclasses.dataclass(frozen=True)
@@ -356,23 +364,11 @@ def _group_bins_by_ranges(
     tgt_def = stats["tgt_def"] or 0
     default_val = (float(tgt_def) / float(cli_def) * 100.0) if cli_def > 0 else 0.0
 
-    expr_col = pl.col(column)
-
-    low, high, val = _get_range_data(0, stats)
-    cond = (
-        expr_col.is_between(low, high, closed="both")
-        if low is not None and high is not None
-        else pl.lit(False)
-    )
+    cond, val = _get_range_condition_and_value(column, 0, stats)
     expr = pl.when(cond).then(val)
 
     for i in range(1, len(bin_ranges)):
-        low, high, val = _get_range_data(i, stats)
-        cond = (
-            expr_col.is_between(low, high, closed="both")
-            if low is not None and high is not None
-            else pl.lit(False)
-        )
+        cond, val = _get_range_condition_and_value(column, i, stats)
         expr = expr.when(cond).then(val)
 
     return expr.otherwise(default_val)
