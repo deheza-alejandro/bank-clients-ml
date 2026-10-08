@@ -16,7 +16,6 @@ y finalmente aplicar transformaciones de bines con `apply_bin_transformations`.
 """
 
 import dataclasses
-from typing import Any, NamedTuple
 
 import numpy as np
 import polars as pl
@@ -222,45 +221,7 @@ def _merge_without_duplicates(
     return dict_1 | dict_2
 
 
-def _get_range_condition_and_value(column: str, i: int, stats) -> tuple[pl.Expr, float]:
-    """Construye la condición y el valor de reemplazo de un rango de bines.
-
-    Agrega los mínimos, máximos, conteos de clientes y sumas del target de la
-    tabla de análisis bivariado y calcula el porcentaje de target del rango
-    como la proporción entre la suma del target y la cantidad de clientes.
-
-    La condición resultante usa `is_between` con intervalo cerrado en ambos
-    extremos, coherente con los bines que genera `_get_bivariate_tables`.
-
-    ## Args:
-        column: Columna sobre la que se construye la condición de pertenencia
-            al rango.
-        i: Índice del rango dentro de las agregaciones calculadas.
-        stats: Fila de agregaciones con los valores mínimos, máximos, conteos
-            de clientes y sumas del target por rango.
-
-    ## Returns:
-        Tupla con la expresión de pertenencia al intervalo `[min, max]` del
-        rango indicado y el porcentaje de target correspondiente. La condición
-        es `False` si el rango solo agrupa bines sin `Min`/`Max` (por ejemplo,
-        bines de nulos).
-    """
-    low = stats[f"min_{i}"]
-    high = stats[f"max_{i}"]
-    cli_sum = stats[f"cli_{i}"] or 0
-    tgt_sum = stats[f"tgt_{i}"] or 0
-
-    val = (float(tgt_sum) / float(cli_sum) * 100.0) if cli_sum > 0 else 0.0
-
-    condition = (
-        pl.col(column).is_between(low, high, closed="both")
-        if low is not None and high is not None
-        else pl.lit(False)
-    )
-    return condition, val
-
-
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class BinRange:
     """Rango inclusivo de bines que se agrupan en un mismo valor.
 
@@ -289,9 +250,164 @@ class BinRange:
             raise ValueError(msg)
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class BinTransformation:
+    """Asociación entre una columna y sus rangos de bines.
+
+    Define cómo deben combinarse los bines de una variable analizada para
+    reemplazar sus valores originales por el porcentaje de target de cada grupo.
+
+    ## Attributes:
+        column: Nombre de la columna a transformar.
+        bin_ranges: Rangos de bines que conforman cada grupo.
+    """
+
+    column: str
+    bin_ranges: tuple[BinRange, ...]
+
+    def __post_init__(self):
+        """Valida los rangos de bines.
+
+        ## Raises:
+            ValueError si `bin_ranges` está vacía o si se solapan bines.
+        """
+        if not self.bin_ranges:
+            msg = f"Column {self.column!r}: 'bin_ranges' must not be empty."
+            raise ValueError(msg)
+
+        seen: set[int] = set()
+        overlapping: set[int] = set()
+        for bin_range in self.bin_ranges:
+            for bin_number in range(bin_range.start, bin_range.end + 1):
+                if bin_number in seen:
+                    overlapping.add(bin_number)
+                seen.add(bin_number)
+        if overlapping:
+            msg = f"Column {self.column!r}: overlapping bins {sorted(overlapping)}"
+            raise ValueError(msg)
+
+
+def _validate_bin_transformation(
+    bin_transformation: BinTransformation, n_bins: int
+) -> None:
+    """Valida la transformación de bines contra la tabla de análisis.
+
+    ## Args:
+        bin_transformation: Asociación entre la columna a transformar y los
+            rangos de bines a validar.
+        n_bins: Cantidad de bines de la tabla.
+
+    ## Raises:
+        ValueError: Si algún rango excede `n_bins`.
+    """
+    for bin_range in bin_transformation.bin_ranges:
+        if bin_range.end > n_bins:
+            msg = (
+                f"Column {bin_transformation.column!r}: invalid range "
+                f"BinRange({bin_range.start}, {bin_range.end}): "
+                f"table has {n_bins} bins."
+            )
+            raise ValueError(msg)
+
+
+def _calculate_target_pct(table: pl.DataFrame, settings: config.Settings) -> float:
+    """Calcula el porcentaje de target de un grupo de bines.
+
+    ## Args:
+        table: Tabla con un grupo de bines con las columnas
+            `settings.col_clients` y `settings.col_target`.
+
+    ## Returns:
+        Porcentaje de target del grupo, o `0.0` si el grupo está vacío.
+    """
+    clients = float(table.get_column(settings.col_clients).sum())
+    target = float(table.get_column(settings.col_target).sum())
+    return target / clients * 100.0 if clients > 0.0 else 0.0
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _BinGroup:
+    """Estadísticas agregadas de un rango de bines.
+
+    ## Attributes:
+        min: Mínimo del grupo (`Min`).
+        max: Máximo del grupo (`Max`).
+        target_pct: Porcentaje de target del grupo.
+    """
+
+    min: int | float | None = dataclasses.field(init=False)
+    max: int | float | None = dataclasses.field(init=False)
+    target_pct: float = dataclasses.field(init=False)
+    table: dataclasses.InitVar[pl.DataFrame]
+    bin_range: dataclasses.InitVar[BinRange]
+    settings: dataclasses.InitVar[config.Settings]
+
+    def __post_init__(
+        self,
+        table: pl.DataFrame,
+        bin_range: BinRange,
+        settings: config.Settings,
+    ) -> None:
+        """Agrega las estadísticas de un rango de bines.
+
+        Filtra la tabla de análisis bivariado por número de bin y resume el
+        intervalo con los límites `[min, max]` con el porcentaje de target del
+        grupo.
+
+        ## Args:
+            table: Tabla de análisis bivariado de la columna.
+            bin_range: Rango de bines a agregar.
+            settings: Configuración con los nombres de las columnas.
+        """
+        if not table.schema["Min"].is_numeric() or not table.schema["Max"].is_numeric():
+            msg = (
+                f"Columns 'Min' and 'Max' must be numeric. "
+                f"Found types: Min={table.schema['Min']}, Max={table.schema['Max']}"
+            )
+            raise TypeError(msg)
+
+        group = table.filter(
+            pl.col(settings.col_bin).is_between(
+                bin_range.start, bin_range.end, closed="both"
+            )
+        )
+        object.__setattr__(self, "min", group.get_column("Min").min())
+        object.__setattr__(self, "max", group.get_column("Max").max())
+        object.__setattr__(self, "target_pct", _calculate_target_pct(group, settings))
+
+    def get_range_condition(self, column: str) -> pl.Expr:
+        """Construye la condición de pertenencia al intervalo del grupo.
+
+        ## Args:
+            column: Columna sobre la que se construye la condición.
+
+        ## Returns:
+            Expresión de pertenencia al intervalo `[low, high]` con ambos extremos
+            incluidos, o `False` si el grupo no tiene límites (por ejemplo, si solo
+            agrupa bines de nulos).
+        """
+        if self.min is None or self.max is None:
+            return pl.lit(False)
+        return pl.col(column).is_between(self.min, self.max, closed="both")
+
+
+def _calculate_default_target_pct(
+    table: pl.DataFrame,
+    bin_transformation: BinTransformation,
+    settings: config.Settings,
+) -> float:
+    bin_match = [
+        pl.col(settings.col_bin).is_between(
+            bin_range.start, bin_range.end, closed="both"
+        )
+        for bin_range in bin_transformation.bin_ranges
+    ]
+    residual_group = table.filter(~pl.any_horizontal(bin_match))
+    return _calculate_target_pct(residual_group, settings)
+
+
 def _group_bins_by_ranges(
-    column: str,
-    bin_ranges: list[BinRange],
+    bin_transformation: BinTransformation,
     table: pl.DataFrame,
     settings: config.Settings | None = None,
 ) -> pl.Expr:
@@ -313,8 +429,8 @@ def _group_bins_by_ranges(
     al grupo residual.
 
     ## Args:
-        column: Columna a transformar.
-        bin_ranges: Rangos de bines que definen cada grupo de agregación.
+        bin_transformation: Asociación entre una columna a transformar y los
+            rangos de bines que definen cada grupo de agregación.
         table: Tabla de análisis bivariado de la columna, con las columnas de
             bin, mínimo, máximo, clientes y target.
         settings: Configuración con el nombre de la columna target. Si no se
@@ -323,69 +439,29 @@ def _group_bins_by_ranges(
     ## Returns:
         Expresión de Polars que asigna a cada fila el porcentaje de target
         del rango al que pertenece.
+
+    ## Raises:
+        ValueError: Si algún rango excede la cantidad de bines de la tabla.
     """
     if settings is None:
         settings = config.get_settings()
 
-    range_conditions = [
-        (pl.col(settings.col_bin) >= bin_range.start)
-        & (pl.col(settings.col_bin) <= bin_range.end)
-        for bin_range in bin_ranges
+    _validate_bin_transformation(bin_transformation, table.height)
+
+    groups = [
+        _BinGroup(table, bin_range, settings)
+        for bin_range in bin_transformation.bin_ranges
     ]
+    column = bin_transformation.column
 
-    aggregations = []
-    for i, cond in enumerate(range_conditions):
-        aggregations.extend(
-            [
-                pl.col("Min").filter(cond).min().alias(f"min_{i}"),
-                pl.col("Max").filter(cond).max().alias(f"max_{i}"),
-                pl.col(settings.col_clients).filter(cond).sum().alias(f"cli_{i}"),
-                pl.col(settings.col_target).filter(cond).sum().alias(f"tgt_{i}"),
-            ]
-        )
+    expr = pl.when(groups[0].get_range_condition(column)).then(groups[0].target_pct)
+    for group in groups[1:]:
+        expr = expr.when(group.get_range_condition(column)).then(group.target_pct)
 
-    out_of_range_cond = ~pl.any_horizontal(range_conditions)
-    aggregations.extend(
-        [
-            pl.col(settings.col_clients)
-            .filter(out_of_range_cond)
-            .sum()
-            .alias("cli_def"),
-            pl.col(settings.col_target)
-            .filter(out_of_range_cond)
-            .sum()
-            .alias("tgt_def"),
-        ]
+    default_target_pct = _calculate_default_target_pct(
+        table, bin_transformation, settings
     )
-
-    stats = table.select(aggregations).row(0, named=True)
-    cli_def = stats["cli_def"] or 0
-    tgt_def = stats["tgt_def"] or 0
-    default_val = (float(tgt_def) / float(cli_def) * 100.0) if cli_def > 0 else 0.0
-
-    cond, val = _get_range_condition_and_value(column, 0, stats)
-    expr = pl.when(cond).then(val)
-
-    for i in range(1, len(bin_ranges)):
-        cond, val = _get_range_condition_and_value(column, i, stats)
-        expr = expr.when(cond).then(val)
-
-    return expr.otherwise(default_val)
-
-
-class BinTransformation(NamedTuple):
-    """Asociación entre una columna y sus rangos de bines.
-
-    Define cómo deben combinarse los bines de una variable analizada para
-    reemplazar sus valores originales por el porcentaje de target de cada grupo.
-
-    ## Attributes:
-        column: Nombre de la columna a transformar.
-        bin_ranges: Rangos de bines que conforman cada grupo.
-    """
-
-    column: str
-    bin_ranges: list[BinRange]
+    return expr.otherwise(default_target_pct)
 
 
 class RedundantColumnFilter:
@@ -655,12 +731,11 @@ class RedundantColumnFilter:
         """
         expr = [
             _group_bins_by_ranges(
-                column,
-                bin_ranges=bin_ranges,
-                table=self._train_analysis[column],
+                bin_transformation,
+                table=self._train_analysis[bin_transformation.column],
                 settings=self._settings,
-            ).alias(column)
-            for column, bin_ranges in bins_transformations
+            ).alias(bin_transformation.column)
+            for bin_transformation in bins_transformations
         ]
         final_train = self.correlated_train.with_columns(expr)
         final_test = self.correlated_test.with_columns(expr)
