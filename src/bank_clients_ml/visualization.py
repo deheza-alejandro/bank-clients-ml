@@ -148,16 +148,16 @@ def plot_top_features(
 
 
 def _format_floats(df: pl.DataFrame) -> pl.DataFrame:
-    """Redondea a dos decimales y convierte a texto todas las columnas de tipo float.
+    """Redondea a dos decimales todas las columnas de tipo float.
 
     Args:
         df: El DataFrame de Polars de entrada.
 
     Returns:
         Un nuevo DataFrame con todas las columnas de tipo float redondeadas a 2
-        decimales y convertidas a string.
+        decimales.
     """
-    return df.with_columns(cs.float().round(2).cast(pl.String))
+    return df.with_columns(cs.float().round(2))
 
 
 def _plot_single_bivariate_chart(
