@@ -396,6 +396,23 @@ def _calculate_default_target_pct(
     bin_transformation: BinTransformation,
     settings: config.Settings,
 ) -> float:
+    """Calcula el porcentaje de target del grupo residual.
+
+    Identifica los bines de la tabla que no pertenecen a ningún rango de la
+    transformación y calcula su porcentaje de target agregado. Este valor se
+    utiliza como valor por defecto para las filas cuyos valores quedan fuera
+    de todos los intervalos definidos, incluidos los nulos y los huecos entre grupos.
+
+    ## Args:
+        table: Tabla de análisis bivariado de la columna.
+        bin_transformation: Asociación entre la columna a transformar y los
+            rangos de bines que definen cada grupo de agregación.
+        settings: Configuración con los nombres de las columnas.
+
+    ## Returns:
+        Porcentaje de target del grupo residual, o `0.0` si no quedan bines
+        sin cubrir.
+    """
     bin_match = [
         pl.col(settings.col_bin).is_between(
             bin_range.start, bin_range.end, closed="both"
