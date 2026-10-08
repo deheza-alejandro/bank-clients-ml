@@ -835,11 +835,11 @@ def _(column_filter):
     final_train, final_test = column_filter.apply_bin_transformations(
         [
             col_filter.BinTransformation(
-                "Client_Age_grp", [col_filter.BinRange(4, 5), col_filter.BinRange(6, 7)]
+                "Client_Age_grp", (col_filter.BinRange(4, 5), col_filter.BinRange(6, 7))
             ),
             col_filter.BinTransformation(
                 "Operations_total_mean",
-                [
+                (
                     col_filter.BinRange(2, 4),
                     col_filter.BinRange(5, 6),
                     col_filter.BinRange(7, 8),
@@ -847,24 +847,24 @@ def _(column_filter):
                     col_filter.BinRange(11, 12),
                     col_filter.BinRange(13, 14),
                     col_filter.BinRange(15, 16),
-                ],
+                ),
             ),
             col_filter.BinTransformation(
                 "Operations_total_median",
-                [
+                (
                     col_filter.BinRange(2, 4),
                     col_filter.BinRange(5, 7),
                     col_filter.BinRange(8, 9),
                     col_filter.BinRange(10, 11),
-                ],
+                ),
             ),
             col_filter.BinTransformation(
                 "CreditCard_Product",
-                [col_filter.BinRange(5, 5), col_filter.BinRange(7, 7)],
+                (col_filter.BinRange(5, 5), col_filter.BinRange(7, 7)),
             ),
             col_filter.BinTransformation(
                 "Quantity_Active_Products_min",
-                [col_filter.BinRange(1, 4), col_filter.BinRange(6, 9)],
+                (col_filter.BinRange(1, 4), col_filter.BinRange(6, 9)),
             ),
         ]
     )
