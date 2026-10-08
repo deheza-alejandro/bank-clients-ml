@@ -11,7 +11,7 @@ el cálculo de deciles de probabilidad y la evaluación sobre el conjunto de pru
 import contextlib
 import io
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import cast
 
 import lightgbm as lgb
 import marimo as mo
@@ -515,7 +515,7 @@ class GroupsLGBMTrainer:
             Un diccionario con elementos visuales de marimo organizados por
             nombre de grupo, listos para mostrarse en el notebook.
         """
-        results: dict[str, Any] = {}
+        results: dict[str, mo.Html] = {}
 
         for group_name, trainer in self.trainers.items():
             results[f"{group_name} searcher"] = trainer.get_cv_results(include_logs)

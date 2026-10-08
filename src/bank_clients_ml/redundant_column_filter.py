@@ -616,7 +616,7 @@ class RedundantColumnFilter:
             .sort(pl.col("correlation").abs(), descending=True)
         )
 
-    def correlations_for_each(self, columns: list[str]) -> dict[str, Any]:
+    def correlations_for_each(self, columns: list[str]) -> dict[str, pl.DataFrame]:
         """Obtiene las variables correlacionadas de cada columna indicada.
 
         ## Args:
@@ -627,7 +627,7 @@ class RedundantColumnFilter:
             Diccionario que mapea cada columna con sus resultados de
             correlación correspondientes.
         """
-        correlations_dict: dict[str, Any] = {}
+        correlations_dict: dict[str, pl.DataFrame] = {}
 
         for column in columns:
             correlations_dict[f'Correlated with "{column}"'] = (
