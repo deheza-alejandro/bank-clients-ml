@@ -223,12 +223,15 @@ def _merge_without_duplicates(
     return dict_1 | dict_2
 
 
-def _get_range_data(i: int, stats) -> tuple[float, float, float]:
+def _get_range_data(i: int, stats) -> tuple[float | int, float | int, float]:
     """Calcula los límites y el valor de reemplazo de un rango de bines.
 
-    Expande levemente los valores mínimo y máximo observados para garantizar
-    la inclusión de los bordes, y calcula el porcentaje de target del rango
-    como la proporción entre la suma del target y la cantidad de clientes.
+    Usa el mínimo y máximo de la tabla de análisis bivariado y calcula el
+    porcentaje de target del rango como la proporción entre la suma del target
+    y la cantidad de clientes.
+
+    El intervalo resultante es cerrado en ambos extremos, coherente con los
+    bines que genera `_get_bivariate_tables`.
 
     ## Args:
         i: Índice del rango dentro de las agregaciones calculadas.
@@ -237,15 +240,15 @@ def _get_range_data(i: int, stats) -> tuple[float, float, float]:
 
     ## Returns:
         Tupla con el límite inferior, el límite superior y el porcentaje de
-        target correspondiente al rango indicado.
+        target correspondiente al rango indicado. Los límites conservan el tipo
+        original de la columna y pueden ser `None` si el rango solo agrupa
+        bines sin `Min`/`Max` (por ejemplo, bines de nulos).
     """
-    min_val = stats[f"min_{i}"]
-    max_val = stats[f"max_{i}"]
+    low = stats[f"min_{i}"]
+    high = stats[f"max_{i}"]
     cli_sum = stats[f"cli_{i}"] or 0
     tgt_sum = stats[f"tgt_{i}"] or 0
 
-    low = (float(min_val) - 0.01) if isinstance(min_val, (int, float)) else 0.0
-    high = (float(max_val) + 0.01) if isinstance(max_val, (int, float)) else 0.0
     val = (float(tgt_sum) / float(cli_sum) * 100.0) if cli_sum > 0 else 0.0
     return low, high, val
 
@@ -288,8 +291,19 @@ def _group_bins_by_ranges(
     """Construye una expresión de transformación por rangos de bines.
 
     Agrupa las estadísticas de la tabla de análisis bivariado según los rangos
-    indicados y calcula el porcentaje de target de cada grupo. Los valores
-    fuera de todos los rangos reciben el porcentaje del grupo residual.
+    indicados y calcula el porcentaje de target de cada grupo. Cada grupo cubre
+    el intervalo `[min, max]` agregado de sus bines, con ambos extremos
+    incluidos. Los huecos entre bines del mismo grupo quedan incluidos en el
+    intervalo. Los valores fuera de todos los rangos, así como los nulos,
+    reciben el porcentaje del grupo residual.
+
+    Si un valor cae exactamente en la frontera compartida por dos grupos
+    (`max` de uno igual al `min` del siguiente), gana el primer rango de la
+    lista, según el orden de la cadena `when/then`.
+
+    La columna debe ser numérica. Los rangos con límites `None` (por ejemplo,
+    los que solo agrupan bines de nulos) nunca hacen match y esos valores van
+    al grupo residual.
 
     ## Args:
         column: Columna a transformar.
@@ -345,11 +359,21 @@ def _group_bins_by_ranges(
     expr_col = pl.col(column)
 
     low, high, val = _get_range_data(0, stats)
-    expr = pl.when(expr_col.is_between(low, high)).then(val)
+    cond = (
+        expr_col.is_between(low, high, closed="both")
+        if low is not None and high is not None
+        else pl.lit(False)
+    )
+    expr = pl.when(cond).then(val)
 
     for i in range(1, len(bin_ranges)):
         low, high, val = _get_range_data(i, stats)
-        expr = expr.when(expr_col.is_between(low, high)).then(val)
+        cond = (
+            expr_col.is_between(low, high, closed="both")
+            if low is not None and high is not None
+            else pl.lit(False)
+        )
+        expr = expr.when(cond).then(val)
 
     return expr.otherwise(default_val)
 
