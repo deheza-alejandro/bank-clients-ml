@@ -147,6 +147,19 @@ def plot_top_features(
     _save_fig_as_svg(fig, plot_name, settings.images_dir, "plot_top_features")
 
 
+def _format_floats(df: pl.DataFrame) -> pl.DataFrame:
+    """Redondea a dos decimales y convierte a texto todas las columnas de tipo float.
+
+    Args:
+        df: El DataFrame de Polars de entrada.
+
+    Returns:
+        Un nuevo DataFrame con todas las columnas de tipo float redondeadas a 2
+        decimales y convertidas a string.
+    """
+    return df.with_columns(cs.float().round(2).cast(pl.String))
+
+
 def _plot_single_bivariate_chart(
     table: pl.DataFrame,
     variable_to_plot: str,
@@ -176,6 +189,8 @@ def _plot_single_bivariate_chart(
     if settings is None:
         settings = config.get_settings()
 
+    formatted_table = _format_floats(table)
+
     fig, (ax_table, ax_graph) = plt.subplots(
         2, 1, figsize=(9, 8), gridspec_kw={"height_ratios": [1, 1]}
     )
@@ -183,25 +198,30 @@ def _plot_single_bivariate_chart(
     ax_table.axis("off")
     ax_table.set_title(f"Variable analysis: {variable_to_plot}", pad=1)
     ax_table.table(
-        cellText=table.rows(),
-        colLabels=table.columns,
+        cellText=formatted_table.rows(),
+        colLabels=formatted_table.columns,
         loc="center",
         cellLoc="center",
         bbox=[0, 0, 1, 0.99],
     )
 
-    x_indices = range(len(table))
+    x_indices = range(len(formatted_table))
 
-    ax_graph.bar(x_indices, table.get_column(settings.col_clients), width=0.35)
+    ax_graph.bar(
+        x_indices, formatted_table.get_column(settings.col_clients), width=0.35
+    )
     ax_graph.set_ylabel(settings.col_clients)
     ax_graph.set_xticks(x_indices)
     ax_graph.set_xticklabels(
-        table.get_column(settings.col_bin), rotation=0, ha="center"
+        formatted_table.get_column(settings.col_bin), rotation=0, ha="center"
     )
 
     ax_graph_target_pct = ax_graph.twinx()
     ax_graph_target_pct.plot(
-        x_indices, table.get_column(settings.col_target_pct), marker="o", color="green"
+        x_indices,
+        formatted_table.get_column(settings.col_target_pct),
+        marker="o",
+        color="green",
     )
     ax_graph_target_pct.set_ylabel(f"{settings.col_target} pct (%)")
 
@@ -336,9 +356,7 @@ def _plot_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
     ax.axis("tight")
     ax.axis("off")
 
-    formatted_df = deciles.with_columns(cs.float().round(2).cast(pl.String)).select(
-        pl.all().cast(pl.String)
-    )
+    formatted_df = _format_floats(deciles).select(pl.all().cast(pl.String))
 
     columns = deciles.columns
 

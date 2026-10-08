@@ -166,8 +166,8 @@ def _get_bivariate_tables(
             df.select(settings.col_target, column)
             .group_by(group_expr.alias("_bin"))
             .agg(
-                pl.col(column).min().round(2).alias("Min"),
-                pl.col(column).max().round(2).alias("Max"),
+                pl.col(column).min().alias("Min"),
+                pl.col(column).max().alias("Max"),
                 pl.len().alias(settings.col_clients),
                 pl.col(settings.col_target).sum().alias(settings.col_target),
             )
