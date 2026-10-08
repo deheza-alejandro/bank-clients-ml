@@ -190,8 +190,8 @@ def _compute_prediction_deciles(
         .agg(
             count=pl.len(),
             target_1_count=pl.col(settings.col_target).sum().cast(pl.UInt32),
-            min_prob=(pl.col("probabilities").min() * 100).round(2),
-            max_prob=(pl.col("probabilities").max() * 100).round(2),
+            min_prob=(pl.col("probabilities").min() * 100),
+            max_prob=(pl.col("probabilities").max() * 100),
         )
         .sort("decile", descending=True)
     )
@@ -200,15 +200,15 @@ def _compute_prediction_deciles(
     count = pl.col("count")
     target_0_count = count - target_1_count
 
-    total_target_1_rate = (target_1_count.sum() / count.sum() * 100).round(2)
-    target_1_rate = (target_1_count / count * 100).round(2)
-    cum_gain = (target_1_count.cum_sum() / target_1_count.sum() * 100).round(2)
-    cum_target_0_rate = (target_0_count.cum_sum() / target_0_count.sum() * 100).round(2)
+    total_target_1_rate = target_1_count.sum() / count.sum() * 100
+    target_1_rate = target_1_count / count * 100
+    cum_gain = target_1_count.cum_sum() / target_1_count.sum() * 100
+    cum_target_0_rate = target_0_count.cum_sum() / target_0_count.sum() * 100
 
     return deciles_df.with_columns(
         target_1_rate=target_1_rate,
         cum_gain=cum_gain,
-        lift=(target_1_rate / total_target_1_rate).round(2),
+        lift=(target_1_rate / total_target_1_rate),
         ks=cum_gain - cum_target_0_rate,
     )
 

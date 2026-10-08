@@ -952,7 +952,7 @@ def _():
     ### Training
 
     - Ordenamiento correcto en todos los deciles, con una distribución relativamente homogénea.
-    - Lift del 1er decil de 2,4 y KS de 47,04 en el 5to decil.
+    - Lift del 1er decil de 2,4 y KS de 47,03 en el 5to decil.
 
     ### Testing
 
@@ -962,7 +962,7 @@ def _():
     ### Stability Gap
 
     - Diferencia de lift de 0,04 en el mismo decil.
-    - Diferencia de KS de 0,18, con 1 decil de diferencia.
+    - Diferencia de KS de 0,19, con 1 decil de diferencia.
     """)
     return
 
