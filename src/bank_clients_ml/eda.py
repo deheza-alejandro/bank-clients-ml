@@ -21,7 +21,7 @@ donde algunos resultados se anexan directamente a la salida visible.
 import operator
 import pathlib
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Final, Literal
+from typing import Final, Literal
 
 import marimo as mo
 import polars as pl
@@ -102,7 +102,7 @@ def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
 
 type ConditionSymbol = Literal["<", ">", "<=", ">=", "==", "!="]
 
-type ComparisonFunction = Callable[[Any, Any], Any]
+type ComparisonFunction = Callable[[pl.Expr, float | int], pl.Expr]
 
 OPERATORS: Final[Mapping[ConditionSymbol, ComparisonFunction]] = {
     "<": operator.lt,
