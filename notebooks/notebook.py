@@ -136,7 +136,7 @@ def _():
 @app.cell
 def _(clean_data):
     training_months, prediction_months = sampling.get_date_windows(
-        clean_data, settings.col_month, prediction_window_size=2
+        clean_data, prediction_window_size=2
     )
     last_training_month = training_months[-1]
     first_prediction_month = prediction_months[0]

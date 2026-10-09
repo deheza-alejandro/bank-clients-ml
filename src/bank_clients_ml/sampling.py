@@ -16,7 +16,9 @@ from bank_clients_ml import config
 
 
 def get_date_windows(
-    df: pl.DataFrame, date_column: str, prediction_window_size: int
+    df: pl.DataFrame,
+    prediction_window_size: int,
+    settings: config.Settings | None = None,
 ) -> tuple[list[datetime.date], list[datetime.date]]:
     """Divide en ventanas de entrenamiento y predicción.
 
@@ -35,11 +37,14 @@ def get_date_windows(
         Tupla con la lista de meses de entrenamiento seguida de la lista de
         meses de predicción, ambas en orden cronológico ascendente.
     """
+    if settings is None:
+        settings = config.get_settings()
+
     pred_offset = f"-{prediction_window_size - 1}mo"
     train_offset = f"-{prediction_window_size + 1}mo"
 
-    last_month = pl.col(date_column).max()
-    first_month = pl.col(date_column).min()
+    last_month = pl.col(settings.col_month).max()
+    first_month = pl.col(settings.col_month).min()
 
     windows = df.select(
         prediction_months=pl.date_range(
