@@ -7,7 +7,7 @@ with app.setup:
     import marimo as mo
     import polars as pl
 
-    from bank_clients_ml import column_groups, config, eda, sampling, training
+    from bank_clients_ml import cleaning, column_groups, config, eda, sampling, training
     from bank_clients_ml import feature_engineering as feat
     from bank_clients_ml import redundant_column_filter as col_filter
 
@@ -98,26 +98,14 @@ def _():
 @app.cell
 def _(raw_data):
     print("raw_data.shape:", raw_data.shape)
-    clean_data = raw_data.filter(
-        pl.col(settings.col_target).is_not_null()
-    ).with_columns(
-        pl.col(
-            settings.col_month,
-            settings.col_first_product_date,
-            settings.col_last_product_date,
-        ).str.to_date(),
-        pl.col(settings.col_id).cast(pl.Int64),
-    )
-    _month_count_by_client = clean_data.group_by(settings.col_id).len(
-        name="month_count"
-    )
+    clean_data = cleaning.clean_up_data(raw_data)
     del raw_data
     mo.ui.tabs(
         {
             "Inspect clean_data": eda.inspect_dataframe(clean_data),
-            "Number of clients by number of months": _month_count_by_client.get_column(
-                "month_count"
-            ).value_counts(sort=True),
+            "Number of clients by number of months": eda.get_clients_by_months(
+                clean_data
+            ),
         }
     )
     return (clean_data,)
@@ -129,33 +117,7 @@ def _():
     # 2. Universe and Target Definition
 
     Se obtienen los meses de las ventanas de entrenamiento y predicción, con una lead window de 1 mes.
-    """)
-    return
 
-
-@app.cell
-def _(clean_data):
-    training_months, prediction_months = sampling.get_date_windows(
-        clean_data, prediction_window_size=2
-    )
-    last_training_month = training_months[-1]
-    first_prediction_month = prediction_months[0]
-
-    print("last_training_month:", last_training_month)
-    print("first_prediction_month:", first_prediction_month)
-    mo.output.append(training_months)
-    mo.output.append(prediction_months)
-    return (
-        first_prediction_month,
-        last_training_month,
-        prediction_months,
-        training_months,
-    )
-
-
-@app.cell(hide_code=True)
-def _():
-    mo.md(r"""
     ## 2.1 Universe Filtering Criteria
 
     Se conservan en el universo los clientes que:
@@ -168,46 +130,38 @@ def _():
 
 
 @app.cell
-def _(clean_data, last_training_month, prediction_months, training_months):
-    _is_valid_client = (
-        (pl.col(settings.col_month) == last_training_month)
-        & (pl.col("Package_Active") == "No")
-        & (pl.col("CreditCard_CoBranding") == "No")
-    )
-
-    _universe_and_target = (
-        clean_data.filter(
-            (pl.len().over(settings.col_id) == 9)
-            & _is_valid_client.any().over(settings.col_id)
-            & pl.col(settings.col_month).is_in(prediction_months)
-        )
-        .select(settings.col_id, settings.col_target)
-        .unique()
-    )
-
-    universe_and_target_data = clean_data.drop(settings.col_target).join(
-        _universe_and_target, on=settings.col_id, how="inner"
-    )
-
-    training_data = universe_and_target_data.filter(
-        pl.col(settings.col_month).is_in(training_months)
-    )
-    prediction_data = universe_and_target_data.filter(
-        pl.col(settings.col_month).is_in(prediction_months)
+def _(clean_data):
+    time_window_split = sampling.define_time_window_split(
+        clean_data, prediction_window_size=2
     )
     del clean_data
-
-    print(f"universe_and_target.shape: {_universe_and_target.shape} \n")
-    print(f"prediction_data.shape: {prediction_data.shape} \n")
+    print(
+        f"universe_and_target.shape: {time_window_split.universe_and_target.shape} \n"
+    )
+    print(f"prediction_data.shape: {time_window_split.prediction_data.shape} \n")
     mo.ui.tabs(
         {
-            "Number of clients per Month": training_data.get_column(
+            "Time Windows Dates": mo.vstack(
+                [
+                    mo.md("#### last_training_month:"),
+                    time_window_split.training_months[-1],
+                    mo.md("#### first_prediction_month:"),
+                    time_window_split.prediction_months[0],
+                    mo.md("#### training_months:"),
+                    time_window_split.training_months,
+                    mo.md("#### prediction_months:"),
+                    time_window_split.prediction_months,
+                ]
+            ),
+            "Number of clients per Month": time_window_split.training_data.get_column(
                 settings.col_month
             ).value_counts(),
-            "Inspect training_data": eda.inspect_dataframe(training_data),
+            "Inspect training_data": eda.inspect_dataframe(
+                time_window_split.training_data
+            ),
         }
     )
-    return prediction_data, training_data, universe_and_target_data
+    return (time_window_split,)
 
 
 @app.cell(hide_code=True)
@@ -220,13 +174,13 @@ def _():
 
 
 @app.cell
-def _(training_data):
+def _(time_window_split):
     _null_cols = ["SavingAccount_Balance_Average", "Region", "CreditCard_Product"]
     print(
         f"SavingAccount_Balance_Average unique values: "
-        f"{training_data.select('SavingAccount_Balance_Average').n_unique()} \n"
+        f"{time_window_split.training_data.select('SavingAccount_Balance_Average').n_unique()} \n"
     )
-    mo.output.append(eda.describe(training_data.select(_null_cols)))
+    mo.output.append(eda.describe(time_window_split.training_data.select(_null_cols)))
     return
 
 
@@ -241,14 +195,14 @@ def _():
 
 
 @app.cell
-def _(training_data):
+def _(time_window_split):
     mo.ui.tabs(
         {
-            'When "Saving Account Balance (Average)" is Null': training_data.select(
+            'When "Saving Account Balance (Average)" is Null': time_window_split.training_data.select(
                 [settings.col_id, *column_groups.get_saving_account_cols()]
             ).filter(pl.col("SavingAccount_Balance_Average").is_null()),
             "Non-null monetary values of Saving Account": eda.filter_nonzero(
-                training_data, column_groups.get_saving_account_cols()
+                time_window_split.training_data, column_groups.get_saving_account_cols()
             ),
         }
     )
@@ -264,8 +218,8 @@ def _():
 
 
 @app.cell
-def _(training_data):
-    training_data_1 = training_data.with_columns(
+def _(time_window_split):
+    training_data_1 = time_window_split.training_data.with_columns(
         pl.col("SavingAccount_Balance_Average").fill_null(
             (
                 pl.col("SavingAccount_Balance_FirstDate")
@@ -274,7 +228,6 @@ def _(training_data):
             / 2.0
         )
     )
-    del training_data
     mo.ui.tabs(
         {
             'Describe "Saving Account Balance (Average)"': eda.describe(
@@ -297,8 +250,10 @@ def _():
 
 
 @app.cell
-def _(prediction_data, training_data_1, universe_and_target_data):
-    _clients_region = prediction_data.select(settings.col_id, "Region").unique()
+def _(time_window_split, training_data_1):
+    _clients_region = time_window_split.prediction_data.select(
+        settings.col_id, "Region"
+    ).unique()
 
     training_data_2 = training_data_1.drop("Region").join(
         _clients_region.with_columns(pl.col("Region").fill_null("BUENOS AIRES")),
@@ -320,7 +275,9 @@ def _(prediction_data, training_data_1, universe_and_target_data):
             "Describe DataFrames": mo.vstack(
                 [
                     mo.md("### Describe universe_and_target_data"),
-                    eda.describe(universe_and_target_data.select("Region")),
+                    eda.describe(
+                        time_window_split.universe_and_target_data.select("Region")
+                    ),
                     mo.md("### Describe clients_region"),
                     eda.describe(_clients_region),
                     mo.md("### Describe training_data"),
@@ -347,15 +304,11 @@ def _():
 
 
 @app.cell
-def _(
-    first_prediction_month,
-    prediction_data,
-    training_data_2,
-    universe_and_target_data,
-):
+def _(time_window_split, training_data_2):
     _clients_credit_card_product = (
-        prediction_data.sort(
-            pl.col(settings.col_month) == first_prediction_month, descending=True
+        time_window_split.prediction_data.sort(
+            pl.col(settings.col_month) == time_window_split.prediction_months[0],
+            descending=True,
         )
         .group_by(settings.col_id)
         .agg(pl.col("CreditCard_Product").drop_nulls().first())
@@ -373,7 +326,6 @@ def _(
             .alias("CreditCard_Product")
         )
     )
-    del prediction_data
     del training_data_2
     mo.ui.tabs(
         {
@@ -387,7 +339,11 @@ def _(
             "Describe DataFrames": mo.vstack(
                 [
                     mo.md("### Describe Credit Card Type (universe_and_target_data)"),
-                    eda.describe(universe_and_target_data.select("CreditCard_Product")),
+                    eda.describe(
+                        time_window_split.universe_and_target_data.select(
+                            "CreditCard_Product"
+                        )
+                    ),
                     mo.md("### Describe clients in prediction window"),
                     eda.describe(_clients_credit_card_product),
                     mo.md("### Describe Credit Card Type (training_data)"),
@@ -410,8 +366,7 @@ def _():
 
 
 @app.cell
-def _(last_training_month, training_data_3, universe_and_target_data):
-    del universe_and_target_data
+def _(time_window_split, training_data_3):
     _binary_dict: dict[str, int] = {"Yes": 1, "No": 0, "M": 1, "F": 0}
 
     training_data_4 = training_data_3.with_columns(
@@ -421,7 +376,7 @@ def _(last_training_month, training_data_3, universe_and_target_data):
     )
 
     identity_features = training_data_4.filter(
-        pl.col(settings.col_month) == last_training_month
+        pl.col(settings.col_month) == time_window_split.training_months[-1]
     ).select(column_groups.get_identity_features_cols())
 
     del training_data_3
@@ -482,24 +437,12 @@ def _():
 
 
 @app.cell
-def _(identity_features_1, last_training_month, training_data_4):
+def _(identity_features_1, time_window_split, training_data_4):
     del training_data_4
-    identity_features_2 = identity_features_1.with_columns(
-        [
-            (
-                pl.col(settings.col_last_product_date)
-                - pl.col(settings.col_first_product_date)
-            )
-            .dt.total_days()
-            .alias("Days_between_first_and_last_product"),
-            (
-                pl.lit(last_training_month).dt.offset_by("1mo")
-                - pl.col(settings.col_last_product_date)
-            )
-            .dt.total_days()
-            .alias("Recency_in_days"),
-        ]
-    ).drop([settings.col_first_product_date, settings.col_last_product_date])
+    identity_features_2 = feat.transform_date_features(
+        identity_features_1, time_window_split.training_months
+    )
+    del time_window_split
     del identity_features_1
     mo.ui.tabs(
         {
@@ -688,6 +631,15 @@ def _():
 def _(column_filter):
     groups_trainer = training.GroupsLGBMTrainer(column_filter.uncorrelated_train)
     groups_trainer.plot_top_features()
+    groups_names = {
+        "all_columns": "All Columns",
+        "saving_account_days_transactions": "Savings Account (Days transactions)",
+        "saving_account_monetary": "Savings Account (Amount)",
+        "operations": "Operations",
+        "credit_card_payment": "Credit Card (Payments)",
+        "credit_card_monetary": "Credit Card (Amount)",
+        "others": "Others",
+    }
     mo.ui.tabs(
         {
             "Groups lengths": groups_trainer.get_groups_lengths_views(),
@@ -697,22 +649,13 @@ def _(column_filter):
             ),
         }
     )
-    return (groups_trainer,)
+    return groups_names, groups_trainer
 
 
 @app.cell
-def _():
-    _groups_names = {
-        "all_columns": "All Columns",
-        "saving_account_days_transactions": "Savings Account (Days transactions)",
-        "saving_account_monetary": "Savings Account (Amount)",
-        "operations": "Operations",
-        "credit_card_payment": "Credit Card (Payments)",
-        "credit_card_monetary": "Credit Card (Amount)",
-        "others": "Others",
-    }
+def _(groups_names):
     eda.build_plot_tabs(
-        _groups_names,
+        groups_names,
         settings.images_dir / "plot_top_features",
         orientation="vertical",
     )
@@ -720,11 +663,10 @@ def _():
 
 
 @app.cell
-def _(column_filter, groups_trainer):
-    top_grouped_features = groups_trainer.get_top_grouped_features()
-    del groups_trainer
+def _(column_filter, groups_names, groups_trainer):
+    del groups_names
     trainer = training.LGBMTrainer(
-        column_filter.uncorrelated_train, top_grouped_features
+        column_filter.uncorrelated_train, groups_trainer.get_top_grouped_features()
     )
     trainer.plot_top_features("top_grouped_features")
     mo.ui.tabs(
@@ -737,7 +679,7 @@ def _(column_filter, groups_trainer):
             "Cross Validation Results": trainer.get_cv_results(include_logs=True),
         }
     )
-    return top_grouped_features, trainer
+    return (trainer,)
 
 
 @app.cell(hide_code=True)
@@ -751,8 +693,10 @@ def _():
 
 
 @app.cell
-def _(column_filter, top_grouped_features):
-    column_filter.plot_uncorrelated(top_grouped_features, "uncorrelated")
+def _(column_filter, groups_trainer):
+    column_filter.plot_uncorrelated(
+        groups_trainer.get_top_grouped_features(), "uncorrelated"
+    )
     _uncorrelated_names = {
         "Client_Age_grp": "Client Age Group",
         "CreditCard_Balance_ARG_SP_pct_max": "Credit Card (Balance ARS / Total spendings) (Max)",
@@ -764,7 +708,7 @@ def _(column_filter, top_grouped_features):
         "SavingAccount_Transfer_In_Amount_max": "Savings Account Transfer-In Amount (Max)",
         "SavingAccount_Transfer_In_Transactions_pct_max": "Savings Account Transfer-In Transactions (Max %)",
     }
-    del top_grouped_features
+    del groups_trainer
     eda.build_plot_tabs(
         _uncorrelated_names,
         settings.images_dir / "bivariate_analysis" / "uncorrelated",
@@ -868,34 +812,28 @@ def _(column_filter):
             ),
         ]
     )
-    _temp_inspect_final_train = eda.inspect_dataframe(final_train)
-
     best_features_names = {
         "Client_Age_grp": "Client Age Group",
         "Operations_total_mean": "Total Operations (Mean)",
         "CreditCard_Product": "Credit Card Product",
         "Quantity_Active_Products_min": "Active Products Quantity (Min)",
     }
-    best_features = list(best_features_names.keys())
-    _final_cols = [settings.col_id, settings.col_target, *best_features]
-    final_train = final_train.select(_final_cols)
-    final_test = final_test.select(_final_cols)
+    result = col_filter.select_features(final_train, final_test, best_features_names)
     mo.ui.tabs(
         {
-            "Inspect final_train before select": _temp_inspect_final_train,
-            "Inspect final_train after select": eda.inspect_dataframe(final_train),
-            "Describe final_train": eda.describe(final_train),
+            "Inspect final_train": eda.inspect_dataframe(result.train),
+            "Describe final_train": eda.describe(result.train),
         }
     )
-    return best_features, best_features_names, final_test, final_train
+    return (result,)
 
 
 @app.cell
-def _(best_features, best_features_names, column_filter, final_train):
-    column_filter.plot_adhoc(final_train, best_features, "best_features")
+def _(column_filter, result):
+    column_filter.plot_adhoc(result.train, result.features_names, "best_features")
     del column_filter
     eda.build_plot_tabs(
-        best_features_names,
+        result.features_renames,
         settings.images_dir / "bivariate_analysis" / "best_features",
         orientation="vertical",
     )
@@ -913,22 +851,19 @@ def _():
 
 
 @app.cell
-def _(best_features, best_features_names, final_test, final_train):
+def _(result):
     _final_trainer = training.LGBMTrainer(
-        final_train,
-        best_features,
+        result.train,
+        result.features_names,
         n_iter=20,
-        test=final_test,
+        test=result.test,
     )
     _final_trainer.plot_top_features(
-        plot_name="best_features", renames=best_features_names
+        plot_name="best_features", renames=result.features_renames
     )
     _final_trainer.plot_evaluation_metrics(plot_name="lightgbm")
     _final_trainer.plot_deciles(plot_name="deciles")
-    del best_features
-    del best_features_names
-    del final_train
-    del final_test
+    del result
     mo.ui.tabs(
         {
             "Best Features Importances": mo.image(
