@@ -450,6 +450,31 @@ class LGBMTrainer:
         )
 
 
+def _generate_trainers(
+    uncorrelated_train: pl.DataFrame,
+    n_iter: int,
+    settings: config.Settings,
+) -> dict[str, LGBMTrainer]:
+    """Entrena cada grupo de variables con un LGBMTrainer distinto.
+
+    ## Args:
+        uncorrelated_train: Datos de entrenamiento sin columnas redundantes,
+            que incluyen la variable target.
+        n_iter: Cantidad de combinaciones de hiperparámetros a evaluar en
+            cada grupo.
+        settings: Configuración global del proyecto.
+    """
+    columns_groups = column_groups.group_columns_by_source(uncorrelated_train, settings)
+
+    trainers = {
+        group_name: LGBMTrainer(
+            uncorrelated_train, cols, top_n, n_iter, settings=settings
+        )
+        for group_name, (cols, top_n) in columns_groups.items()
+    }
+    return trainers
+
+
 class GroupsLGBMTrainer:
     """Entrenador de modelos LightGBM por grupos de variables (usa LGBMTrainer).
 
@@ -485,16 +510,7 @@ class GroupsLGBMTrainer:
         """
         settings = settings or config.get_settings()
 
-        columns_groups = column_groups.group_columns_by_source(
-            uncorrelated_train, settings
-        )
-
-        self.trainers: dict[str, LGBMTrainer] = {
-            group_name: LGBMTrainer(
-                uncorrelated_train, cols, top_n, n_iter, settings=settings
-            )
-            for group_name, (cols, top_n) in columns_groups.items()
-        }
+        self.trainers = _generate_trainers(uncorrelated_train, n_iter, settings)
 
     def get_groups_lengths_views(self) -> mo.Html:
         """Retorna componentes de marimo con la cantidad de columnas de cada grupo."""
