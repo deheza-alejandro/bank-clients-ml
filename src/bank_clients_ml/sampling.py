@@ -3,8 +3,12 @@
 Centraliza las funciones de muestreo del proyecto basadas en Polars
 
 ## Funciones exportadas:
-    stratified_train_test_split: Divide en entrenamiento y prueba de forma estratificada.
-    oversample_with_unique_ids: Realiza oversampling con identificadores únicos.
+    define_time_window_split: Genera la partición de ventanas de entrenamiento y predicción.
+    stratified_train_test_split: Divide en sets de entrenamiento y prueba de forma estratificada.
+    oversample_with_unique_ids: Aplica oversampling con identificadores únicos.
+
+## Clases exportadas:
+    TimeWindowSplit: Resultado de la partición de ventanas de entrenamiento y predicción.
 """
 
 import dataclasses
@@ -20,22 +24,23 @@ def _get_date_windows(
     prediction_window_size: int,
     settings: config.Settings | None = None,
 ) -> tuple[list[datetime.date], list[datetime.date]]:
-    """Divide en ventanas de entrenamiento y predicción.
+    """Calcula las ventanas de entrenamiento y predicción a partir de los meses disponibles.
 
-    Toma el mes mínimo y el mes máximo de la columna de fechas y reserva los
+    Toma el mes mínimo y el mes máximo de la columna de meses y reserva los
     últimos `prediction_window_size` meses como ventana de predicción. La
     ventana de entrenamiento abarca desde el primer mes hasta dos meses antes
     del inicio de la predicción, de modo que siempre queda un mes intermedio de
-    separación (Lead Window) que evita la fuga de información entre ambas ventanas.
+    separación (Lead Window) que evita fugas de información entre ambas ventanas.
 
     ## Args:
-        df: DataFrame con todos los meses.
-        date_column: Nombre de la columna con las fechas mensuales.
+        df: DataFrame con todos los meses observados.
         prediction_window_size: Cantidad de meses reservados para predicción.
+        settings: Configuración con el nombre de la columna de meses. Si no se
+            indica, se obtiene la configuración global.
 
     ## Returns:
         Tupla con la lista de meses de entrenamiento seguida de la lista de
-        meses de predicción, ambas en orden cronológico ascendente.
+            meses de predicción, ambas en orden cronológico ascendente.
     """
     if settings is None:
         settings = config.get_settings()
@@ -63,6 +68,23 @@ def _get_date_windows(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class TimeWindowSplit:
+    """Resultado de la partición temporal en ventanas de entrenamiento y predicción.
+
+    Agrupa los meses que definen cada ventana junto con el universo de clientes
+    y los subconjuntos de datos correspondientes.
+
+    ## Attributes:
+        training_months: Meses incluidos en la ventana de entrenamiento.
+        prediction_months: Meses incluidos en la ventana de predicción.
+        universe_and_target: Universo de clientes con su variable target.
+        universe_and_target_data: Datos completos del universo con la variable
+            target incorporada.
+        training_data: Registros del universo restringidos a los meses de
+            entrenamiento.
+        prediction_data: Registros del universo restringidos a los meses de
+            predicción.
+    """
+
     training_months: list[datetime.date]
     prediction_months: list[datetime.date]
     universe_and_target: pl.DataFrame
@@ -76,6 +98,24 @@ def define_time_window_split(
     prediction_window_size: int,
     settings: config.Settings | None = None,
 ) -> TimeWindowSplit:
+    """Define la partición temporal en ventanas de entrenamiento y predicción.
+
+    Construye el universo de clientes, conserva únicamente a los clientes con
+    historial completo y sin el producto en el último mes de entrenamiento, e
+    incorpora la variable target. Posteriormente restringe los datos del
+    universo a cada ventana.
+
+    ## Args:
+        clean_data: Datos limpios con todos los meses, identificadores y
+            variable objetivo.
+        prediction_window_size: Cantidad de meses reservados para predicción.
+        settings: Configuración con los nombres de las columnas relevantes.
+            Si no se indica, se obtiene la configuración global.
+
+    ## Returns:
+        Partición temporal con los meses de cada ventana, el universo con su
+        target y los datos correspondientes de entrenamiento y predicción.
+    """
     settings = settings or config.get_settings()
 
     training_months, prediction_months = _get_date_windows(
@@ -124,20 +164,19 @@ def stratified_train_test_split(
     test_ratio: float = 0.3,
     settings: config.Settings | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Divide un DataFrame en entrenamiento y prueba de forma estratificada.
+    """Divide un DataFrame en sets de entrenamiento y prueba de forma estratificada.
 
-    Mezcla las filas con la semilla configurada.
-    Se conserva la proporción original del target en ambos conjuntos.
+    Mezcla las filas con la semilla configurada y conserva la proporción
+    original de la variable target en ambos conjuntos.
 
     ## Args:
-        df: Dataframe a dividir.
+        df: DataFrame a dividir.
         test_ratio: Fracción de cada clase destinada al conjunto de prueba.
-        settings: Configuración con el nombre de la columna target y la
-            semilla aleatoria. Si no se indica, se obtiene la configuración global.
+        settings: Configuración con el nombre de la columna target y la semilla
+            aleatoria. Si no se indica, se obtiene la configuración global.
 
     ## Returns:
-        Tupla con el DataFrame de entrenamiento seguido del DataFrame de
-        prueba.
+        Tupla con el DataFrame de entrenamiento seguido del DataFrame de prueba.
 
     ## Raises:
         ValueError: Si test_ratio no está en el intervalo abierto entre 0 y 1.
@@ -169,9 +208,9 @@ def oversample_with_unique_ids(
     target_proportion: float = 0.5,
     settings: config.Settings | None = None,
 ) -> pl.DataFrame:
-    """Realiza oversampling con identificadores únicos.
+    """Aplica oversampling con identificadores únicos.
 
-    Mantiene intacta la clase mayoritaria (target igual a 0) y muestrea con
+    Mantiene intacta la clase mayoritaria  (target igual a 0) y muestrea con
     reemplazo la clase minoritaria (target igual a 1) hasta alcanzar la
     proporción deseada. A las filas duplicadas se les asignan identificadores
     nuevos y consecutivos a partir del máximo existente, y el resultado final
@@ -183,21 +222,21 @@ def oversample_with_unique_ids(
     dejando intactos los datos de validación de cada fold.
 
     ## Args:
-        train: Conjunto de entrenamiento con el target binario.
-        target_proportion: Proporción de target de la clase minoritaria en el
+        train: Conjunto de entrenamiento con la variable target binaria.
+        target_proportion: Proporción deseada de la clase minoritaria en el
             resultado, expresada como un valor entre 0 y 1 sin incluir los
             extremos.
-        settings: Configuración con los nombres de las columnas de
-            identificador y target, y la semilla aleatoria.
-            Si no se indica, se obtiene la configuración global.
+        settings: Configuración con los nombres de las columnas de identificador
+            y target, y la semilla aleatoria. Si no se indica, se obtiene la
+            configuración global.
 
     ## Returns:
-        DataFrame balanceado según la proporción solicitada, con
-        identificadores únicos y filas mezcladas.
+        DataFrame balanceado según la proporción solicitada, con identificadores
+            únicos y filas mezcladas.
 
     ## Raises:
-        ValueError: Si la proporción de target no está en el intervalo abierto
-            entre 0 y 1.
+        ValueError: Si target_proportion no está en el intervalo abierto entre
+            0 y 1.
     """
     if not (0 < target_proportion < 1):
         msg = f"Invalid target_proportion {target_proportion}: must satisfy 0 < proportion < 1"
