@@ -9,6 +9,7 @@ donde algunos resultados se anexan directamente a la salida visible.
     count_row_matches: Cuenta, por columna, las filas que cumplen una condición.
     filter_columns_by_cardinality: Filtra columnas según su cantidad de valores únicos.
     low_cardinality_value_counts: Filtra columnas de baja cardinalidad e indica las ocurrencias.
+    get_clients_by_months: Resume la cantidad de meses registrados por cliente.
     mins_in_range: Identifica columnas numéricas cuyo mínimo cae dentro de un rango abierto.
     columns_with_zeros: Identifica columnas numéricas que contienen valores iguales a cero.
     filter_nonzero: Filtra las filas donde todas las columnas indicadas son distintas de cero.
@@ -227,6 +228,33 @@ def low_cardinality_value_counts(
         .group_by(["column", "value"])
         .len("count")
         .sort(["column", "count"], descending=[False, True])
+    )
+
+
+def get_clients_by_months(
+    clean_data: pl.DataFrame, settings: config.Settings | None = None
+) -> pl.DataFrame:
+    """Resume la cantidad de meses registrados por cliente.
+
+    ## Args:
+        clean_data: DataFrame depurado con una fila por cliente y mes.
+        settings: Configuración con el nombre de la columna identificadora
+            del cliente. Si no se indica, se obtiene la configuración global.
+
+    ## Returns:
+        Nuevo DataFrame con las columnas `month_count` y `clients_count`, donde
+        cada fila indica cuántos meses de datos se posee de un grupo de
+        clientes y cuántos clientes hay en cada grupo, ordenado por frecuencia
+        descendente.
+    """
+    settings = settings or config.get_settings()
+
+    return (
+        clean_data.group_by(settings.col_id)
+        .len(name="month_count")
+        .get_column("month_count")
+        .value_counts(sort=True)
+        .rename({"count": "clients_count"})
     )
 
 
