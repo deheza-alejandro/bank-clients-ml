@@ -2,11 +2,14 @@
 
 ## Funciones exportadas:
     target_encode_columns: Reemplaza columnas categóricas por su porcentaje respecto al target.
+    transform_date_features: Genera variables a partir de las fechas de producto.
     with_transformations: Genera variables transformadas mensuales.
     aggregate_monthly_to_client: Genera agregaciones a una fila por cliente.
     with_extra_transformations: Crea transformaciones adicionales.
     standardize: Estandariza las variables numéricas.
 """
+
+import datetime
 
 import polars as pl
 
@@ -59,6 +62,49 @@ def target_encode_columns(
         expressions.append(((count_1 / total) * 100).round(3).alias(column))
 
     return df.with_columns(expressions)
+
+
+def transform_date_features(
+    identity_features: pl.DataFrame,
+    training_months: list[datetime.date],
+    settings: config.Settings | None = None,
+) -> pl.DataFrame:
+    """Genera variables a partir de las fechas de producto.
+
+    Calcula los días entre la primera y la última fecha de producto y la recencia en días
+    desde la última fecha de producto hasta el mes siguiente al último mes de
+    entrenamiento, y elimina las columnas originales de fechas.
+
+    ## Args:
+        identity_features: DataFrame con las fechas de primer y último producto
+            por cliente.
+        training_months: Lista de meses de entrenamiento; se utiliza el último
+            mes para calcular la recencia.
+        settings: Configuración con los nombres de las columnas de fechas.
+            Si no se indica, se obtiene la configuración global.
+
+    ## Returns:
+        Nuevo DataFrame con las columnas `Days_between_first_and_last_product` y
+        `Recency_in_days` en lugar de las columnas originales de fechas.
+    """
+    settings = settings or config.get_settings()
+
+    return identity_features.with_columns(
+        [
+            (
+                pl.col(settings.col_last_product_date)
+                - pl.col(settings.col_first_product_date)
+            )
+            .dt.total_days()
+            .alias("Days_between_first_and_last_product"),
+            (
+                pl.lit(training_months[-1]).dt.offset_by("1mo")
+                - pl.col(settings.col_last_product_date)
+            )
+            .dt.total_days()
+            .alias("Recency_in_days"),
+        ]
+    ).drop([settings.col_first_product_date, settings.col_last_product_date])
 
 
 def _safe_denominator(
