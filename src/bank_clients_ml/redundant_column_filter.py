@@ -762,25 +762,56 @@ class RedundantColumnFilter:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class FeaturesSelection:
-    final_train: pl.DataFrame
-    final_test: pl.DataFrame
-    best_features_renames: dict[str, str]
-    best_features: list[str]
+    """Selección de variables para el modelado.
+
+    Agrupa los conjuntos de entrenamiento y prueba ya filtrados con el
+    mapeo de renombres y la lista de variables seleccionadas.
+
+    ## Attributes:
+        train: Conjunto de entrenamiento con las columnas identificadora,
+            target y mejores variables.
+        test: Conjunto de prueba con las columnas identificadora,
+            target y mejores variables.
+        features_renames: Mapeo entre el nombre original de cada variable
+            seleccionada y su nombre final.
+        features_names: Nombres originales de las variables seleccionadas.
+    """
+
+    train: pl.DataFrame
+    test: pl.DataFrame
+    features_renames: dict[str, str]
+    features_names: list[str]
 
 
 def select_features(
     train: pl.DataFrame,
     test: pl.DataFrame,
-    best_features_renames: dict[str, str],
+    features_renames: dict[str, str],
     settings: config.Settings | None = None,
 ) -> FeaturesSelection:
+    """Selecciona las variables para el modelado.
+
+    Conserva únicamente las columnas identificadora y target junto con las
+    variables indicadas en el mapeo de renombres, tanto en entrenamiento
+    como en prueba.
+
+    ## Args:
+        train: Conjunto de entrenamiento a filtrar.
+        test: Conjunto de prueba a filtrar.
+        features_renames: Mapeo entre el nombre original de cada variable
+            seleccionada y su nombre final.
+        settings: Configuración con los nombres de las columnas identificadora
+            y target. Si no se indica, se obtiene la configuración global.
+
+    ## Returns:
+        Selección final con los conjuntos filtrados, el mapeo de renombres
+        y la lista de mejores variables.
+    """
     settings = settings or config.get_settings()
 
-    best_features = list(best_features_renames.keys())
-    _final_cols = [settings.col_id, settings.col_target, *best_features]
+    features_names = list(features_renames.keys())
+    _final_cols = [settings.col_id, settings.col_target, *features_names]
     final_train = train.select(_final_cols)
     final_test = test.select(_final_cols)
 
-    return FeaturesSelection(
-        final_train, final_test, best_features_renames, best_features
-    )
+    return FeaturesSelection(final_train, final_test, features_renames, features_names)
