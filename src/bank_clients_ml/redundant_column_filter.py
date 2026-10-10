@@ -758,3 +758,29 @@ class RedundantColumnFilter:
         final_test = self.correlated_test.with_columns(expr)
 
         return final_train, final_test
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class FeaturesSelection:
+    final_train: pl.DataFrame
+    final_test: pl.DataFrame
+    best_features_renames: dict[str, str]
+    best_features: list[str]
+
+
+def select_features(
+    train: pl.DataFrame,
+    test: pl.DataFrame,
+    best_features_renames: dict[str, str],
+    settings: config.Settings | None = None,
+) -> FeaturesSelection:
+    settings = settings or config.get_settings()
+
+    best_features = list(best_features_renames.keys())
+    _final_cols = [settings.col_id, settings.col_target, *best_features]
+    final_train = train.select(_final_cols)
+    final_test = test.select(_final_cols)
+
+    return FeaturesSelection(
+        final_train, final_test, best_features_renames, best_features
+    )
