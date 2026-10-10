@@ -17,16 +17,17 @@ import subprocess
 from collections.abc import Mapping
 
 import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.style
+import numpy as np
+import polars as pl
 import polars.selectors as cs
 from matplotlib.figure import Figure
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
-import polars as pl
-
 from bank_clients_ml import config
 
+matplotlib.use("Agg")
+matplotlib.style.use("default")
 matplotlib.rcParams["svg.hashsalt"] = "fixed_seed_for_this_project"
 matplotlib.rcParams["svg.fonttype"] = "path"
 
