@@ -3,11 +3,11 @@
 Centraliza las funciones de muestreo del proyecto basadas en Polars
 
 ## Funciones exportadas:
-    get_date_windows: Divide en ventanas de entrenamiento y predicción.
     stratified_train_test_split: Divide en entrenamiento y prueba de forma estratificada.
     oversample_with_unique_ids: Realiza oversampling con identificadores únicos.
 """
 
+import dataclasses
 import datetime
 
 import polars as pl
@@ -15,7 +15,7 @@ import polars as pl
 from bank_clients_ml import config
 
 
-def get_date_windows(
+def _get_date_windows(
     df: pl.DataFrame,
     prediction_window_size: int,
     settings: config.Settings | None = None,
@@ -59,6 +59,64 @@ def get_date_windows(
     training_months = windows.get_column("training_months").item(0).to_list()
 
     return training_months, prediction_months
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class TimeWindowSplit:
+    training_months: list[datetime.date]
+    prediction_months: list[datetime.date]
+    universe_and_target: pl.DataFrame
+    universe_and_target_data: pl.DataFrame
+    training_data: pl.DataFrame
+    prediction_data: pl.DataFrame
+
+
+def define_time_window_split(
+    clean_data: pl.DataFrame,
+    prediction_window_size: int,
+    settings: config.Settings | None = None,
+) -> TimeWindowSplit:
+    settings = settings or config.get_settings()
+
+    training_months, prediction_months = _get_date_windows(
+        clean_data, prediction_window_size, settings
+    )
+
+    is_valid_client = (
+        (pl.col(settings.col_month) == training_months[-1])
+        & (pl.col("Package_Active") == "No")
+        & (pl.col("CreditCard_CoBranding") == "No")
+    )
+    universe_and_target = (
+        clean_data.filter(
+            (pl.len().over(settings.col_id) == 9)
+            & is_valid_client.any().over(settings.col_id)
+            & pl.col(settings.col_month).is_in(prediction_months)
+        )
+        .select(settings.col_id, settings.col_target)
+        .unique()
+    )
+
+    universe_and_target_data = clean_data.drop(settings.col_target).join(
+        universe_and_target, on=settings.col_id, how="inner"
+    )
+
+    training_data = universe_and_target_data.filter(
+        pl.col(settings.col_month).is_in(training_months)
+    )
+
+    prediction_data = universe_and_target_data.filter(
+        pl.col(settings.col_month).is_in(prediction_months)
+    )
+
+    return TimeWindowSplit(
+        training_months,
+        prediction_months,
+        universe_and_target,
+        universe_and_target_data,
+        training_data,
+        prediction_data,
+    )
 
 
 def stratified_train_test_split(
