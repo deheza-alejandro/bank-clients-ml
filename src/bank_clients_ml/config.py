@@ -16,22 +16,48 @@ import pydantic_settings
 
 
 class DirectoryPaths(pydantic.BaseModel):
+    """Rutas base de directorios del proyecto.
+
+    Centraliza la resolución de rutas para mantener una referencia única
+    y consistente en todos los módulos que acceden a datos y artefactos.
+
+    ## Attributes:
+        project: Directorio raíz del proyecto.
+        data: Directorio de datos calculado dinámicamente a partir de project.
+        images: Directorio de imágenes calculado dinámicamente a partir de project.
+    """
+
     project: pathlib.Path = pathlib.Path(__file__).parent.parent.parent
 
     @pydantic.computed_field
     @property
     def data(self) -> pathlib.Path:
-        """Directorio de datos calculado dinámicamente de project_dir."""
+        """Directorio de datos calculado dinámicamente a partir de project."""
         return self.project / "data"
 
     @pydantic.computed_field
     @property
     def images(self) -> pathlib.Path:
-        """Directorio de imágenes calculado dinámicamente de project_dir."""
+        """Directorio de imágenes calculado dinámicamente a partir de project."""
         return self.project / "notebooks" / "images"
 
 
 class DatasetColumns(pydantic.BaseModel):
+    """Nombres de columnas del conjunto de datos principal.
+
+    Mantiene una referencia única para las columnas utilizadas en el proceso
+    de modelado.
+
+    ## Attributes:
+        id: Nombre de la columna identificadora del cliente.
+        target: Nombre de la columna target del modelo.
+        month: Nombre de la columna que indica el mes.
+        first_product_date: Nombre de la columna con la fecha de registro
+            del primer producto.
+        last_product_date: Nombre de la columna con la fecha de registro
+            del último producto.
+    """
+
     id: str = "client_id"
     target: str = "Target"
     month: str = "Month"
@@ -40,6 +66,16 @@ class DatasetColumns(pydantic.BaseModel):
 
 
 class AnalysisColumns(pydantic.BaseModel):
+    """Nombres de columnas genéricas para resultados de análisis.
+
+    ## Attributes:
+        feature: Nombre genérico de la columna de feature.
+        importance: Nombre genérico de la columna de importancia de variable.
+        bin: Nombre genérico de la columna de bin.
+        clients: Nombre genérico de la columna de clientes.
+        target_pct: Nombre genérico de la columna de porcentaje de target.
+    """
+
     feature: str = "Feature"
     importance: str = "Importance"
     bin: str = "Bin"
@@ -51,28 +87,15 @@ class Settings(pydantic_settings.BaseSettings):
     """Parámetros globales de configuración del proyecto.
 
     Define los valores por defecto utilizados en el proceso de modelado.
-    Los nombres de columnas permiten mantener una referencia única y
-    consistente en todos los módulos que consumen esta configuración.
+    Agrupa rutas y nombres de columnas para mantener una referencia única y
+    consistente en todos los módulos.
 
     ## Attributes:
         debug: Indica si el modo de depuración está activado.
         random_state: Semilla utilizada para garantizar reproducibilidad.
-        id: Nombre de la columna identificadora del cliente.
-        target: Nombre de la columna target del modelo.
-        month: Nombre de la columna que indica el mes.
-        first_product_date: Nombre de la columna que indica la fecha de
-            registro del primer producto.
-        last_product_date: Nombre de la columna que indica la fecha de
-            registro del ultimo producto.
-        feature: Nombre genérico de la columna de feature.
-        importance: Nombre genérico de la columna de importancia de variable.
-        bin: Nombre genérico de la columna de Bin.
-        clients: Nombre genérico de la columna de clientes.
-        target_pct: Nombre genérico de la columna de porcentaje de target,
-            calculado dinámicamente de col_target.
-        project_dir: Directorio base del proyecto.
-        data_dir: Directorio de datos calculado dinámicamente de project_dir.
-        images_dir: Directorio de imágenes calculado dinámicamente de project_dir.
+        paths: Rutas base de directorios del proyecto.
+        dataset: Nombres de columnas del conjunto de datos principal.
+        analysis: Nombres de columnas genéricas para resultados de análisis.
     """
 
     debug: bool = False
