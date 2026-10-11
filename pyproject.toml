@@ -39,6 +39,8 @@ min-severity = "warn"
 
 [tool.ruff]
 extend-exclude = [".env", ".venv", "data/", "notebooks/images/"]
+line-length = 88
+indent-width = 4
 
 [tool.ruff.lint]
 extend-select = [
