@@ -56,6 +56,10 @@ class DatasetColumns(pydantic.BaseModel):
             del primer producto.
         last_product_date: Nombre de la columna con la fecha de registro
             del último producto.
+        package_active: Nombre de la columna que indica si el cliente tiene
+            paquete activo.
+        credit_card_co_branding: Nombre de la columna que indica si el cliente
+            tiene "credit card co branding".
     """
 
     id: str = "client_id"
@@ -63,6 +67,8 @@ class DatasetColumns(pydantic.BaseModel):
     month: str = "Month"
     first_product_date: str = "First_product_dt"
     last_product_date: str = "Last_product_dt"
+    package_active: str = "Package_Active"
+    credit_card_co_branding: str = "CreditCard_CoBranding"
 
 
 class AnalysisColumns(pydantic.BaseModel):
@@ -74,6 +80,7 @@ class AnalysisColumns(pydantic.BaseModel):
         bin: Nombre genérico de la columna de bin.
         clients: Nombre genérico de la columna de clientes.
         target_pct: Nombre genérico de la columna de porcentaje de target.
+        column_name: Nombre genérico de la columna "Column name".
     """
 
     feature: str = "Feature"
@@ -81,6 +88,7 @@ class AnalysisColumns(pydantic.BaseModel):
     bin: str = "Bin"
     clients: str = "Clients"
     target_pct: str = "Target_pct"
+    column_name: str = "Column name"
 
 
 class Settings(pydantic_settings.BaseSettings):
@@ -107,12 +115,13 @@ class Settings(pydantic_settings.BaseSettings):
 
     # api_key: pydantic.SecretStr  # Keeps the secret hidden in logs and print statements.
 
-    # model_config = pydantic_settings.SettingsConfigDict(
-    #     env_file=".env",
-    #     env_nested_delimiter="__",
-    #     env_file_encoding="utf-8",
-    #     extra="ignore",
-    # )
+    model_config = pydantic_settings.SettingsConfigDict(
+        frozen=True
+        # env_file=".env",
+        # env_nested_delimiter="__",
+        # env_file_encoding="utf-8",
+        # extra="ignore",
+    )
 
 
 @functools.cache
