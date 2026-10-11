@@ -124,8 +124,8 @@ def define_time_window_split(
 
     is_valid_client = (
         (pl.col(settings.dataset.month) == training_months[-1])
-        & (pl.col("Package_Active") == "No")
-        & (pl.col("CreditCard_CoBranding") == "No")
+        & (pl.col(settings.dataset.package_active) == "No")
+        & (pl.col(settings.dataset.credit_card_co_branding) == "No")
     )
     universe_and_target = (
         clean_data.filter(
