@@ -91,7 +91,7 @@ def _fit_lgbm_random_search(
     )
 
     X_train = train.select(columns)
-    y_train = train.get_column(settings.col_target)
+    y_train = train.get_column(settings.dataset.target)
 
     log_buffer = io.StringIO()
     with (
@@ -105,10 +105,10 @@ def _fit_lgbm_random_search(
     fitted_classifier: lgb.LGBMClassifier = searcher.best_estimator_
     importances = pl.DataFrame(
         {
-            settings.col_feature: columns,
-            settings.col_importance: fitted_classifier.feature_importances_,
+            settings.analysis.feature: columns,
+            settings.analysis.importance: fitted_classifier.feature_importances_,
         }
-    ).sort(settings.col_importance, descending=True)
+    ).sort(settings.analysis.importance, descending=True)
     return searcher, importances, search_logs
 
 
@@ -135,9 +135,9 @@ def _with_rename_columns(
     settings = settings or config.get_settings()
 
     return importances.with_columns(
-        pl.col(settings.col_feature)
-        .replace_strict(renames, default=pl.col(settings.col_feature))
-        .alias(settings.col_feature)
+        pl.col(settings.analysis.feature)
+        .replace_strict(renames, default=pl.col(settings.analysis.feature))
+        .alias(settings.analysis.feature)
     )
 
 
@@ -182,14 +182,14 @@ def _compute_prediction_deciles(
 
     deciles_df = (
         df.select(
-            settings.col_target,
+            settings.dataset.target,
             probabilities=probabilities,
         )
         .with_columns(decile=decile_expr.cast(decile_dtype))
         .group_by("decile")
         .agg(
             count=pl.len(),
-            target_1_count=pl.col(settings.col_target).sum().cast(pl.UInt32),
+            target_1_count=pl.col(settings.dataset.target).sum().cast(pl.UInt32),
             min_prob=(pl.col("probabilities").min() * 100),
             max_prob=(pl.col("probabilities").max() * 100),
         )
@@ -248,7 +248,7 @@ def _evaluate(
 
     probabilities_train = cast(np.ndarray, best_model.predict_proba(X_train))[:, 1]
     probabilities_test = cast(np.ndarray, best_model.predict_proba(X_test))[:, 1]
-    y_true_arr = test.get_column(settings.col_target).to_numpy()
+    y_true_arr = test.get_column(settings.dataset.target).to_numpy()
     y_pred = (probabilities_test >= 0.5).astype(int)
 
     roc_auc = float(sklearn.metrics.roc_auc_score(y_true_arr, probabilities_test))
@@ -395,7 +395,7 @@ class LGBMTrainer:
         """Retorna los nombres de las variables mas relevantes según importancia."""
         return (
             self._importances.head(self._top_n)
-            .get_column(self._settings.col_feature)
+            .get_column(self._settings.analysis.feature)
             .to_list()
         )
 

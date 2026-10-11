@@ -29,13 +29,13 @@ def clean_up_data(
     settings = settings or config.get_settings()
 
     clean_data = raw_data.filter(
-        pl.col(settings.col_target).is_not_null()
+        pl.col(settings.dataset.target).is_not_null()
     ).with_columns(
         pl.col(
-            settings.col_month,
-            settings.col_first_product_date,
-            settings.col_last_product_date,
+            settings.dataset.month,
+            settings.dataset.first_product_date,
+            settings.dataset.last_product_date,
         ).str.to_date(),
-        pl.col(settings.col_id).cast(pl.Int64),
+        pl.col(settings.dataset.id).cast(pl.Int64),
     )
     return clean_data

@@ -29,7 +29,7 @@ def _():
 
 @app.cell
 def _():
-    raw_data = pl.read_parquet(settings.data_dir / "data.parquet")
+    raw_data = pl.read_parquet(settings.paths.data / "data.parquet")
 
     _less_than_zero_columns = [
         "SavingAccount_Balance_Average",
@@ -75,11 +75,11 @@ def _(raw_data):
                 include_header=True
             ),
             "Null row": raw_data.filter(
-                pl.col(settings.col_target).is_null()
+                pl.col(settings.dataset.target).is_null()
             ).transpose(include_header=True),
             "Null row id": raw_data.filter(
-                pl.col(settings.col_target).is_null()
-            ).select(settings.col_id),
+                pl.col(settings.dataset.target).is_null()
+            ).select(settings.dataset.id),
         }
     )
     return
@@ -154,7 +154,7 @@ def _(clean_data):
                 ]
             ),
             "Number of clients per Month": time_window_split.training_data.get_column(
-                settings.col_month
+                settings.dataset.month
             ).value_counts(),
             "Inspect training_data": eda.inspect_dataframe(
                 time_window_split.training_data
@@ -199,7 +199,7 @@ def _(time_window_split):
     mo.ui.tabs(
         {
             'When "Saving Account Balance (Average)" is Null': time_window_split.training_data.select(
-                [settings.col_id, *column_groups.get_saving_account_cols()]
+                [settings.dataset.id, *column_groups.get_saving_account_cols()]
             ).filter(pl.col("SavingAccount_Balance_Average").is_null()),
             "Non-null monetary values of Saving Account": eda.filter_nonzero(
                 time_window_split.training_data, column_groups.get_saving_account_cols()
@@ -252,12 +252,12 @@ def _():
 @app.cell
 def _(time_window_split, training_data_1):
     _clients_region = time_window_split.prediction_data.select(
-        settings.col_id, "Region"
+        settings.dataset.id, "Region"
     ).unique()
 
     training_data_2 = training_data_1.drop("Region").join(
         _clients_region.with_columns(pl.col("Region").fill_null("BUENOS AIRES")),
-        on=settings.col_id,
+        on=settings.dataset.id,
         how="left",
     )
     del training_data_1
@@ -307,15 +307,15 @@ def _():
 def _(time_window_split, training_data_2):
     _clients_credit_card_product = (
         time_window_split.prediction_data.sort(
-            pl.col(settings.col_month) == time_window_split.prediction_months[0],
+            pl.col(settings.dataset.month) == time_window_split.prediction_months[0],
             descending=True,
         )
-        .group_by(settings.col_id)
+        .group_by(settings.dataset.id)
         .agg(pl.col("CreditCard_Product").drop_nulls().first())
     )
     training_data_3 = (
         training_data_2.drop("CreditCard_Product")
-        .join(_clients_credit_card_product, on=settings.col_id, how="left")
+        .join(_clients_credit_card_product, on=settings.dataset.id, how="left")
         .with_columns(
             pl.when(
                 pl.col("CreditCard_Product").is_null()
@@ -376,7 +376,7 @@ def _(time_window_split, training_data_3):
     )
 
     identity_features = training_data_4.filter(
-        pl.col(settings.col_month) == time_window_split.training_months[-1]
+        pl.col(settings.dataset.month) == time_window_split.training_months[-1]
     ).select(column_groups.get_identity_features_cols())
 
     del training_data_3
@@ -505,7 +505,7 @@ def _(training_data_5):
             "Describe training_data": eda.describe(training_data_6),
             "Some columns with non-zero rows": training_data_6.select(
                 [
-                    settings.col_id,
+                    settings.dataset.id,
                     "SavingAccount_Transactions_Transactions",
                     "Operations_total",
                     "CreditCard_Payment_total",
@@ -561,7 +561,7 @@ def _():
 
 @app.cell
 def _(data_agg, identity_features_2):
-    _abt = identity_features_2.join(data_agg, on=settings.col_id, how="inner")
+    _abt = identity_features_2.join(data_agg, on=settings.dataset.id, how="inner")
     _temp_abt_inspect = eda.inspect_dataframe(_abt)
     _abt = feat.with_extra_transformations(_abt)
     train, test = sampling.stratified_train_test_split(_abt)
@@ -656,7 +656,7 @@ def _(column_filter):
 def _(groups_names):
     eda.build_plot_tabs(
         groups_names,
-        settings.images_dir / "plot_top_features",
+        settings.paths.images / "plot_top_features",
         orientation="vertical",
     )
     return
@@ -672,7 +672,7 @@ def _(column_filter, groups_names, groups_trainer):
     mo.ui.tabs(
         {
             "Top grouped features importances": mo.image(
-                src=settings.images_dir
+                src=settings.paths.images
                 / "plot_top_features"
                 / "top_grouped_features.svg"
             ),
@@ -711,7 +711,7 @@ def _(column_filter, groups_trainer):
     del groups_trainer
     eda.build_plot_tabs(
         _uncorrelated_names,
-        settings.images_dir / "bivariate_analysis" / "uncorrelated",
+        settings.paths.images / "bivariate_analysis" / "uncorrelated",
         orientation="vertical",
     )
     return
@@ -749,7 +749,7 @@ def _(column_filter):
     column_filter.plot_correlated(list(_correlated_names.keys()), "correlated")
     eda.build_plot_tabs(
         _correlated_names,
-        settings.images_dir / "bivariate_analysis" / "correlated",
+        settings.paths.images / "bivariate_analysis" / "correlated",
         orientation="vertical",
     )
     return
@@ -834,7 +834,7 @@ def _(column_filter, result):
     del column_filter
     eda.build_plot_tabs(
         result.features_renames,
-        settings.images_dir / "bivariate_analysis" / "best_features",
+        settings.paths.images / "bivariate_analysis" / "best_features",
         orientation="vertical",
     )
     return
@@ -867,7 +867,7 @@ def _(result):
     mo.ui.tabs(
         {
             "Best Features Importances": mo.image(
-                src=settings.images_dir / "plot_top_features" / "best_features.svg"
+                src=settings.paths.images / "plot_top_features" / "best_features.svg"
             ),
             "Best Features Cross Validation Results": _final_trainer.get_cv_results(
                 include_logs=True
@@ -881,8 +881,8 @@ def _(result):
 def _():
     mo.md(rf"""
     ## 6.1 Performance Metrics
-    {mo.image(src=settings.images_dir / "plot_evaluation_metrics" / "lightgbm.svg")}
-    {mo.image(src=settings.images_dir / "plot_evaluation_metrics" / "deciles.svg")}
+    {mo.image(src=settings.paths.images / "plot_evaluation_metrics" / "lightgbm.svg")}
+    {mo.image(src=settings.paths.images / "plot_evaluation_metrics" / "deciles.svg")}
 
     ### Training
 

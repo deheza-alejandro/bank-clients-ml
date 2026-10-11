@@ -48,8 +48,8 @@ def _get_date_windows(
     pred_offset = f"-{prediction_window_size - 1}mo"
     train_offset = f"-{prediction_window_size + 1}mo"
 
-    last_month = pl.col(settings.col_month).max()
-    first_month = pl.col(settings.col_month).min()
+    last_month = pl.col(settings.dataset.month).max()
+    first_month = pl.col(settings.dataset.month).min()
 
     windows = df.select(
         prediction_months=pl.date_range(
@@ -123,30 +123,30 @@ def define_time_window_split(
     )
 
     is_valid_client = (
-        (pl.col(settings.col_month) == training_months[-1])
+        (pl.col(settings.dataset.month) == training_months[-1])
         & (pl.col("Package_Active") == "No")
         & (pl.col("CreditCard_CoBranding") == "No")
     )
     universe_and_target = (
         clean_data.filter(
-            (pl.len().over(settings.col_id) == 9)
-            & is_valid_client.any().over(settings.col_id)
-            & pl.col(settings.col_month).is_in(prediction_months)
+            (pl.len().over(settings.dataset.id) == 9)
+            & is_valid_client.any().over(settings.dataset.id)
+            & pl.col(settings.dataset.month).is_in(prediction_months)
         )
-        .select(settings.col_id, settings.col_target)
+        .select(settings.dataset.id, settings.dataset.target)
         .unique()
     )
 
-    universe_and_target_data = clean_data.drop(settings.col_target).join(
-        universe_and_target, on=settings.col_id, how="inner"
+    universe_and_target_data = clean_data.drop(settings.dataset.target).join(
+        universe_and_target, on=settings.dataset.id, how="inner"
     )
 
     training_data = universe_and_target_data.filter(
-        pl.col(settings.col_month).is_in(training_months)
+        pl.col(settings.dataset.month).is_in(training_months)
     )
 
     prediction_data = universe_and_target_data.filter(
-        pl.col(settings.col_month).is_in(prediction_months)
+        pl.col(settings.dataset.month).is_in(prediction_months)
     )
 
     return TimeWindowSplit(
@@ -191,8 +191,10 @@ def stratified_train_test_split(
     df_flagged = df.sample(
         fraction=1.0, shuffle=True, seed=settings.random_state
     ).with_columns(
-        _group_id=pl.col(settings.col_target).cum_count().over(settings.col_target),
-        _group_total=pl.len().over(settings.col_target),
+        _group_id=pl.col(settings.dataset.target)
+        .cum_count()
+        .over(settings.dataset.target),
+        _group_total=pl.len().over(settings.dataset.target),
     )
 
     is_test = pl.col("_group_id") <= (pl.col("_group_total") * test_ratio).round()
@@ -245,10 +247,10 @@ def oversample_with_unique_ids(
     if settings is None:
         settings = config.get_settings()
 
-    df_majority = train.filter(pl.col(settings.col_target) == 0)
-    df_minority = train.filter(pl.col(settings.col_target) == 1)
+    df_majority = train.filter(pl.col(settings.dataset.target) == 0)
+    df_minority = train.filter(pl.col(settings.dataset.target) == 1)
 
-    max_id = train.select(pl.col(settings.col_id).max()).item()
+    max_id = train.select(pl.col(settings.dataset.id).max()).item()
 
     count_majority = len(df_majority)
     count_minority_target = round(
@@ -257,7 +259,7 @@ def oversample_with_unique_ids(
 
     df_minority_oversampled = df_minority.sample(
         n=count_minority_target, with_replacement=True, seed=settings.random_state
-    ).with_columns((max_id + 1 + pl.int_range(0, pl.len())).alias(settings.col_id))
+    ).with_columns((max_id + 1 + pl.int_range(0, pl.len())).alias(settings.dataset.id))
 
     balanced_train = pl.concat([df_majority, df_minority_oversampled]).sample(
         fraction=1.0, shuffle=True, seed=settings.random_state

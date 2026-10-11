@@ -88,7 +88,7 @@ def _get_imbalanced_binary_columns(
     is_imbalanced = (first_val_ratio < threshold) | (first_val_ratio > c_threshold)
 
     return _get_true_column_names(
-        df.drop(settings.col_target).select(is_binary & is_imbalanced)
+        df.drop(settings.dataset.target).select(is_binary & is_imbalanced)
     )
 
 
@@ -162,28 +162,32 @@ def _get_bivariate_tables(
             group_expr = pl.col(column)
 
         tables[column] = (
-            df.select(settings.col_target, column)
+            df.select(settings.dataset.target, column)
             .group_by(group_expr.alias("_bin"))
             .agg(
                 pl.col(column).min().alias("Min"),
                 pl.col(column).max().alias("Max"),
-                pl.len().alias(settings.col_clients),
-                pl.col(settings.col_target).sum().alias(settings.col_target),
+                pl.len().alias(settings.analysis.clients),
+                pl.col(settings.dataset.target).sum().alias(settings.dataset.target),
             )
             .sort(by="Min", descending=False, nulls_last=True)
             .with_columns(
-                pl.int_range(1, pl.len() + 1).alias(settings.col_bin),
+                pl.int_range(1, pl.len() + 1).alias(settings.analysis.bin),
                 (
-                    (pl.col(settings.col_target) / pl.col(settings.col_clients)) * 100
-                ).alias(settings.col_target_pct),
+                    (
+                        pl.col(settings.dataset.target)
+                        / pl.col(settings.analysis.clients)
+                    )
+                    * 100
+                ).alias(settings.analysis.target_pct),
             )
             .select(
-                settings.col_bin,
+                settings.analysis.bin,
                 "Min",
                 "Max",
-                settings.col_clients,
-                settings.col_target,
-                settings.col_target_pct,
+                settings.analysis.clients,
+                settings.dataset.target,
+                settings.analysis.target_pct,
             )
         )
 
@@ -315,13 +319,13 @@ def _calculate_target_pct(table: pl.DataFrame, settings: config.Settings) -> flo
 
     ## Args:
         table: Tabla con un grupo de bines con las columnas
-            `settings.col_clients` y `settings.col_target`.
+            `settings.analysis.clients` y `settings.dataset.target`.
 
     ## Returns:
         Porcentaje de target del grupo, o `0.0` si el grupo está vacío.
     """
-    clients = float(table.get_column(settings.col_clients).sum())
-    target = float(table.get_column(settings.col_target).sum())
+    clients = float(table.get_column(settings.analysis.clients).sum())
+    target = float(table.get_column(settings.dataset.target).sum())
     return target / clients * 100.0 if clients > 0.0 else 0.0
 
 
@@ -367,7 +371,7 @@ class _BinGroup:
             raise TypeError(msg)
 
         group = table.filter(
-            pl.col(settings.col_bin).is_between(
+            pl.col(settings.analysis.bin).is_between(
                 bin_range.start, bin_range.end, closed="both"
             )
         )
@@ -414,7 +418,7 @@ def _calculate_default_target_pct(
         sin cubrir.
     """
     bin_match = [
-        pl.col(settings.col_bin).is_between(
+        pl.col(settings.analysis.bin).is_between(
             bin_range.start, bin_range.end, closed="both"
         )
         for bin_range in bin_transformation.bin_ranges
@@ -531,7 +535,7 @@ class RedundantColumnFilter:
             self.reduced_train, imbalanced_binary_threshold, self._settings
         )
         self._corr_df = self.correlated_train.drop(
-            self._settings.col_id, self._settings.col_target
+            self._settings.dataset.id, self._settings.dataset.target
         ).corr()
         self._to_delete = _get_redundant_correlated_columns(
             self._corr_df, correlation_threshold
@@ -810,7 +814,7 @@ def select_features(
     settings = settings or config.get_settings()
 
     features_names = list(features_renames.keys())
-    _final_cols = [settings.col_id, settings.col_target, *features_names]
+    _final_cols = [settings.dataset.id, settings.dataset.target, *features_names]
     final_train = train.select(_final_cols)
     final_test = test.select(_final_cols)
 

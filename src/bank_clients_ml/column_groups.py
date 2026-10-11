@@ -91,11 +91,11 @@ def get_identity_features_cols(settings: config.Settings | None = None) -> list[
     settings = settings or config.get_settings()
 
     return [
-        settings.col_id,
-        settings.col_target,
+        settings.dataset.id,
+        settings.dataset.target,
         *get_categorical_cols(),
-        settings.col_first_product_date,
-        settings.col_last_product_date,
+        settings.dataset.first_product_date,
+        settings.dataset.last_product_date,
         *get_binary_identity_features_cols(),
     ]
 
@@ -242,7 +242,7 @@ def group_columns_by_source(
     if settings is None:
         settings = config.get_settings()
 
-    excluded_cols = {settings.col_id, settings.col_target}
+    excluded_cols = {settings.dataset.id, settings.dataset.target}
     all_columns = [col for col in df.columns if col not in excluded_cols]
     grouped: dict[str, list[str]] = {group: [] for group in TOP_N_PER_GROUP}
 

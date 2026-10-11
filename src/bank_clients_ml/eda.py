@@ -250,7 +250,7 @@ def get_clients_by_months(
     settings = settings or config.get_settings()
 
     return (
-        clean_data.group_by(settings.col_id)
+        clean_data.group_by(settings.dataset.id)
         .len(name="month_count")
         .get_column("month_count")
         .value_counts(sort=True)
@@ -321,7 +321,11 @@ def filter_nonzero(
     if settings is None:
         settings = config.get_settings()
 
-    keep = [settings.col_id, *columns] if settings.col_id in df.columns else columns
+    keep = (
+        [settings.dataset.id, *columns]
+        if settings.dataset.id in df.columns
+        else columns
+    )
 
     return df.filter(pl.all_horizontal(pl.col(columns) != 0)).select(keep)
 

@@ -99,7 +99,7 @@ def plot_top_features(
     fuente y de figura se ajustan según la cantidad de variables a mostrar.
 
     El resultado se exporta a:
-    {settings.images_dir}/plot_top_features/{plot_name}.svg
+    {settings.paths.images}/plot_top_features/{plot_name}.svg
 
     ## Args:
         variables_to_plot: DataFrame con las variables y sus importancias,
@@ -125,15 +125,15 @@ def plot_top_features(
     fig, ax = plt.subplots(figsize=(8, max(6, top_n * 0.7)))
 
     bars = ax.barh(
-        top_vars.get_column(settings.col_feature),
-        top_vars.get_column(settings.col_importance),
+        top_vars.get_column(settings.analysis.feature),
+        top_vars.get_column(settings.analysis.importance),
         color="#4a90e2",
         edgecolor="black",
     )
 
     ax.invert_yaxis()
-    ax.set_xlabel(settings.col_importance, fontsize=label_fontsize)
-    ax.set_ylabel(settings.col_feature, fontsize=label_fontsize)
+    ax.set_xlabel(settings.analysis.importance, fontsize=label_fontsize)
+    ax.set_ylabel(settings.analysis.feature, fontsize=label_fontsize)
     ax.tick_params(axis="both", labelsize=tick_fontsize)
     ax.bar_label(bars, fmt="%.0f", padding=5, fontsize=value_fontsize)
     ax.spines[["top", "right"]].set_visible(False)
@@ -145,7 +145,7 @@ def plot_top_features(
         fontsize=label_fontsize,
     )
 
-    _save_fig_as_svg(fig, plot_name, settings.images_dir, "plot_top_features")
+    _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_top_features")
 
 
 def _format_floats(df: pl.DataFrame) -> pl.DataFrame:
@@ -175,7 +175,7 @@ def _plot_single_bivariate_chart(
     target en un eje secundario.
 
     El resultado se exporta a:
-    {settings.images_dir}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
+    {settings.paths.images}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
 
     ## Args:
         table: Tabla de análisis bivariado con las columnas de intervalo,
@@ -191,7 +191,7 @@ def _plot_single_bivariate_chart(
         settings = config.get_settings()
 
     formatted_table = _format_floats(
-        table.with_columns(pl.col(settings.col_target_pct).round().cast(pl.Int64))
+        table.with_columns(pl.col(settings.analysis.target_pct).round().cast(pl.Int64))
     )
 
     fig, (ax_table, ax_graph) = plt.subplots(
@@ -211,28 +211,28 @@ def _plot_single_bivariate_chart(
     x_indices = range(len(formatted_table))
 
     ax_graph.bar(
-        x_indices, formatted_table.get_column(settings.col_clients), width=0.35
+        x_indices, formatted_table.get_column(settings.analysis.clients), width=0.35
     )
-    ax_graph.set_ylabel(settings.col_clients)
+    ax_graph.set_ylabel(settings.analysis.clients)
     ax_graph.set_xticks(x_indices)
     ax_graph.set_xticklabels(
-        formatted_table.get_column(settings.col_bin), rotation=0, ha="center"
+        formatted_table.get_column(settings.analysis.bin), rotation=0, ha="center"
     )
 
     ax_graph_target_pct = ax_graph.twinx()
     ax_graph_target_pct.plot(
         x_indices,
-        formatted_table.get_column(settings.col_target_pct),
+        formatted_table.get_column(settings.analysis.target_pct),
         marker="o",
         color="green",
     )
-    ax_graph_target_pct.set_ylabel(f"{settings.col_target} pct (%)")
+    ax_graph_target_pct.set_ylabel(f"{settings.dataset.target} pct (%)")
 
     fig.tight_layout()
     _save_fig_as_svg(
         fig,
         variable_to_plot,
-        settings.images_dir,
+        settings.paths.images,
         f"bivariate_analysis/{analysis_name}",
     )
 
@@ -251,7 +251,7 @@ def plot_bivariate_charts(
     contrario para acelerar la generación de una gran cantidad de gráficos.
 
     Las imágenes se exportan a:
-    {settings.images_dir}/bivariate_analysis/{analysis_name}/
+    {settings.paths.images}/bivariate_analysis/{analysis_name}/
 
     ## Args:
         tables: Diccionario que asocia cada nombre de variable con su tabla de
@@ -307,7 +307,7 @@ def plot_evaluation_metrics(
     Incluye una anotación con los valores de accuracy y ROC AUC.
 
     El resultado se exporta a:
-    {settings.images_dir}/plot_evaluation_metrics/{plot_name}.svg
+    {settings.paths.images}/plot_evaluation_metrics/{plot_name}.svg
 
     ## Args:
         roc_auc: Métrica ROC AUC del modelo evaluado.
@@ -340,7 +340,7 @@ def plot_evaluation_metrics(
     ax.set_ylim(0, 1)
     ax.grid(True, linestyle=":", alpha=0.6)
 
-    _save_fig_as_svg(fig, plot_name, settings.images_dir, "plot_evaluation_metrics")
+    _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_evaluation_metrics")
 
 
 def _plot_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
@@ -404,7 +404,7 @@ def plot_deciles(
     un único archivo SVG optimizado.
 
     El resultado se exporta a:
-    {settings.images_dir}/plot_evaluation_metrics/{plot_name}.svg
+    {settings.paths.images}/plot_evaluation_metrics/{plot_name}.svg
 
     ## Args:
         train_deciles: Tabla de deciles calculada sobre el conjunto de
@@ -425,4 +425,4 @@ def plot_deciles(
     _plot_single_deciles_table(ax2, test_deciles, title_test_deciles)
 
     plt.tight_layout()
-    _save_fig_as_svg(fig, plot_name, settings.images_dir, "plot_evaluation_metrics")
+    _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_evaluation_metrics")

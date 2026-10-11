@@ -45,8 +45,8 @@ def target_encode_columns(
     expressions = []
 
     for column in columns:
-        count_1 = (pl.col(settings.col_target) == 1.0).sum().over(column)
-        total = pl.col(settings.col_target).is_in([0.0, 1.0]).sum().over(column)
+        count_1 = (pl.col(settings.dataset.target) == 1.0).sum().over(column)
+        total = pl.col(settings.dataset.target).is_in([0.0, 1.0]).sum().over(column)
 
         if df.select((total == 0).any()).item():
             categories_with_issue = (
@@ -55,7 +55,7 @@ def target_encode_columns(
             msg = (
                 f"Division by zero while target-encoding {column!r} "
                 f"for categories: {categories_with_issue}.\n"
-                f"Ensure {settings.col_target!r} contains 0.0/1.0 for every category"
+                f"Ensure {settings.dataset.target!r} contains 0.0/1.0 for every category"
             )
             raise ZeroDivisionError(msg)
 
@@ -92,19 +92,19 @@ def transform_date_features(
     return identity_features.with_columns(
         [
             (
-                pl.col(settings.col_last_product_date)
-                - pl.col(settings.col_first_product_date)
+                pl.col(settings.dataset.last_product_date)
+                - pl.col(settings.dataset.first_product_date)
             )
             .dt.total_days()
             .alias("Days_between_first_and_last_product"),
             (
                 pl.lit(training_months[-1]).dt.offset_by("1mo")
-                - pl.col(settings.col_last_product_date)
+                - pl.col(settings.dataset.last_product_date)
             )
             .dt.total_days()
             .alias("Recency_in_days"),
         ]
-    ).drop([settings.col_first_product_date, settings.col_last_product_date])
+    ).drop([settings.dataset.first_product_date, settings.dataset.last_product_date])
 
 
 def _safe_denominator(
@@ -593,9 +593,9 @@ def aggregate_monthly_to_client(
     columns_without_quantities = {
         *columns_with_monetary_values,
         *identity_features.columns,
-        settings.col_month,
-        settings.col_first_product_date,
-        settings.col_last_product_date,
+        settings.dataset.month,
+        settings.dataset.first_product_date,
+        settings.dataset.last_product_date,
     }
 
     columns_with_quantities = [
@@ -627,8 +627,8 @@ def aggregate_monthly_to_client(
     ]
 
     data_agg = (
-        training_data.sort([settings.col_id, settings.col_month])
-        .group_by(settings.col_id)
+        training_data.sort([settings.dataset.id, settings.dataset.month])
+        .group_by(settings.dataset.id)
         .agg(agg_exprs)
     )
 
@@ -707,7 +707,7 @@ def standardize(
     if settings is None:
         settings = config.get_settings()
 
-    cols_to_standardize = pl.exclude(settings.col_id, settings.col_target)
+    cols_to_standardize = pl.exclude(settings.dataset.id, settings.dataset.target)
 
     standardized_df = df.with_columns(
         (cols_to_standardize - cols_to_standardize.mean())
