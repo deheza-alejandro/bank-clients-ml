@@ -12,7 +12,7 @@ donde algunos resultados se anexan directamente a la salida visible.
     get_clients_by_months: Resume la cantidad de meses registrados por cliente.
     mins_in_range: Identifica columnas numéricas cuyo mínimo cae dentro de un rango abierto.
     columns_with_zeros: Identifica columnas numéricas que contienen valores iguales a cero.
-    filter_nonzero: Filtra las filas donde todas las columnas indicadas son distintas de cero.
+    filter_nonzero: Filtra las filas donde todas las columnas son distintas de cero.
     build_plot_tabs: Crea un componente de pestañas en Marimo mostrando imágenes.
 
 ## Constantes exportadas:
@@ -21,7 +21,7 @@ donde algunos resultados se anexan directamente a la salida visible.
 
 import operator
 import pathlib
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from typing import Final, Literal
 
 import marimo as mo
@@ -138,9 +138,9 @@ def _get_operator(condition: ConditionSymbol) -> ComparisonFunction:
 
 def count_row_matches(
     df: pl.DataFrame,
-    columns: Sequence[str] | str,
-    threshold: float,
     condition: ConditionSymbol = "<",
+    threshold: float = 0.0,
+    settings: config.Settings | None = None,
 ) -> pl.DataFrame:
     """Cuenta, por columna, las filas que cumplen una condición respecto a un umbral.
 
@@ -155,24 +155,30 @@ def count_row_matches(
             ">=" para mayor o igual que,
             "==" para igual que,
             "!=" para distinto que.
+        settings: Configuración del proyecto. Si es None, se obtiene la
+            configuración global.
 
     ## Returns:
         Nuevo DataFrame con el nombre de cada columna y la cantidad de filas que
         cumplen la condición indicada.
     """
-    if isinstance(columns, str):
-        columns = [columns]
+    settings = settings or config.get_settings()
 
     comparison_function = _get_operator(condition)
 
+    columns = df.columns
+
     return df.select(comparison_function(pl.col(columns), threshold).sum()).unpivot(
-        variable_name="Column name",
+        variable_name=settings.analysis.column_name,
         value_name=f"Number of rows {condition} {threshold}",
     )
 
 
 def filter_columns_by_cardinality(
-    df: pl.DataFrame, condition: ConditionSymbol = ">", threshold: int = 10
+    df: pl.DataFrame,
+    condition: ConditionSymbol = ">",
+    threshold: int = 10,
+    settings: config.Settings | None = None,
 ) -> pl.DataFrame:
     """Filtra columnas según su cantidad de valores únicos.
 
@@ -180,22 +186,30 @@ def filter_columns_by_cardinality(
         df: DataFrame con las columnas sobre las que se calcula la cardinalidad.
         condition: Símbolo de comparación aplicado sobre el conteo de valores únicos.
         threshold: Umbral de valores únicos para filtrar las columnas.
+        settings: Configuración del proyecto. Si es None, se obtiene la
+            configuración global.
 
     ## Returns:
         Nuevo DataFrame con las columnas que cumplen la condición y su cantidad de
         valores únicos.
     """
+    settings = settings or config.get_settings()
+
     comparison_function = _get_operator(condition)
 
     return (
         df.select(pl.all().n_unique())
-        .unpivot(variable_name="column", value_name="unique_values")
+        .unpivot(
+            variable_name=settings.analysis.column_name, value_name="unique_values"
+        )
         .filter(comparison_function(pl.col("unique_values"), threshold))
     )
 
 
 def low_cardinality_value_counts(
-    df: pl.DataFrame, max_unique_values: int = 10
+    df: pl.DataFrame,
+    max_unique_values: int = 10,
+    settings: config.Settings | None = None,
 ) -> pl.DataFrame:
     """Filtra columnas de baja cardinalidad e indica las ocurrencias.
 
@@ -205,29 +219,37 @@ def low_cardinality_value_counts(
     ## Args:
         df: DataFrame con las columnas a analizar.
         max_unique_values: Cantidad máxima de valores únicos que debe tener una columna.
+        settings: Configuración del proyecto. Si es None, se obtiene la
+            configuración global.
 
     ## Returns:
         Nuevo DataFrame con las columnas `column`, `value` y `count`, ordenado por
         columna y frecuencia descendente. Si ninguna columna cumple el criterio,
         retorna un DataFrame vacío con dicho esquema.
     """
+    settings = settings or config.get_settings()
+
     cols_to_keep = (
         filter_columns_by_cardinality(df, "<=", max_unique_values)
-        .get_column("column")
+        .get_column(settings.analysis.column_name)
         .to_list()
     )
 
     if not cols_to_keep:
         return pl.DataFrame(
-            schema={"column": pl.String, "value": pl.String, "count": pl.UInt32}
+            schema={
+                settings.analysis.column_name: pl.String,
+                "value": pl.String,
+                "count": pl.UInt32,
+            }
         )
 
     return (
         df.select(pl.col(cols_to_keep).cast(pl.String))
-        .unpivot(variable_name="column", value_name="value")
-        .group_by(["column", "value"])
+        .unpivot(variable_name=settings.analysis.column_name, value_name="value")
+        .group_by([settings.analysis.column_name, "value"])
         .len("count")
-        .sort(["column", "count"], descending=[False, True])
+        .sort([settings.analysis.column_name, "count"], descending=[False, True])
     )
 
 
@@ -258,7 +280,12 @@ def get_clients_by_months(
     )
 
 
-def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.DataFrame:
+def mins_in_range(
+    df: pl.DataFrame,
+    low: float = -1,
+    high: float = 1,
+    settings: config.Settings | None = None,
+) -> pl.DataFrame:
     """Identifica columnas numéricas cuyo mínimo cae dentro de un rango abierto.
 
     Excluye los límites del intervalo y los mínimos iguales a cero, lo que
@@ -269,13 +296,17 @@ def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.Data
         df: DataFrame a analizar.
         low: Límite inferior exclusivo del rango.
         high: Límite superior exclusivo del rango.
+        settings: Configuración del proyecto. Si es None, se obtiene la
+            configuración global.
 
     ## Returns:
         Nuevo DataFrame con las columnas que cumplen el criterio y su valor mínimo.
     """
+    settings = settings or config.get_settings()
+
     return (
         df.select(cs.numeric().min())
-        .unpivot(variable_name="column", value_name="minimum")
+        .unpivot(variable_name=settings.analysis.column_name, value_name="minimum")
         .filter(
             pl.col("minimum").is_between(low, high, closed="none")
             & (pl.col("minimum") != 0)
@@ -283,56 +314,49 @@ def mins_in_range(df: pl.DataFrame, low: float = -1, high: float = 1) -> pl.Data
     )
 
 
-def columns_with_zeros(df: pl.DataFrame) -> pl.DataFrame:
+def columns_with_zeros(
+    df: pl.DataFrame, settings: config.Settings | None = None
+) -> pl.DataFrame:
     """Identifica columnas numéricas que contienen valores iguales a cero.
 
     ## Args:
         df: DataFrame a analizar.
+        settings: Configuración del proyecto. Si es None, se obtiene la
+            configuración global.
 
     ## Returns:
         Nuevo DataFrame con las columnas que contienen al menos un cero y la cantidad
         de ceros encontrados en cada una.
     """
+    settings = settings or config.get_settings()
+
     return (
         df.select((cs.numeric() == 0).sum())
-        .unpivot(variable_name="column", value_name="zeros_quantity")
+        .unpivot(
+            variable_name=settings.analysis.column_name, value_name="zeros_quantity"
+        )
         .filter(pl.col("zeros_quantity") > 0)
     )
 
 
-def filter_nonzero(
-    df: pl.DataFrame, columns: list[str], settings: config.Settings | None = None
-) -> pl.DataFrame:
-    """Filtra las filas donde todas las columnas indicadas son distintas de cero.
-
-    Conserva la columna identificadora configurada, cuando existe en el
-    DataFrame, junto con las columnas evaluadas.
+def filter_nonzero(df: pl.DataFrame) -> pl.DataFrame:
+    """Filtra las filas donde todas las columnas son distintas de cero.
 
     ## Args:
         df: DataFrame a filtrar.
-        columns: Columnas de `df` a analizar.
-        settings: Configuración con el nombre de la columna identificadora.
-            Si no se indica, se obtiene la configuración global.
 
     ## Returns:
-        Nuevo DataFrame filtrado con la columna identificadora y las columnas que cumplen la
-        condición evaluada.
+        Nuevo DataFrame filtrado con las columnas que cumplen la condición
+        evaluada.
     """
-    if settings is None:
-        settings = config.get_settings()
+    columns = df.columns
 
-    keep = (
-        [settings.dataset.id, *columns]
-        if settings.dataset.id in df.columns
-        else columns
-    )
-
-    return df.filter(pl.all_horizontal(pl.col(columns) != 0)).select(keep)
+    return df.filter(pl.all_horizontal(pl.col(columns) != 0))
 
 
 def build_plot_tabs(
     names: Mapping[str, str],
-    subdirectory: pathlib.Path,
+    directory: pathlib.Path,
     orientation: Literal["horizontal", "vertical"] = "horizontal",
 ) -> mo.Html:
     """Crea un componente de pestañas en Marimo mostrando imágenes.
@@ -348,7 +372,7 @@ def build_plot_tabs(
     """
     return mo.ui.tabs(
         {
-            title: mo.image(src=subdirectory / f"{filename}.svg")
+            title: mo.image(src=directory / f"{filename}.svg")
             for filename, title in names.items()
         },
         orientation=orientation,
