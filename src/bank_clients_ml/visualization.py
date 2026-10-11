@@ -393,8 +393,6 @@ def plot_deciles(
     train_deciles: pl.DataFrame,
     test_deciles: pl.DataFrame,
     plot_name: str,
-    title_train_deciles: str = "Train Deciles",
-    title_test_deciles: str = "Test Deciles",
     settings: config.Settings | None = None,
 ) -> None:
     """Genera un gráfico con tablas de deciles de entrenamiento y prueba.
@@ -411,8 +409,6 @@ def plot_deciles(
             entrenamiento.
         test_deciles: Tabla de deciles calculada sobre el conjunto de prueba.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
-        title_train_deciles: Título de la tabla de entrenamiento.
-        title_test_deciles: Título de la tabla de prueba.
         settings: Configuración con el directorio base donde se guarda la imagen.
             Si no se indica, se obtiene la configuración global.
     """
@@ -421,8 +417,8 @@ def plot_deciles(
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8), dpi=300)
 
-    _plot_single_deciles_table(ax1, train_deciles, title_train_deciles)
-    _plot_single_deciles_table(ax2, test_deciles, title_test_deciles)
+    _plot_single_deciles_table(ax1, train_deciles, "Train Deciles")
+    _plot_single_deciles_table(ax2, test_deciles, "Test Deciles")
 
     plt.tight_layout()
     _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_evaluation_metrics")
