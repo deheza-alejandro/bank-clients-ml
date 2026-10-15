@@ -1,7 +1,4 @@
-"""Funciones para el análisis exploratorio de datos con Polars y Marimo.
-
-Las funciones están pensadas para uso interactivo en cuadernos Marimo,
-donde algunos resultados se anexan directamente a la salida visible.
+"""Funciones para el análisis exploratorio de datos con Polars.
 
 ## Funciones exportadas:
     describe: Retorna el resumen estadístico del DataFrame.
@@ -13,18 +10,16 @@ donde algunos resultados se anexan directamente a la salida visible.
     mins_in_range: Identifica columnas numéricas cuyo mínimo cae dentro de un rango abierto.
     columns_with_zeros: Identifica columnas numéricas que contienen valores iguales a cero.
     filter_nonzero: Filtra las filas donde todas las columnas son distintas de cero.
-    build_plot_tabs: Crea un componente de pestañas en Marimo mostrando imágenes.
 
 ## Constantes exportadas:
     OPERATORS: funciones del módulo `operator` asociadas a símbolos de comparación.
 """
 
 import operator
-import pathlib
-from collections.abc import Callable, Mapping
+import types
+from collections.abc import Callable
 from typing import Final, Literal
 
-import marimo as mo
 import polars as pl
 import polars.selectors as cs
 
@@ -40,7 +35,11 @@ def describe(df: pl.DataFrame) -> pl.DataFrame:
     ## Args:
         df: DataFrame a analizar.
     """
-    return df.describe().transpose(include_header=True, column_names="statistic")
+    return (
+        df.describe()
+        .transpose(include_header=True, column_names="statistic")
+        .with_columns(pl.col("null_count").cast(pl.Float64).cast(pl.Int64))
+    )
 
 
 def inspect_dataframe(df: pl.DataFrame) -> pl.DataFrame:
@@ -105,14 +104,18 @@ type ConditionSymbol = Literal["<", ">", "<=", ">=", "==", "!="]
 
 type ComparisonFunction = Callable[[pl.Expr, float | int], pl.Expr]
 
-OPERATORS: Final[Mapping[ConditionSymbol, ComparisonFunction]] = {
-    "<": operator.lt,
-    ">": operator.gt,
-    "<=": operator.le,
-    ">=": operator.ge,
-    "==": operator.eq,
-    "!=": operator.ne,
-}
+OPERATORS: Final[types.MappingProxyType[ConditionSymbol, ComparisonFunction]] = (
+    types.MappingProxyType(
+        {
+            "<": operator.lt,
+            ">": operator.gt,
+            "<=": operator.le,
+            ">=": operator.ge,
+            "==": operator.eq,
+            "!=": operator.ne,
+        }
+    )
+)
 
 
 def _get_operator(condition: ConditionSymbol) -> ComparisonFunction:
@@ -282,6 +285,7 @@ def get_clients_by_months(
 
 def mins_in_range(
     df: pl.DataFrame,
+    *,
     low: float = -1,
     high: float = 1,
     settings: config.Settings | None = None,
@@ -352,28 +356,3 @@ def filter_nonzero(df: pl.DataFrame) -> pl.DataFrame:
     columns = df.columns
 
     return df.filter(pl.all_horizontal(pl.col(columns) != 0))
-
-
-def build_plot_tabs(
-    names: Mapping[str, str],
-    directory: pathlib.Path,
-    orientation: Literal["horizontal", "vertical"] = "horizontal",
-) -> mo.Html:
-    """Crea un componente de pestañas en Marimo mostrando imágenes.
-
-    ## Args:
-        names: Mapeo de títulos de pestañas a nombres de archivo.
-        subdirectory: Directorio donde se encuentran las imágenes.
-        orientation: Orientación de las pestañas ('horizontal' o 'vertical').
-            Por defecto es 'horizontal'.
-
-    ## Returns:
-        Componente interactivo de marimo con las imágenes renderizadas.
-    """
-    return mo.ui.tabs(
-        {
-            title: mo.image(src=directory / f"{filename}.svg")
-            for filename, title in names.items()
-        },
-        orientation=orientation,
-    )
