@@ -1,10 +1,13 @@
-"""add docs.
+"""Helpers para visualización de resultados en cuadernos Marimo.
 
 Las funciones están pensadas para uso interactivo en cuadernos Marimo,
 donde algunos resultados se anexan directamente a la salida visible.
 
 ## Funciones exportadas:
-    build_plot_tabs: Crea un componente de pestañas en Marimo mostrando imágenes.
+    build_plot_tabs: Crea un componente de pestañas con imágenes SVG.
+    get_trainer_cv_results: Muestra los resultados de validación cruzada de un entrenador.
+    get_trainers_cv_results: Muestra los resultados de validación cruzada por grupo.
+    format_correlations_dict: Formatea correlaciones para su presentación.
 """
 
 import pathlib
@@ -23,16 +26,19 @@ def build_plot_tabs(
     directory: pathlib.Path,
     orientation: Literal["horizontal", "vertical"] = "horizontal",
 ) -> mo.Html:
-    """Crea un componente de pestañas en Marimo mostrando imágenes.
+    """Crea un componente de pestañas con imágenes en Marimo.
+
+    Construye una pestaña por cada entrada del mapeo, cargando la imagen SVG
+    correspondiente desde el directorio indicado.
 
     ## Args:
-        renames: Mapeo de títulos de pestañas a nombres de archivo.
-        subdirectory: Directorio donde se encuentran las imágenes.
-        orientation: Orientación de las pestañas ('horizontal' o 'vertical').
-            Por defecto es 'horizontal'.
+        renames: Mapeo de nombres de archivo en snake_case a títulos legibles
+            para las pestañas.
+        directory: Directorio donde se encuentran las imágenes.
+        orientation: Orientación de las pestañas.
 
     ## Returns:
-        Componente interactivo de marimo con las imágenes renderizadas.
+        Componente interactivo de Marimo con las imágenes renderizadas.
     """
     return mo.ui.tabs(
         {
@@ -46,17 +52,19 @@ def build_plot_tabs(
 def get_trainer_cv_results(
     trainer: training.LGBMTrainer, include_logs: bool = False
 ) -> mo.Html:
-    """Retorna componentes de marimo para visualizar los resultados del entrenamiento.
+    """Genera componentes visuales con los resultados de validación cruzada.
 
-    Permite visualizar las combinaciones de hiperparámetros de los modelos
-    probados con validación cruzada, ordenados por la métrica obtenida
-    (`rank_test_score`). Opcionalmente permite ver los logs.
+    Muestra las combinaciones de hiperparámetros evaluadas, ordenadas por la
+    métrica obtenida (`rank_test_score`). Opcionalmente incluye los logs de la
+    búsqueda.
 
     ## Args:
-        include_logs: Si es True, incluye los logs de búsqueda en formato de texto.
+        trainer: Entrenador con los resultados de validación cruzada y los logs
+            de búsqueda.
+        include_logs: Si es True, añade los logs de búsqueda en formato de texto.
 
     ## Returns:
-        elementos visuales de marimo listos para mostrarse en el notebook.
+        Contenedor vertical de Marimo listo para mostrarse en el cuaderno.
     """
     marimo_items: list[object] = [trainer.cv_results]
 
@@ -69,24 +77,27 @@ def get_trainer_cv_results(
 
 
 def get_trainers_cv_results(
-    groups_trainer: training.GroupsLGBMTrainer, include_logs: bool = False
+    group_trainers: training.GroupsLGBMTrainer, include_logs: bool = False
 ) -> types.MappingProxyType[str, mo.Html]:
-    """Retorna componentes de marimo con las combinaciones de cada grupo.
+    """Genera componentes visuales con los resultados por grupo.
+
+    Aplica la visualización de resultados de validación cruzada a cada
+    entrenador del contenedor y organiza la salida por nombre de grupo.
 
     ## Args:
-        include_logs: Si es True, incluye los logs de búsqueda
-            junto a cada buscador en formato de texto.
+        group_trainers: Contenedor de entrenadores organizados por grupo.
+        include_logs: Si es True, incluye los logs de búsqueda junto a cada
+            resultado.
 
     ## Returns:
-        Un diccionario con elementos visuales de marimo organizados por
-        nombre de grupo, listos para mostrarse en el notebook.
+        Mapeo inmutable de nombres de grupo a contenedores visuales de Marimo.
     """
     return types.MappingProxyType(
         {
             f"{group.pretty_name} Searcher": get_trainer_cv_results(
                 trainer, include_logs
             )
-            for group, trainer in groups_trainer.items()
+            for group, trainer in group_trainers.items()
         }
     )
 
@@ -94,7 +105,19 @@ def get_trainers_cv_results(
 def format_correlations_dict(
     correlations_dict: Mapping[str, pl.DataFrame],
 ) -> types.MappingProxyType[str, pl.DataFrame]:
-    """Add docs."""
+    """Formatea un diccionario de correlaciones para su presentación.
+
+    Genera etiquetas legibles para cada columna de referencia, de modo que
+    los resultados puedan mostrarse directamente como pestañas o secciones
+    en el cuaderno.
+
+    ## Args:
+        correlations_dict: Mapeo de nombres de columna a tablas con sus
+            correlaciones.
+
+    ## Returns:
+        Mapeo inmutable de etiquetas legibles a tablas de correlaciones.
+    """
     return types.MappingProxyType(
         {
             f"Correlated with {column!r}": dataframe
