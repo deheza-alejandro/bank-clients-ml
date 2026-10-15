@@ -1,13 +1,13 @@
 """Funciones para el análisis exploratorio de datos con Polars.
 
 ## Funciones exportadas:
-    describe: Retorna el resumen estadístico del DataFrame.
+    describe: Retorna el resumen estadístico del DataFrame en formato transpuesto.
     inspect_dataframe: Inspecciona la estructura y la calidad general del DataFrame.
     count_row_matches: Cuenta, por columna, las filas que cumplen una condición.
     filter_columns_by_cardinality: Filtra columnas según su cantidad de valores únicos.
     low_cardinality_value_counts: Filtra columnas de baja cardinalidad e indica las ocurrencias.
     get_clients_by_months: Resume la cantidad de meses registrados por cliente.
-    mins_in_range: Identifica columnas numéricas cuyo mínimo cae dentro de un rango abierto.
+    mins_in_range: Detecta columnas numéricas cuyo valor mínimo pertenece a un intervalo abierto.
     columns_with_zeros: Identifica columnas numéricas que contienen valores iguales a cero.
     filter_nonzero: Filtra las filas donde todas las columnas son distintas de cero.
 
@@ -27,13 +27,18 @@ from bank_clients_ml import config
 
 
 def describe(df: pl.DataFrame) -> pl.DataFrame:
-    """Retorna el resumen estadístico del DataFrame.
+    """Genera el resumen estadístico del DataFrame en formato transpuesto.
 
-    Transpone el resultado de `df.describe()` para facilitar la lectura de las
-    estadísticas por columna.
+    Calcula las estadísticas descriptivas con `df.describe()`, transpone el
+    resultado para mostrar una fila por columna original y normaliza la columna
+    `null_count` a entero para facilitar su lectura.
 
     ## Args:
         df: DataFrame a analizar.
+
+    ## Returns:
+        Nuevo DataFrame con una fila por columna del DataFrame original y una
+        columna `statistic` que identifica cada medida estadística.
     """
     return (
         df.describe()
@@ -290,21 +295,24 @@ def mins_in_range(
     high: float = 1,
     settings: config.Settings | None = None,
 ) -> pl.DataFrame:
-    """Identifica columnas numéricas cuyo mínimo cae dentro de un rango abierto.
+    """Detecta columnas numéricas cuyo valor mínimo pertenece a un intervalo abierto.
 
-    Excluye los límites del intervalo y los mínimos iguales a cero, lo que
-    resulta útil para detectar valores cercanos a cero o posibles residuos de
-    normalizaciones.
+    Calcula el mínimo de cada columna numérica y conserva solo aquellas cuyo
+    mínimo se encuentra estrictamente entre `low` y `high`, excluyendo además
+    los valores iguales a cero. Resulta útil para identificar residuos de
+    normalización o valores cercanos a cero.
 
     ## Args:
         df: DataFrame a analizar.
-        low: Límite inferior exclusivo del rango.
-        high: Límite superior exclusivo del rango.
+        low: Límite inferior exclusivo del intervalo de búsqueda.
+        high: Límite superior exclusivo del intervalo de búsqueda.
         settings: Configuración del proyecto. Si es None, se obtiene la
             configuración global.
 
     ## Returns:
-        Nuevo DataFrame con las columnas que cumplen el criterio y su valor mínimo.
+        Nuevo DataFrame con las columnas que cumplen el criterio y su valor
+        mínimo correspondiente. Si ninguna columna cumple la condición, retorna
+        un DataFrame vacío con dicho esquema.
     """
     settings = settings or config.get_settings()
 
