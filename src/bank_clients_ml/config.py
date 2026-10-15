@@ -75,17 +75,21 @@ class AnalysisColumns(pydantic.BaseModel):
     """Nombres de columnas genéricas para resultados de análisis.
 
     ## Attributes:
-        feature: Nombre genérico de la columna de feature.
-        importance: Nombre genérico de la columna de importancia de variable.
-        bin: Nombre genérico de la columna de bin.
-        clients: Nombre genérico de la columna de clientes.
-        target_pct: Nombre genérico de la columna de porcentaje de target.
-        column_name: Nombre genérico de la columna "Column name".
+        feature: Nombre de la columna de feature.
+        importance: Nombre de la columna de importancia de variable.
+        bin: Nombre de la columna de bin.
+        min: Nombre de la columna min.
+        max: Nombre de la columna max.
+        clients: Nombre de la columna de clientes.
+        target_pct: Nombre de la columna de porcentaje de target.
+        column_name: Nombre de la columna "Column name".
     """
 
     feature: str = "Feature"
     importance: str = "Importance"
     bin: str = "Bin"
+    min: str = "Min"
+    max: str = "Max"
     clients: str = "Clients"
     target_pct: str = "Target_pct"
     column_name: str = "Column name"
