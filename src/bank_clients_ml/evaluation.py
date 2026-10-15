@@ -1,3 +1,12 @@
+"""Evaluación de desempeño de modelos de clasificación binaria.
+
+## Funciones exportadas:
+    evaluate: Evalúa las predicciones de un modelo sobre los conjuntos de datos.
+
+## Clases exportadas:
+    EvaluationMetrics: Métricas de evaluación de un modelo de clasificación binaria.
+"""
+
 import dataclasses
 from collections.abc import Sequence
 from typing import cast
@@ -25,10 +34,9 @@ def _compute_prediction_deciles(
     ## Args:
         df: Datos que incluyen la variable target.
         probabilities: Probabilidades predichas por el modelo para la clase positiva.
-        bins: bins para segmentar las probabilidades (util para test).
-            Si no se indica, se calcula en deciles según `probabilities`.
-        settings: Configuración con el nombre de la columna target. Si no se
-            indica, se obtiene la configuración global.
+        settings: Configuración con el nombre de la columna target.
+        bins: bins para segmentar las probabilidades. Si no se indica, se
+            calculan los deciles a partir de `probabilities`.
 
     ## Returns:
         Tabla por decil con conteos, probabilidades mínima y máxima, tasa de
@@ -81,13 +89,18 @@ def _compute_prediction_deciles(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class EvaluationMetrics:
-    """Métricas de un modelo LightGBM.
+    """Métricas de evaluación de un modelo de clasificación binaria.
+
+    Contiene las métricas globales, los puntos de la curva ROC y las tablas
+    de desempeño por decil para los conjuntos de entrenamiento y prueba.
 
     ## Attributes:
-        roc_auc: Métrica ROC AUC del modelo evaluado.
-        accuracy: Exactitud del modelo evaluado.
+        roc_auc: Área bajo la curva ROC calculada sobre el conjunto de prueba.
+        accuracy: Proporción de aciertos con umbral de 0.5 sobre el conjunto de prueba.
         fpr: Tasas de falsos positivos de la curva ROC.
         tpr: Tasas de verdaderos positivos de la curva ROC.
+        train_deciles: Tabla de desempeño por decil del conjunto de entrenamiento.
+        test_deciles: Tabla de desempeño por decil del conjunto de prueba.
     """
 
     roc_auc: float
@@ -99,10 +112,22 @@ class EvaluationMetrics:
 
     @property
     def train_deciles_without_probs(self) -> pl.DataFrame:
+        """Tabla de deciles de entrenamiento sin columnas de probabilidad.
+
+        ## Returns:
+            Copia de la tabla de deciles de entrenamiento sin las columnas
+                de probabilidad mínima y máxima.
+        """
         return self.train_deciles.drop("min_prob", "max_prob")
 
     @property
     def test_deciles_without_probs(self) -> pl.DataFrame:
+        """Tabla de deciles de prueba sin columnas de probabilidad.
+
+        ## Returns:
+            Copia de la tabla de deciles de prueba sin las columnas de
+                probabilidad mínima y máxima.
+        """
         return self.test_deciles.drop("min_prob", "max_prob")
 
 
@@ -114,25 +139,25 @@ def evaluate(
     probabilities_test: np.ndarray,
     settings: config.Settings,
 ) -> EvaluationMetrics:
-    """Evalúa el mejor modelo sobre el conjunto de prueba.
+    """Evalúa las predicciones de un modelo sobre los conjuntos de datos.
 
-    Calcula las probabilidades de entrenamiento y prueba, obtiene las
-    métricas ROC AUC y accuracy junto con los puntos de la curva ROC, y
-    construye las tablas de deciles. Los bins de los deciles de prueba se
-    derivan de los bins de las probabilidades de entrenamiento.
+    Calcula las métricas ROC AUC y accuracy junto con los puntos de la curva
+    ROC sobre el conjunto de prueba, y construye las tablas de deciles de
+    entrenamiento y prueba. Los cortes de los deciles de prueba se derivan
+    de los cuantiles de las probabilidades de entrenamiento.
 
     ## Args:
-        searcher: Buscador entrenado cuyo mejor estimador se desea evaluar.
-        train: Datos de entrenamiento utilizados para definir los bins.
+        train: Datos de entrenamiento utilizados para definir los cortes de deciles.
         test: Datos de prueba sobre los que se calculan las métricas.
-        columns: Columnas utilizadas de `train`.
-        settings: Configuración con el nombre de la columna target. Si no se
-            indica, se obtiene la configuración global.
+        probabilities_train: Probabilidades predichas para la clase positiva
+            en el conjunto de entrenamiento.
+        probabilities_test: Probabilidades predichas para la clase positiva
+            en el conjunto de prueba.
+        settings: Configuración con el nombre de la columna target.
 
     ## Returns:
-        Tupla con ROC AUC, exactitud, tasas de falsos positivos y de
-            verdaderos positivos de la curva ROC, y tablas de deciles de
-            entrenamiento y de prueba.
+        Métricas globales, puntos de la curva ROC y tablas de deciles de
+            entrenamiento y prueba.
     """
     y_true_arr = test.get_column(settings.dataset.target).to_numpy()
     y_pred = (probabilities_test >= 0.5).astype(int)
