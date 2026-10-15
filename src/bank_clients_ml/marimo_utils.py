@@ -5,9 +5,9 @@ donde algunos resultados se anexan directamente a la salida visible.
 
 ## Funciones exportadas:
     build_plot_tabs: Crea un componente de pestañas con imágenes SVG.
-    get_trainer_cv_results: Muestra los resultados de validación cruzada de un entrenador.
-    get_trainers_cv_results: Muestra los resultados de validación cruzada por grupo.
-    format_correlations_dict: Formatea correlaciones para su presentación.
+    build_trainer_cv_view: Muestra los resultados de validación cruzada de un entrenador.
+    build_group_cv_views: Muestra los resultados de validación cruzada por grupo.
+    build_correlation_tabs: Formatea correlaciones para su presentación.
 """
 
 import pathlib
@@ -22,9 +22,9 @@ from bank_clients_ml import binning, training
 
 
 def build_plot_tabs(
-    renames: binning.Renames,
+    name_mapping: binning.NameMapping,
     directory: pathlib.Path,
-    orientation: Literal["horizontal", "vertical"] = "horizontal",
+    orientation: Literal["horizontal", "vertical"] = "vertical",
 ) -> mo.Html:
     """Crea un componente de pestañas con imágenes en Marimo.
 
@@ -32,7 +32,7 @@ def build_plot_tabs(
     correspondiente desde el directorio indicado.
 
     ## Args:
-        renames: Mapeo de nombres de archivo en snake_case a títulos legibles
+        name_mapping: Mapeo de nombres de archivo en snake_case a títulos legibles
             para las pestañas.
         directory: Directorio donde se encuentran las imágenes.
         orientation: Orientación de las pestañas.
@@ -43,13 +43,13 @@ def build_plot_tabs(
     return mo.ui.tabs(
         {
             pretty_name: mo.image(src=directory / f"{snake_case_name}.svg")
-            for snake_case_name, pretty_name in renames.items()
+            for snake_case_name, pretty_name in name_mapping.items()
         },
         orientation=orientation,
     )
 
 
-def get_trainer_cv_results(
+def build_trainer_cv_view(
     trainer: training.LGBMTrainer, include_logs: bool = False
 ) -> mo.Html:
     """Genera componentes visuales con los resultados de validación cruzada.
@@ -76,7 +76,7 @@ def get_trainer_cv_results(
     return mo.vstack(marimo_items)
 
 
-def get_trainers_cv_results(
+def build_group_cv_views(
     group_trainers: training.GroupsLGBMTrainer, include_logs: bool = False
 ) -> types.MappingProxyType[str, mo.Html]:
     """Genera componentes visuales con los resultados por grupo.
@@ -94,7 +94,7 @@ def get_trainers_cv_results(
     """
     return types.MappingProxyType(
         {
-            f"{group.pretty_name} Searcher": get_trainer_cv_results(
+            f"{group.pretty_name} Searcher": build_trainer_cv_view(
                 trainer, include_logs
             )
             for group, trainer in group_trainers.items()
@@ -102,9 +102,10 @@ def get_trainers_cv_results(
     )
 
 
-def format_correlations_dict(
-    correlations_dict: Mapping[str, pl.DataFrame],
-) -> types.MappingProxyType[str, pl.DataFrame]:
+def build_correlation_tabs(
+    correlations_mapping: Mapping[str, pl.DataFrame],
+    orientation: Literal["horizontal", "vertical"] = "vertical",
+) -> mo.Html:
     """Formatea un diccionario de correlaciones para su presentación.
 
     Genera etiquetas legibles para cada columna de referencia, de modo que
@@ -112,15 +113,16 @@ def format_correlations_dict(
     en el cuaderno.
 
     ## Args:
-        correlations_dict: Mapeo de nombres de columna a tablas con sus
+        correlations_mapping: Mapeo de nombres de columna a tablas con sus
             correlaciones.
 
     ## Returns:
         Mapeo inmutable de etiquetas legibles a tablas de correlaciones.
     """
-    return types.MappingProxyType(
+    return mo.ui.tabs(
         {
             f"Correlated with {column!r}": dataframe
-            for column, dataframe in correlations_dict.items()
-        }
+            for column, dataframe in correlations_mapping.items()
+        },
+        orientation=orientation,
     )
