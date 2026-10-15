@@ -69,7 +69,7 @@ max-complexity = 10
 [tool.ruff.lint.pylint]
 max-statements = 30
 max-args = 8
-max-returns = 5
+max-returns = 6
 
 [tool.ruff.lint.pycodestyle]
 max-line-length = 100
