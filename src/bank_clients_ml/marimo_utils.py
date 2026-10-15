@@ -4,10 +4,10 @@ Las funciones están pensadas para uso interactivo en cuadernos Marimo,
 donde algunos resultados se anexan directamente a la salida visible.
 
 ## Funciones exportadas:
-    build_plot_tabs: Crea un componente de pestañas con imágenes SVG.
+    build_plot_tabs: Presenta imágenes SVG como pestañas en Marimo.
     build_trainer_cv_view: Muestra los resultados de validación cruzada de un entrenador.
     build_group_cv_views: Muestra los resultados de validación cruzada por grupo.
-    build_correlation_tabs: Formatea correlaciones para su presentación.
+    build_correlation_tabs: Presenta tablas de correlación como pestañas en Marimo.
 """
 
 import pathlib
@@ -26,14 +26,14 @@ def build_plot_tabs(
     directory: pathlib.Path,
     orientation: Literal["horizontal", "vertical"] = "vertical",
 ) -> mo.Html:
-    """Crea un componente de pestañas con imágenes en Marimo.
+    """Presenta imágenes SVG como pestañas en Marimo.
 
     Construye una pestaña por cada entrada del mapeo, cargando la imagen SVG
     correspondiente desde el directorio indicado.
 
     ## Args:
-        name_mapping: Mapeo de nombres de archivo en snake_case a títulos legibles
-            para las pestañas.
+        name_mapping: Mapeo de nombres de archivo en snake_case a títulos
+            legibles para las pestañas.
         directory: Directorio donde se encuentran las imágenes.
         orientation: Orientación de las pestañas.
 
@@ -55,13 +55,14 @@ def build_trainer_cv_view(
     """Genera componentes visuales con los resultados de validación cruzada.
 
     Muestra las combinaciones de hiperparámetros evaluadas, ordenadas por la
-    métrica obtenida (`rank_test_score`). Opcionalmente incluye los logs de la
-    búsqueda.
+    métrica obtenida (`rank_test_score`). Opcionalmente incluye los logs de
+    la búsqueda.
 
     ## Args:
-        trainer: Entrenador con los resultados de validación cruzada y los logs
-            de búsqueda.
-        include_logs: Si es True, añade los logs de búsqueda en formato de texto.
+        trainer: Entrenador con los resultados de validación cruzada y los
+            logs de búsqueda.
+        include_logs: Si es True, añade los logs de búsqueda en formato
+            de texto.
 
     ## Returns:
         Contenedor vertical de Marimo listo para mostrarse en el cuaderno.
@@ -106,18 +107,18 @@ def build_correlation_tabs(
     correlations_mapping: Mapping[str, pl.DataFrame],
     orientation: Literal["horizontal", "vertical"] = "vertical",
 ) -> mo.Html:
-    """Formatea un diccionario de correlaciones para su presentación.
+    """Presenta tablas de correlación como pestañas en Marimo.
 
-    Genera etiquetas legibles para cada columna de referencia, de modo que
-    los resultados puedan mostrarse directamente como pestañas o secciones
-    en el cuaderno.
+    Genera una pestaña por cada columna de referencia, con una etiqueta
+    legible que identifica la columna analizada.
 
     ## Args:
         correlations_mapping: Mapeo de nombres de columna a tablas con sus
             correlaciones.
+        orientation: Orientación de las pestañas.
 
     ## Returns:
-        Mapeo inmutable de etiquetas legibles a tablas de correlaciones.
+        Componente interactivo de Marimo con las tablas de correlación.
     """
     return mo.ui.tabs(
         {
