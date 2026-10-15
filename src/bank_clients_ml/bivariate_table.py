@@ -15,13 +15,13 @@ class BivariateTable:
     def title_for_plot(self):
         return f"Variable analysis: {self.pretty_name}"
 
-    def with_format_column(self, column: str) -> pl.DataFrame:
+    def with_rounded_int_column(self, column: str) -> pl.DataFrame:
         return self.table.with_columns(pl.col(column).round().cast(pl.Int64))
 
 
-def get_bivariate_tables(
+def build_bivariate_tables(
     df: pl.DataFrame,
-    renames: binning.Renames,
+    name_mapping: binning.NameMapping,
     max_bins_quantity: int,
     settings: config.Settings,
 ) -> tuple[BivariateTable, ...]:
@@ -44,7 +44,7 @@ def get_bivariate_tables(
     """
     bivariate_tables: list[BivariateTable] = []
 
-    for column in renames.snake_case_names:
+    for column in name_mapping.snake_case_names:
         if df.get_column(column).n_unique() > max_bins_quantity:
             group_expr = pl.col(column).qcut(
                 quantiles=max_bins_quantity, allow_duplicates=True
@@ -81,6 +81,6 @@ def get_bivariate_tables(
                 settings.analysis.target_pct,
             )
         )
-        bivariate_tables.append(BivariateTable(column, renames.get(column), table))
+        bivariate_tables.append(BivariateTable(column, name_mapping.get(column), table))
 
     return tuple(bivariate_tables)
