@@ -26,13 +26,13 @@ class FeaturesSelection:
             target y mejores variables.
         test: Conjunto de prueba con las columnas identificadora,
             target y mejores variables.
-        features_renames: Mapeo entre el nombre original de cada variable
+        features_name_mapping: Mapeo entre el nombre original de cada variable
             seleccionada y su nombre final.
         features_names: Nombres originales de las variables seleccionadas.
     """
 
     test: pl.DataFrame
-    renames: binning.Renames
+    name_mapping: binning.NameMapping
     trainer: training.LGBMTrainer
     settings: config.Settings
     n_iter: int
@@ -43,25 +43,25 @@ class FeaturesSelection:
         *,
         train: pl.DataFrame,
         test: pl.DataFrame,
-        renames: binning.Renames,
+        name_mapping: binning.NameMapping,
         settings: config.Settings,
         n_iter: int = 20,
     ) -> Self:
         trainer = training.LGBMTrainer.fit_and_build(
             train,
-            renames.snake_case_names,
+            name_mapping.snake_case_names,
             settings,
             n_iter=n_iter,
         )
-        return cls(test, renames, trainer, settings, n_iter)
+        return cls(test, name_mapping, trainer, settings, n_iter)
 
     @property
     def train(self) -> pl.DataFrame:
         return self.trainer.train
 
     @property
-    def names(self) -> tuple[str, ...]:
-        return self.renames.snake_case_names
+    def snake_case_names(self) -> tuple[str, ...]:
+        return self.name_mapping.snake_case_names
 
     def plot_bivariate_analysis(
         self, analysis_name: str, max_bins_quantity: int = 20
@@ -74,15 +74,15 @@ class FeaturesSelection:
             max_bins_quantity: Cantidad máxima de bines por variable.
         """
         visualization.plot_bivariate_charts(
-            bivariate_table.get_bivariate_tables(
-                self.train, self.renames, max_bins_quantity, settings=self.settings
+            bivariate_table.build_bivariate_tables(
+                self.train, self.name_mapping, max_bins_quantity, settings=self.settings
             ),
             analysis_name,
             settings=self.settings,
         )
 
     def plot_top_features(self, plot_name: str) -> None:
-        self.trainer.plot_top_features(plot_name, self.renames)
+        self.trainer.plot_top_features(plot_name, self.name_mapping)
 
     def evaluate_and_plot_metrics(
         self, *, roc_curve_name: str, deciles_name: str
@@ -106,19 +106,19 @@ class BivariateAnalyzer:
             col_filter.correlated_train, col_filter.correlated_test, col_filter.settings
         )
 
-    def _get_bivariate_tables(
-        self, renames: binning.Renames, max_bins_quantity: int
+    def _build_bivariate_tables(
+        self, name_mapping: binning.NameMapping, max_bins_quantity: int
     ) -> tuple[bivariate_table.BivariateTable, ...]:
-        return bivariate_table.get_bivariate_tables(
+        return bivariate_table.build_bivariate_tables(
             self.correlated_train,
-            renames,
+            name_mapping,
             max_bins_quantity,
             settings=self.settings,
         )
 
     def plot_bivariate(
         self,
-        renames: binning.Renames,
+        name_mapping: binning.NameMapping,
         analysis_name: str,
         max_bins_quantity: int = 20,
     ) -> None:
@@ -135,14 +135,14 @@ class BivariateAnalyzer:
             max_bins_quantity: Cantidad máxima de bines por variable.
         """
         visualization.plot_bivariate_charts(
-            self._get_bivariate_tables(renames, max_bins_quantity),
+            self._build_bivariate_tables(name_mapping, max_bins_quantity),
             analysis_name,
             settings=self.settings,
         )
 
-    def apply_bin_transformations(
+    def apply_binning(
         self,
-        bins_transformations: Iterable[binning.BinTransformation],
+        binners: Iterable[binning.Binner],
         max_bins_quantity: int = 20,
     ) -> FeaturesSelection:
         """Aplica transformaciones por bines a los conjuntos de entrenamiento y prueba.
@@ -157,9 +157,9 @@ class BivariateAnalyzer:
         como en prueba.
 
         ## Args:
-            bins_transformations: Lista con las columnas con los rangos de bines que
+            binners: Lista con las columnas con los rangos de bines que
                 definen cada transformación.
-            features_renames: Mapeo entre el nombre original de cada variable
+            features_name_mapping: Mapeo entre el nombre original de cada variable
                 seleccionada y su nombre final.
 
         ## Returns:
@@ -167,28 +167,27 @@ class BivariateAnalyzer:
             transformados y filtrados, el mapeo de renombres y la lista de
             mejores variables.
         """
-        renames = binning.Renames.from_nameable(bins_transformations)
+        name_mapping = binning.NameMapping.from_dual_named(binners)
 
-        bivariate_tables = self._get_bivariate_tables(renames, max_bins_quantity)
+        bivariate_tables = self._build_bivariate_tables(name_mapping, max_bins_quantity)
 
         expr = [
-            bin_transformation.group_bins_by_ranges(
-                bivariate_table.table, self.settings
-            )
-            for bin_transformation, bivariate_table in zip(
-                bins_transformations, bivariate_tables, strict=True
-            )
+            binner.build_encoding_expr(bivariate_table.table, self.settings)
+            for binner, bivariate_table in zip(binners, bivariate_tables, strict=True)
         ]
 
         final_cols = [
             self.settings.dataset.id,
             self.settings.dataset.target,
-            *renames.snake_case_names,
+            *name_mapping.snake_case_names,
         ]
 
         final_train = self.correlated_train.with_columns(expr).select(final_cols)
         final_test = self.correlated_test.with_columns(expr).select(final_cols)
 
         return FeaturesSelection.fit_and_build(
-            train=final_train, test=final_test, renames=renames, settings=self.settings
+            train=final_train,
+            test=final_test,
+            name_mapping=name_mapping,
+            settings=self.settings,
         )
