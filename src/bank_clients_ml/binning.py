@@ -1,3 +1,9 @@
+"""add docs.
+
+## Clases exportadas:
+    Binner: Asociación entre una columna y sus rangos de bines.
+"""
+
 import dataclasses
 import types
 from collections.abc import ItemsView, Iterable, Mapping
@@ -8,18 +14,18 @@ import polars as pl
 from bank_clients_ml import config
 
 
-class _BinGroup(NamedTuple):
-    range_condition: pl.Expr
+class _GroupedBins(NamedTuple):
+    interval_expr: pl.Expr
     target_pct: float
 
 
-def _get_range_condition(
-    column: str, group: pl.DataFrame, settings: config.Settings
+def _build_interval_expr(
+    feature: str, group: pl.DataFrame, settings: config.Settings
 ) -> pl.Expr:
     """Construye la condición de pertenencia al intervalo del grupo.
 
     ## Args:
-        column: Columna sobre la que se construye la condición.
+        feature: feature sobre la que se construye la condición.
 
     ## Returns:
         Expresión de pertenencia al intervalo `[low, high]` con ambos extremos
@@ -31,26 +37,28 @@ def _get_range_condition(
 
     if min is None or max is None:
         return pl.lit(False)
-    return pl.col(column).is_between(min, max, closed="both")
+    return pl.col(feature).is_between(min, max, closed="both")
 
 
-def _calculate_target_pct(table: pl.DataFrame, settings: config.Settings) -> float:
+def _calculate_target_pct(
+    bivariate_table: pl.DataFrame, settings: config.Settings
+) -> float:
     """Calcula el porcentaje de target de un grupo de bines.
 
     ## Args:
-        table: Tabla con un grupo de bines con las columnas
+        bivariate_table: Tabla con un grupo de bines con las columnas
             `settings.analysis.clients` y `settings.dataset.target`.
 
     ## Returns:
         Porcentaje de target del grupo, o `0.0` si el grupo está vacío.
     """
-    clients = float(table.get_column(settings.analysis.clients).sum())
-    target = float(table.get_column(settings.dataset.target).sum())
+    clients = float(bivariate_table.get_column(settings.analysis.clients).sum())
+    target = float(bivariate_table.get_column(settings.dataset.target).sum())
     return target / clients * 100.0 if clients > 0.0 else 0.0
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BinRange:
+class _BinInterval:
     """Rango inclusivo de bines que se agrupan en un mismo valor.
 
     Representa un intervalo cerrado sobre la numeración de bines generada por
@@ -89,9 +97,9 @@ class BinRange:
             self.start, self.end, closed="both"
         )
 
-    def to_bin_group(
-        self, column: str, table: pl.DataFrame, settings: config.Settings
-    ) -> _BinGroup:
+    def group(
+        self, feature: str, bivariate_table: pl.DataFrame, settings: config.Settings
+    ) -> _GroupedBins:
         """Agrega las estadísticas de un rango de bines.
 
         Filtra la tabla de análisis bivariado por número de bin y resume el
@@ -99,93 +107,97 @@ class BinRange:
         grupo.
 
         ## Args:
-            table: Tabla de análisis bivariado de la columna.
-            bin_range: Rango de bines a agregar.
+            bivariate_table: Tabla de análisis bivariado de la feature.
+            bin_interval: Rango de bines a agregar.
             settings: Configuración con los nombres de las columnas.
         """
         if (
-            not table.schema[settings.analysis.min].is_numeric()
-            or not table.schema[settings.analysis.max].is_numeric()
+            not bivariate_table.schema[settings.analysis.min].is_numeric()
+            or not bivariate_table.schema[settings.analysis.max].is_numeric()
         ):
             msg = (
                 f"Columns 'Min' and 'Max' must be numeric. "
                 f"Found types: "
-                f"Min={table.schema[settings.analysis.min]}, "
-                f"Max={table.schema[settings.analysis.max]}"
+                f"Min={bivariate_table.schema[settings.analysis.min]}, "
+                f"Max={bivariate_table.schema[settings.analysis.max]}"
             )
             raise TypeError(msg)
 
-        group = table.filter(
+        group = bivariate_table.filter(
             pl.col(settings.analysis.bin).is_between(
                 self.start, self.end, closed="both"
             )
         )
 
         target_pct = _calculate_target_pct(group, settings)
-        range_condition = _get_range_condition(column, group, settings)
+        interval_expr = _build_interval_expr(feature, group, settings)
 
-        return _BinGroup(range_condition, target_pct)
+        return _GroupedBins(interval_expr, target_pct)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BinTransformation:
-    """Asociación entre una columna y sus rangos de bines.
+class Binner:
+    """Asociación entre una feature y sus rangos de bines.
 
     Define cómo deben combinarse los bines de una variable analizada para
     reemplazar sus valores originales por el porcentaje de target de cada grupo.
 
     ## Attributes:
-        column: Nombre de la columna a transformar.
-        bin_ranges: Rangos de bines que conforman cada grupo.
+        feature: Nombre de la feature a transformar.
+        bin_intervals: Rangos de bines que conforman cada grupo.
     """
 
     snake_case_name: str
     pretty_name: str
-    bin_ranges: list[BinRange] = dataclasses.field(default_factory=list[BinRange])
+    bin_intervals: list[_BinInterval] = dataclasses.field(
+        default_factory=list[_BinInterval]
+    )
 
-    def add_range(self, start: int, end: int | None = None) -> Self:
+    def merge_bins(self, start: int, end: int | None = None) -> Self:
         end = end or start
-        self.bin_ranges.append(BinRange(start, end))
+        self.bin_intervals.append(_BinInterval(start, end))
         return self
 
-    def validate(self, bivariate_table: pl.DataFrame) -> None:
+    def _validate_against(self, bivariate_table: pl.DataFrame) -> None:
         """Valida la transformación de bines.
 
         ## Args:
-            bin_transformation: Asociación entre la columna a transformar y los
+            binner: Asociación entre la feature a transformar y los
                 rangos de bines a validar.
             n_bins: Cantidad de bines de la tabla.
 
         ## Raises:
-            ValueError: Si algún rango excede `n_bins`, si `bin_ranges` está
+            ValueError: Si algún rango excede `n_bins`, si `bin_intervals` está
             vacía o si se solapan bines.
         """
-        if not self.bin_ranges:
-            msg = f"Column {self.snake_case_name!r}: 'bin_ranges' must not be empty."
+        if not self.bin_intervals:
+            msg = (
+                f"Feature {self.snake_case_name!r}: 'bin_intervals' must not be empty."
+            )
             raise ValueError(msg)
 
         seen: set[int] = set()
         overlapping: set[int] = set()
-        for bin_range in self.bin_ranges:
-            for bin_number in bin_range.range:
+        for bin_interval in self.bin_intervals:
+            for bin_number in bin_interval.range:
                 if bin_number in seen:
                     overlapping.add(bin_number)
                 seen.add(bin_number)
         if overlapping:
-            msg = f"Column {self.snake_case_name!r}: overlapping bins {sorted(overlapping)}"
+            msg = f"Feature {self.snake_case_name!r}: overlapping bins {sorted(overlapping)}"
             raise ValueError(msg)
 
         n_bins = bivariate_table.height
-        for bin_range in self.bin_ranges:
-            if bin_range.exceeds(n_bins):
+        for bin_interval in self.bin_intervals:
+            if bin_interval.exceeds(n_bins):
                 msg = (
-                    f"Column {self.snake_case_name!r}: "
-                    f"invalid range {bin_range}: "
-                    f"table has {n_bins} bins."
+                    f"Feature {self.snake_case_name!r}: "
+                    f"invalid range {bin_interval}: "
+                    f"bivariate_table has {n_bins} bins."
                 )
                 raise ValueError(msg)
 
-    def _get_default_target_pct(
+    def _calculate_residual_target_pct(
         self, bivariate_table: pl.DataFrame, settings: config.Settings
     ) -> float:
         """Calcula el porcentaje de target del grupo residual.
@@ -196,8 +208,8 @@ class BinTransformation:
         de todos los intervalos definidos, incluidos los nulos y los huecos entre grupos.
 
         ## Args:
-            table: Tabla de análisis bivariado de la columna.
-            bin_transformation: Asociación entre la columna a transformar y los
+            bivariate_table: Tabla de análisis bivariado de la feature.
+            binner: Asociación entre la feature a transformar y los
                 rangos de bines que definen cada grupo de agregación.
             settings: Configuración con los nombres de las columnas.
 
@@ -205,11 +217,13 @@ class BinTransformation:
             Porcentaje de target del grupo residual, o `0.0` si no quedan bines
             sin cubrir.
         """
-        bin_match = [bin_range.to_expr(settings) for bin_range in self.bin_ranges]
-        residual_group = bivariate_table.filter(~pl.any_horizontal(bin_match))
+        bin_intervals_exprs = [
+            bin_interval.to_expr(settings) for bin_interval in self.bin_intervals
+        ]
+        residual_group = bivariate_table.filter(~pl.any_horizontal(bin_intervals_exprs))
         return _calculate_target_pct(residual_group, settings)
 
-    def group_bins_by_ranges(
+    def build_encoding_expr(
         self,
         bivariate_table: pl.DataFrame,
         settings: config.Settings,
@@ -232,9 +246,9 @@ class BinTransformation:
         al grupo residual.
 
         ## Args:
-            bin_transformation: Asociación entre una columna a transformar y los
+            binner: Asociación entre una feature a transformar y los
                 rangos de bines que definen cada grupo de agregación.
-            table: Tabla de análisis bivariado de la columna, con las columnas de
+            bivariate_table: Tabla de análisis bivariado de la feature, con las columnas de
                 bin, mínimo, máximo, clientes y target.
             settings: Configuración con el nombre de la columna target. Si no se
                 indica, se obtiene la configuración global.
@@ -246,22 +260,24 @@ class BinTransformation:
         ## Raises:
             ValueError: Si algún rango excede la cantidad de bines de la tabla.
         """
-        self.validate(bivariate_table)
+        self._validate_against(bivariate_table)
 
         groups = [
-            bin_range.to_bin_group(self.snake_case_name, bivariate_table, settings)
-            for bin_range in self.bin_ranges
+            bin_interval.group(self.snake_case_name, bivariate_table, settings)
+            for bin_interval in self.bin_intervals
         ]
 
-        expr = pl.when(groups[0].range_condition).then(groups[0].target_pct)
+        expr = pl.when(groups[0].interval_expr).then(groups[0].target_pct)
         for group in groups[1:]:
-            expr = expr.when(group.range_condition).then(group.target_pct)
+            expr = expr.when(group.interval_expr).then(group.target_pct)
 
-        default_target_pct = self._get_default_target_pct(bivariate_table, settings)
+        default_target_pct = self._calculate_residual_target_pct(
+            bivariate_table, settings
+        )
         return expr.otherwise(default_target_pct).alias(self.snake_case_name)
 
 
-class Nameable(Protocol):
+class DualNamed(Protocol):
     @property
     def snake_case_name(self) -> str: ...
 
@@ -270,7 +286,7 @@ class Nameable(Protocol):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class Renames:
+class NameMapping:
     _mapping: types.MappingProxyType[str, str]
 
     @classmethod
@@ -278,11 +294,11 @@ class Renames:
         return cls(types.MappingProxyType(mapping))
 
     @classmethod
-    def from_nameable(cls, nameable_iterable: Iterable[Nameable]) -> Self:
+    def from_dual_named(cls, dual_named_iterable: Iterable[DualNamed]) -> Self:
         return cls.from_dict(
             {
-                nameable.snake_case_name: nameable.pretty_name
-                for nameable in nameable_iterable
+                dual_named.snake_case_name: dual_named.pretty_name
+                for dual_named in dual_named_iterable
             }
         )
 
@@ -300,20 +316,20 @@ class Renames:
     def items(self) -> ItemsView[str, str]:
         return self._mapping.items()
 
-    def to_expr(self, column: str) -> pl.Expr:
+    def to_expr(self, feature: str) -> pl.Expr:
         """Aplica nombres distintos.
 
-        Reemplaza los valores de la columna feature según el diccionario de
+        Reemplaza los valores de la feature según el diccionario de
         renombres y conserva el valor original cuando no existe correspondencia.
 
         ## Args:
-            column: nombre de la columna.
+            feature: nombre de la feature.
 
         ## Returns:
             .
         """
         return (
-            pl.col(column)
-            .replace_strict(self._mapping, default=pl.col(column))
-            .alias(column)
+            pl.col(feature)
+            .replace_strict(self._mapping, default=pl.col(feature))
+            .alias(feature)
         )
