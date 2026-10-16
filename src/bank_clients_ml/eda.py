@@ -154,8 +154,6 @@ def count_row_matches(
 
     ## Args:
         df: DataFrame sobre el que se realiza el conteo.
-        columns: Columna o secuencia de columnas a evaluar.
-        threshold: Valor umbral contra el que se compara cada celda.
         condition: Símbolo de comparación a aplicar. Valores posibles:
             "<" para menor que,
             ">" para mayor que,
@@ -163,6 +161,7 @@ def count_row_matches(
             ">=" para mayor o igual que,
             "==" para igual que,
             "!=" para distinto que.
+        threshold: Valor umbral contra el que se compara cada celda.
         settings: Configuración del proyecto. Si es None, se obtiene la
             configuración global.
 
@@ -231,9 +230,9 @@ def low_cardinality_value_counts(
             configuración global.
 
     ## Returns:
-        Nuevo DataFrame con las columnas `column`, `value` y `count`, ordenado por
-        columna y frecuencia descendente. Si ninguna columna cumple el criterio,
-        retorna un DataFrame vacío con dicho esquema.
+        Nuevo DataFrame con el nombre de la columna, el valor y el conteo,
+        ordenado por columna y frecuencia descendente. Si ninguna columna
+        cumple el criterio, retorna un DataFrame vacío con dicho esquema.
     """
     settings = settings or config.get_settings()
 
@@ -358,8 +357,8 @@ def filter_nonzero(df: pl.DataFrame) -> pl.DataFrame:
         df: DataFrame a filtrar.
 
     ## Returns:
-        Nuevo DataFrame filtrado con las columnas que cumplen la condición
-        evaluada.
+        Nuevo DataFrame con las filas donde todas las columnas son distintas
+        de cero.
     """
     columns = df.columns
 

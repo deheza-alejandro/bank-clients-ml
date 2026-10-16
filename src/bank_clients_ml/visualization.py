@@ -125,7 +125,6 @@ def plot_top_features(
         top_n: Cantidad máxima de variables a incluir en el gráfico.
         settings: Configuración con los nombres de columnas de variable e importancia,
             y el directorio base donde se guarda la imagen.
-            Si no se indica, se obtiene la configuración global.
     """
     top_n = min(top_n, variables_to_plot.height)
 
@@ -195,8 +194,7 @@ def _plot_single_bivariate_chart(
             como título y como nombre del archivo generado.
         analysis_name: Nombre del análisis. Define el subdirectorio de salida.
         settings: Configuración con el nombre de la columna target y el directorio
-            base donde se guarda la imagen. Si no se indica, se obtiene la
-            configuración global.
+            base donde se guarda la imagen.
     """
     formatted_table = _format_floats(
         bivariate_table.with_rounded_int_column(settings.analysis.target_pct)
@@ -253,7 +251,7 @@ def plot_bivariate_charts(
 ) -> None:
     """Genera gráficos bivariados para un conjunto de variables.
 
-    Recorre el diccionario de tablas de análisis y genera un gráfico por variable.
+    Recorre la secuencia de tablas de análisis y genera un gráfico por variable.
     Utiliza ejecución secuencial cuando se solicita un solo worker o cuando
     hay pocas tablas, y ejecución en paralelo con procesos separados en caso
     contrario para acelerar la generación de una gran cantidad de gráficos.
@@ -264,14 +262,13 @@ def plot_bivariate_charts(
     ## Args:
         bivariate_tables: Tablas de análisis bivariados a graficar.
         analysis_name: Nombre del análisis. Define el subdirectorio de salida.
-        max_workers: Cantidad máxima de procesos en paralelo. Si no se indica,
-            se usan todos los núcleos disponibles. si len(tables) < 20 se usa
-            1 solo proceso. El valor 1 fuerza la ejecución secuencial.
         settings: Configuración con el nombre de la columna target y el
-            directorio base donde se guardan las imágenes. Si no se indica,
-            se obtiene la configuración global.
+            directorio base donde se guardan las imágenes.
+        max_workers: Cantidad máxima de procesos en paralelo. Si no se indica,
+            se usan todos los núcleos disponibles. Si se indica el valor 1 o si
+            hay menos de 20 tablas, se utiliza ejecución secuencial.
     """
-    if max_workers == 1 or len(bivariate_tables) < 20 or max_workers is None:
+    if max_workers == 1 or len(bivariate_tables) < 20:
         for bivariate_table in bivariate_tables:
             _plot_single_bivariate_chart(
                 bivariate_table,
@@ -312,7 +309,6 @@ def plot_roc_curve(
         evaluation_metrics: Métricas del modelo.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
         settings: Configuración con el directorio base donde se guarda la imagen.
-            Si no se indica, se obtiene la configuración global.
     """
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.plot(evaluation_metrics.fpr, evaluation_metrics.tpr)
@@ -406,7 +402,6 @@ def plot_deciles(
         evaluation_metrics: Métricas del modelo.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
         settings: Configuración con el directorio base donde se guarda la imagen.
-            Si no se indica, se obtiene la configuración global.
     """
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8), dpi=300)
 

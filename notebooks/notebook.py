@@ -1,3 +1,10 @@
+"""Cuaderno principal del proyecto bank_clients_ml.
+
+Documenta el flujo completo de modelado en Marimo, desde el análisis
+exploratorio y la limpieza inicial hasta la ingeniería de variables,
+la selección de features y la evaluación final del modelo.
+"""
+
 import marimo
 
 __generated_with = "0.24.2"

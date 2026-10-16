@@ -35,7 +35,8 @@ def target_encode_columns(
             categóricas a codificar.
         training_data: DataFrame con la historia por cliente y mes.
         categorical_cols: Nombres de las columnas categóricas a codificar.
-            Si no se indica, se obtiene la configuración global.
+            Si no se indica, se utilizan las columnas definidas en
+            `column_groups.CATEGORICAL_COLS`.
         settings: Configuración con el nombre de la columna target.
             Si no se indica, se obtiene la configuración global.
 
@@ -601,9 +602,11 @@ def aggregate_monthly_to_client(
         transformed_training_data: DataFrame ya transformado con la historia
             por cliente y mes.
         columns_with_monetary_values: Nombres de las columnas monetarias.
-            Si no se indica, se obtiene la configuración global.
+            Si no se indica, se utilizan las columnas definidas en
+            `column_groups.COLUMNS_WITH_MONETARY_VALUES`.
         columns_with_quantities: Nombres de las columnas con cantidades.
-            Si no se indica, se obtiene la configuración global.
+            Si no se indica, se determinan por exclusión con
+            `column_groups.get_columns_with_quantities`.
         settings: Configuración con los nombres de identificador y target.
             Si no se indica, se obtiene la configuración global.
 

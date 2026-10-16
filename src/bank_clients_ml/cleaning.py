@@ -17,12 +17,12 @@ def clean_up_data(
     Filtra los registros sin target y normaliza los tipos de las
     columnas de fechas e identificador según la configuración vigente.
 
-    Args:
+    ## Args:
         raw_data: Datos crudos de clientes por depurar.
         settings: Configuración del proyecto. Si es None, se obtiene
             la configuración global.
 
-    Returns:
+    ## Returns:
         Datos limpios con fechas convertidas, identificador
             normalizado y sin valores nulos en la columna target.
     """

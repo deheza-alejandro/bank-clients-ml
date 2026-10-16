@@ -35,8 +35,7 @@ def _build_date_windows(
     ## Args:
         df: DataFrame con todos los meses observados.
         prediction_window_size: Cantidad de meses reservados para predicción.
-        settings: Configuración con el nombre de la columna de meses. Si no se
-            indica, se obtiene la configuración global.
+        settings: Configuración con el nombre de la columna de meses.
 
     ## Returns:
         Tupla con la lista de meses de entrenamiento seguida de la lista de
@@ -225,10 +224,11 @@ def oversample_with_unique_ids(
     nuevos y consecutivos a partir del máximo existente, y el resultado final
     se mezcla para evitar bloques ordenados por clase.
 
-    No deberías usar esta función si usas LightGBM + RandomizedSearchCV + StratifiedKFold.
-    En ese caso deberías usar algo como imbalanced-learn para hacer oversampling
-    solo sobre los datos de entrenamiento de cada fold de StratifiedKFold,
-    dejando intactos los datos de validación de cada fold.
+    No se recomienda usar esta función con LightGBM combinado con
+    RandomizedSearchCV y StratifiedKFold. En ese caso se recomienda aplicar
+    oversampling solo sobre los datos de entrenamiento de cada fold de
+    StratifiedKFold, por ejemplo con imbalanced-learn, y dejar intactos los
+    datos de validación de cada fold.
 
     ## Args:
         train: Conjunto de entrenamiento con la variable target binaria.
