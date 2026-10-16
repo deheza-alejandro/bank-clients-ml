@@ -10,15 +10,20 @@
 """
 
 import datetime
+from collections.abc import Iterable
 
 import polars as pl
 
-from bank_clients_ml import config
+from bank_clients_ml import column_groups, config
 
 
 def target_encode_columns(
-    df: pl.DataFrame, columns: list[str], settings: config.Settings | None = None
-) -> pl.DataFrame:
+    *,
+    identity_features: pl.DataFrame,
+    training_data: pl.DataFrame,
+    categorical_cols: Iterable[str] | None = None,
+    settings: config.Settings | None = None,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Reemplaza columnas categóricas por su porcentaje respecto al target.
 
     Calcula, para cada categoría de cada columna indicada, la proporción de
@@ -26,47 +31,62 @@ def target_encode_columns(
     la multiplica por 100 y sustituye la categoría por dicho valor redondeado a tres decimales.
 
     ## Args:
-        df: DataFrame que contiene la columna target y las columnas categóricas a codificar.
-        columns: Nombres de las columnas categóricas a codificar.
+        identity_features: DataFrame que contiene la columna target y las columnas
+            categóricas a codificar.
+        training_data: DataFrame con la historia por cliente y mes.
+        categorical_cols: Nombres de las columnas categóricas a codificar.
+            Si no se indica, se obtiene la configuración global.
         settings: Configuración con el nombre de la columna target.
             Si no se indica, se obtiene la configuración global.
 
     ## Returns:
-        Nuevo DataFrame con las mismas filas de entrada donde cada columna indicada
-        contiene el porcentaje de target.
+        Nuevo DataFrame de identity_features con las mismas filas de entrada
+        donde cada columna indicada contiene el porcentaje de target y nuevo
+        DataFrame de training_data sin las columnas categóricas.
 
     ## Raises:
         ZeroDivisionError: Si alguna categoría no tiene registros con target 0.0 o 1.0
             y el denominador del calculo resulta cero.
     """
-    if settings is None:
-        settings = config.get_settings()
+    settings = settings or config.get_settings()
+    categorical_cols = categorical_cols or column_groups.CATEGORICAL_COLS
 
     expressions = []
 
-    for column in columns:
-        count_1 = (pl.col(settings.dataset.target) == 1.0).sum().over(column)
-        total = pl.col(settings.dataset.target).is_in([0.0, 1.0]).sum().over(column)
+    for categorical_col in categorical_cols:
+        count_1 = (pl.col(settings.dataset.target) == 1.0).sum().over(categorical_col)
+        total = (
+            pl.col(settings.dataset.target)
+            .is_in([0.0, 1.0])
+            .sum()
+            .over(categorical_col)
+        )
 
-        if df.select((total == 0).any()).item():
+        if identity_features.select((total == 0).any()).item():
             categories_with_issue = (
-                df.filter(total == 0).get_column(column).unique().to_list()
+                identity_features.filter(total == 0)
+                .get_column(categorical_col)
+                .unique()
+                .to_list()
             )
             msg = (
-                f"Division by zero while target-encoding {column!r} "
+                f"Division by zero while target-encoding {categorical_col!r} "
                 f"for categories: {categories_with_issue}.\n"
                 f"Ensure {settings.dataset.target!r} contains 0.0/1.0 for every category"
             )
             raise ZeroDivisionError(msg)
 
-        expressions.append(((count_1 / total) * 100).round(3).alias(column))
+        expressions.append(((count_1 / total) * 100).round(3).alias(categorical_col))
 
-    return df.with_columns(expressions)
+    return (
+        identity_features.with_columns(expressions),
+        training_data.drop(categorical_cols),
+    )
 
 
 def transform_date_features(
     identity_features: pl.DataFrame,
-    training_months: list[datetime.date],
+    last_training_month: datetime.date,
     settings: config.Settings | None = None,
 ) -> pl.DataFrame:
     """Genera variables a partir de las fechas de producto.
@@ -98,7 +118,7 @@ def transform_date_features(
             .dt.total_days()
             .alias("Days_between_first_and_last_product"),
             (
-                pl.lit(training_months[-1]).dt.offset_by("1mo")
+                pl.lit(last_training_month).dt.offset_by("1mo")
                 - pl.col(settings.dataset.last_product_date)
             )
             .dt.total_days()
@@ -552,10 +572,10 @@ def with_transformations(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def aggregate_monthly_to_client(
-    saving_account_cols: list[str],
-    credit_card_cols: list[str],
-    training_data: pl.DataFrame,
-    identity_features: pl.DataFrame,
+    transformed_training_data: pl.DataFrame,
+    *,
+    columns_with_monetary_values: Iterable[str] | None = None,
+    columns_with_quantities: Iterable[str] | None = None,
     settings: config.Settings | None = None,
 ) -> pl.DataFrame:
     """Genera agregaciones para la historia mensual a una fila por cliente.
@@ -563,17 +583,20 @@ def aggregate_monthly_to_client(
     Ordena por identificador y mes, agrupa por cliente y calcula estadísticas
     para cada variable. Protege las divisiones contra ceros.
 
-    Las estadísticas incluyen mínimo, máximo, media, mediana, suma, conteo de no ceros,
-    varianza, desvío estándar, cantidad de valores únicos (valores únicos redondeados para montos),
-    diferencia entre valor máximo y valor mínimo, diferencia entre último y primer mes,
-    diferencia relativa (último / primero) y variación porcentual (1 - diferencia relativa).
+    Las estadísticas incluyen mínimo, máximo, media, mediana, suma, conteo de
+    no ceros, varianza, desvío estándar, cantidad de valores únicos (valores
+    únicos redondeados para montos), diferencia entre valor máximo y valor
+    mínimo, diferencia entre último y primer mes,
+    diferencia relativa (último / primero) y
+    variación porcentual (1 - diferencia relativa).
 
     ## Args:
-        saving_account_cols: Nombres de las columnas monetarias de caja de ahorro.
-        credit_card_cols: Nombres de las columnas monetarias de tarjeta de crédito.
-        training_data: DataFrame ya transformado con la historia por cliente y mes.
-        identity_features: DataFrame con identity features cuyas columnas se excluyen de
-            la agregación.
+        transformed_training_data: DataFrame ya transformado con la historia
+            por cliente y mes.
+        columns_with_monetary_values: Nombres de las columnas monetarias.
+            Si no se indica, se obtiene la configuración global.
+        columns_with_quantities: Nombres de las columnas con cantidades.
+            Si no se indica, se obtiene la configuración global.
         settings: Configuración con los nombres de identificador y target.
             Si no se indica, se obtiene la configuración global.
 
@@ -581,26 +604,17 @@ def aggregate_monthly_to_client(
         Nuevo DataFrame agregado a nivel de cliente con una fila por identificador y
         columnas con sufijos de estadísticas.
     """
-    if settings is None:
-        settings = config.get_settings()
+    settings = settings or config.get_settings()
 
-    columns_with_monetary_values = [
-        *saving_account_cols,
-        "SavingAccount_Balance_last_minus_first_date",
-        *[c for c in credit_card_cols if c != "CreditCard_Total_Limit"],
-    ]
-
-    columns_without_quantities = {
-        *columns_with_monetary_values,
-        *identity_features.columns,
-        settings.dataset.month,
-        settings.dataset.first_product_date,
-        settings.dataset.last_product_date,
-    }
-
-    columns_with_quantities = [
-        c for c in training_data.columns if c not in columns_without_quantities
-    ]
+    columns_with_monetary_values = (
+        columns_with_monetary_values or column_groups.COLUMNS_WITH_MONETARY_VALUES
+    )
+    columns_with_quantities = (
+        columns_with_quantities
+        or column_groups.get_columns_with_quantities(
+            transformed_training_data, settings
+        )
+    )
 
     cols = pl.col([*columns_with_quantities, *columns_with_monetary_values])
 
@@ -627,7 +641,7 @@ def aggregate_monthly_to_client(
     ]
 
     data_agg = (
-        training_data.sort([settings.dataset.id, settings.dataset.month])
+        transformed_training_data.sort([settings.dataset.id, settings.dataset.month])
         .group_by(settings.dataset.id)
         .agg(agg_exprs)
     )
@@ -635,18 +649,18 @@ def aggregate_monthly_to_client(
     return data_agg
 
 
-def with_extra_transformations(df: pl.DataFrame) -> pl.DataFrame:
+def with_extra_transformations(abt: pl.DataFrame) -> pl.DataFrame:
     """Crea transformaciones adicionales.
 
     Combina variables agregadas a nivel de cliente.
 
     ## Args:
-        df: Tabla analítica a nivel de cliente con variables agregadas.
+        abt: Tabla analítica a nivel de cliente con variables agregadas.
 
     ## Returns:
         Nuevo DataFrame con las columnas originales más las transformaciones adicionales.
     """
-    result = df.with_columns(
+    result = abt.with_columns(
         (
             _min_max_normalize("SavingAccount_Days_with_use_count_nonzero")
             + _min_max_normalize("SavingAccount_Days_with_use_min")
@@ -704,8 +718,7 @@ def standardize(
     ## Returns:
         Nuevo DataFrame con las variables numéricas estandarizadas.
     """
-    if settings is None:
-        settings = config.get_settings()
+    settings = settings or config.get_settings()
 
     cols_to_standardize = pl.exclude(settings.dataset.id, settings.dataset.target)
 
