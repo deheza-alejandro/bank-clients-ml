@@ -4,18 +4,22 @@ Centraliza las reglas de agrupamiento utilizadas durante la exploración y
 la selección de variables con LightGBM.
 
 ## Funciones exportadas:
-    get_saving_account_cols: Retorna las columnas monetarias asociadas a la caja de ahorro.
-    get_categorical_cols: Retorna los nombres de las categorical features del cliente.
-    get_binary_identity_features_cols: Retorna las identity features binarias.
     get_identity_features_cols: Retorna las identity features del cliente.
-    get_credit_card_cols: Retorna las columnas monetarias asociadas a la tarjeta de crédito.
-    group_columns_by_source: Agrupa las columnas de un dataframe según su fuente de negocio.
+    get_columns_with_quantities: Retorna las columnas con cantidades.
+    group_columns_by_source: Agrupa las columnas de un DataFrame según su fuente de negocio.
 
 ## Constantes exportadas:
-    CREDIT_CARD_EXCLUDED: Columnas asociadas a la tarjeta de crédito excluidas del grupo monetario.
+    SAVING_ACCOUNT_COLS: Columnas monetarias asociadas a la caja de ahorro.
+    CATEGORICAL_COLS: Nombres de las categorical features del cliente.
+    BINARY_IDENTITY_FEATURES_COLS: Identity features binarias del cliente.
+    CREDIT_CARD_COLS: Columnas monetarias asociadas a la tarjeta de crédito.
+    COLUMNS_WITH_MONETARY_VALUES: Columnas con valores monetarios.
+    CREDIT_CARD_EXCLUDED: Columnas de tarjeta de crédito excluidas del grupo monetario.
 
 ## Clases exportadas:
-    ColumnGroups: Grupos de columnas validos para la selección.
+    ColumnGroup: Configuración de un grupo de columnas.
+    ValidColumnGroup: Grupos válidos para la selección por fuente.
+    GeneratedColumnGroups: Agrupamiento validado de columnas por fuente.
 """
 
 import dataclasses
@@ -28,7 +32,6 @@ import polars as pl
 
 from bank_clients_ml import config
 
-"""Retorna las columnas monetarias asociadas a la caja de ahorro del cliente."""
 SAVING_ACCOUNT_COLS: Final[tuple[str, ...]] = (
     "SavingAccount_Balance_Average",
     "SavingAccount_Balance_FirstDate",
@@ -44,19 +47,15 @@ SAVING_ACCOUNT_COLS: Final[tuple[str, ...]] = (
     "SavingAccount_DebitCard_Spend_Amount",
     "SavingAccount_Debits_Amounts",
 )
+"""Columnas monetarias asociadas a la caja de ahorro del cliente."""
 
-"""Retorna los nombres de las categorical features del cliente."""
 CATEGORICAL_COLS: Final[tuple[str, ...]] = (
     "Client_Age_grp",
     "Region",
     "CreditCard_Product",
 )
+"""Nombres de las categorical features del cliente."""
 
-
-"""Retorna las identity features binarias del cliente.
-
-Representan la foto del cliente en el último mes de entrenamiento.
-"""
 BINARY_IDENTITY_FEATURES_COLS: Final[tuple[str, ...]] = (
     "CreditCard_Premium",
     "CreditCard_Active",
@@ -79,6 +78,7 @@ BINARY_IDENTITY_FEATURES_COLS: Final[tuple[str, ...]] = (
     "Mobile",
     "Email",
 )
+"""Identity features binarias del cliente."""
 
 
 def get_identity_features_cols(
@@ -87,9 +87,15 @@ def get_identity_features_cols(
     """Retorna las identity features del cliente.
 
     Representan la foto del cliente en el último mes de entrenamiento.
+    Combinan identificador, target, categorical features, fechas de
+    producto e identity features binarias.
+
+    ## Args:
+        settings: Configuración con los nombres de columnas. Si no se indica,
+            se obtiene la configuración global.
 
     ## Returns:
-        Nombres de las columnas binarias.
+        Nombres de las columnas que componen las identity features.
     """
     settings = settings or config.get_settings()
 
@@ -113,21 +119,34 @@ _CREDIT_CARD_COLS_MINUS_1: Final[tuple[str, ...]] = (
     "CreditCard_Spending_Aut_Debits",
     "CreditCard_Revolving",
 )
+"""Columnas monetarias de tarjeta de crédito sin "CreditCard_Total_Limit"."""
 
-"""Retorna las columnas monetarias asociadas a la tarjeta de crédito del cliente."""
 CREDIT_CARD_COLS: Final[tuple[str, ...]] = (
     "CreditCard_Total_Limit",
     *_CREDIT_CARD_COLS_MINUS_1,
 )
+"""Columnas monetarias asociadas a la tarjeta de crédito del cliente."""
 
 COLUMNS_WITH_MONETARY_VALUES: Final[tuple[str, ...]] = (
     *SAVING_ACCOUNT_COLS,
     "SavingAccount_Balance_last_minus_first_date",
     *_CREDIT_CARD_COLS_MINUS_1,
 )
+"""Columnas con valores monetarios para agregación diferenciada."""
 
 
 def _get_columns_without_quantities(settings: config.Settings) -> set[str]:
+    """Retorna los nombres de columnas sin cantidades.
+
+    Reúne columnas monetarias, identity features, mes y fechas de producto
+    para excluirlas de la detección de columnas con cantidades.
+
+    ## Args:
+        settings: Configuración con los nombres de columnas del dataset.
+
+    ## Returns:
+        Conjunto con los nombres de columnas sin cantidades.
+    """
     return {
         *COLUMNS_WITH_MONETARY_VALUES,
         *get_identity_features_cols(settings),
@@ -140,6 +159,18 @@ def _get_columns_without_quantities(settings: config.Settings) -> set[str]:
 def get_columns_with_quantities(
     transformed_training_data: pl.DataFrame, settings: config.Settings
 ) -> tuple[str, ...]:
+    """Retorna las columnas con cantidades.
+
+    Identifica por exclusión, conservando el orden original del DataFrame.
+
+    ## Args:
+        transformed_training_data: DataFrame transformado cuyas columnas se
+            desean clasificar.
+        settings: Configuración con los nombres de columnas del dataset.
+
+    ## Returns:
+        Nombres de las columnas con cantidades en orden de aparición.
+    """
     return tuple(
         [
             c
@@ -151,15 +182,22 @@ def get_columns_with_quantities(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ColumnGroup:
+    """Configuración de un grupo de columnas.
+
+    ## Attributes:
+        top_n: Cantidad de variables a seleccionar dentro del grupo.
+        pretty_name: Nombre legible del grupo para reportes y gráficos.
+    """
+
     top_n: int
     pretty_name: str
 
 
 class ValidColumnGroup(enum.Enum):
-    """Grupos validos.
+    """Grupos válidos para la selección por fuente de negocio.
 
-    Incluye la clave ALL con todas las variables consideradas con top_n cero
-    como referencia para el entrenamiento base.
+    Incluye la clave ALL con todas las variables consideradas y top_n cero
+    como referencia para la selección de variables.
     """
 
     ALL = ColumnGroup(0, "All Columns")
@@ -180,22 +218,32 @@ class ValidColumnGroup(enum.Enum):
 
     @classmethod
     def members(cls) -> tuple[Self, ...]:
+        """Retorna los miembros del enum.
+
+        ## Returns:
+            Tupla con todos los grupos válidos en orden de definición.
+        """
         return tuple([member for member in cls])
 
     @property
     def top_n(self) -> int:
+        """Cantidad de variables a seleccionar dentro del grupo."""
         return self.value.top_n
 
     @property
     def pretty_name(self) -> str:
+        """Nombre legible del grupo para reportes y gráficos."""
         return self.value.pretty_name
 
     @property
     def snake_case_name(self) -> str:
-        """Formatea.
+        """Retorna el nombre del grupo en formato snake case.
 
-        Toma un string, lo pasa a minúsculas, elimina los paréntesis
-        y reemplaza los espacios por guiones bajos.
+        Convierte el nombre legible a minúsculas, elimina paréntesis y
+        reemplaza espacios por guiones bajos.
+
+        ## Returns:
+            Nombre normalizado para uso en archivos y columnas.
         """
         return (
             self.pretty_name.lower().replace("(", "").replace(")", "").replace(" ", "_")
@@ -210,26 +258,25 @@ CREDIT_CARD_EXCLUDED: Final[frozenset[str]] = frozenset(
         "CreditCard_Product",
     }
 )
+"""Columnas de tarjeta de crédito excluidas del grupo monetario."""
 
 
 def _classify_column(col: str) -> ValidColumnGroup:
-    """Aplica reglas para determinar el grupo de una columna.
+    """Clasifica una columna según su fuente de negocio.
 
-    Clasifica una columna según su prefijo y su contenido en uno de los
-    grupos definidos en ValidColumnGroup. Las columnas incluidas
-    en CREDIT_CARD_EXCLUDED se derivan al grupo residual "others".
+    Aplica reglas por prefijo y contenido para asignar la columna a uno de
+    los grupos definidos en ValidColumnGroup. Las columnas incluidas en
+    CREDIT_CARD_EXCLUDED se derivan al grupo residual OTHERS.
 
     ## Args:
         col: Nombre de la columna a clasificar.
 
     ## Returns:
-        Nombre del grupo al que pertenece la columna.
+        Grupo al que pertenece la columna.
 
     ## Example:
         group = _classify_column("Operations_total_mean")
-        # group == "operations"
         group = _classify_column("CreditCard_Balance_ARG")
-        # group == "credit_card_monetary"
     """
     match col:
         case _ if col.startswith("SavingAccount_Days_with_") or (
@@ -257,6 +304,12 @@ def _classify_column(col: str) -> ValidColumnGroup:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GeneratedColumnGroups:
+    """Agrupamiento validado de columnas por fuente de negocio.
+
+    ## Attributes:
+        _groups: Mapeo inmutable de cada grupo a sus columnas asignadas.
+    """
+
     _groups: types.MappingProxyType[ValidColumnGroup, tuple[str, ...]]
 
     def __post_init__(self) -> None:
@@ -266,11 +319,6 @@ class GeneratedColumnGroups:
         originales y verifica que no existan faltantes ni sobrantes. Este control
         garantiza que ninguna variable se pierda o se duplique antes de la
         selección por grupos.
-
-        ## Args:
-            columns: Columnas que debieron agruparse.
-            groups: Agrupamiento propuesto, donde cada clave es un grupo y cada
-                valor contiene sus columnas asignadas.
 
         ## Raises:
             ValueError: Si existen columnas faltantes o sobrantes en el
@@ -304,6 +352,12 @@ class GeneratedColumnGroups:
             )
 
     def items(self) -> ItemsView[ValidColumnGroup, tuple[str, ...]]:
+        """Retorna los pares de grupo y columnas asignadas.
+
+        ## Returns:
+            Vista con los grupos y sus tuplas de columnas correspondientes para
+            poder iterar los datos como un diccionario.
+        """
         return self._groups.items()
 
 
@@ -312,25 +366,24 @@ def group_columns_by_source(
 ) -> GeneratedColumnGroups:
     """Agrupa las columnas de un DataFrame según su fuente de negocio.
 
-    Excluye el identificador y la variable target definidos en la
-    configuración, clasifica cada columna restante según su fuente de negocio
-    y valida la cobertura total.
+    Excluye identificador y target definidos en la configuración, clasifica
+    cada columna restante según su fuente de negocio y valida la cobertura
+    total del agrupamiento.
 
     ## Args:
         df: DataFrame de entrada cuyas columnas se desean agrupar.
-        settings: Configuración con los nombres del identificador y del
-            target. Si no se indica, se obtiene la configuración global.
+        settings: Configuración con los nombres del identificador y del target.
 
     ## Returns:
-        Agrupamiento por fuente, donde cada grupo se asocia con sus columnas
-        y su top_n para la selección.
+        Agrupamiento por fuente, donde cada grupo se asocia con sus columnas.
 
     ## Raises:
         ValueError: Si la validación detecta columnas faltantes o sobrantes.
 
     ## Example:
         columns_groups = group_columns_by_source(df, settings)
-        operation_cols, weight = columns_groups["operations"]
+        for group, columns in columns_groups.items():
+            print(group.pretty_name, len(columns))
     """
     excluded_cols = {settings.dataset.id, settings.dataset.target}
     all_columns = [col for col in df.columns if col not in excluded_cols]
