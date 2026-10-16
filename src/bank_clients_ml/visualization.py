@@ -35,6 +35,17 @@ matplotlib.rcParams["svg.fonttype"] = "path"
 
 @contextmanager
 def _closing_figure(fig: Figure) -> Generator[Figure]:
+    """Gestiona una figura y garantiza su cierre al finalizar.
+
+    Permite utilizar la figura dentro de un bloque y la libera
+    aunque ocurra un error durante su manipulación.
+
+    ## Args:
+        fig: Figura a gestionar dentro del contexto.
+
+    ## Yields:
+        Figura recibida para su uso dentro del bloque.
+    """
     try:
         yield fig
     finally:
@@ -107,8 +118,8 @@ def plot_top_features(
     {settings.paths.images}/plot_top_features/{plot_name}.svg
 
     ## Args:
-        variables_to_plot: DataFrame con las variables y sus importancias,
-            ordenado de mayor a menor importancia.
+        variables_to_plot: Tabla con las variables y sus importancias,
+            ordenada de mayor a menor importancia.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
         roc_auc: Métrica ROC AUC a mostrar en el título del gráfico.
         top_n: Cantidad máxima de variables a incluir en el gráfico.
@@ -153,12 +164,11 @@ def plot_top_features(
 def _format_floats(df: pl.DataFrame) -> pl.DataFrame:
     """Redondea a dos decimales todas las columnas de tipo float.
 
-    Args:
-        df: El DataFrame de Polars de entrada.
+    ## Args:
+        df: Datos de entrada con valores a redondear.
 
-    Returns:
-        Un nuevo DataFrame con todas las columnas de tipo float redondeadas a 2
-        decimales.
+    ## Returns:
+        Nuevos datos con las columnas de tipo float redondeadas a 2 decimales.
     """
     return df.with_columns(cs.float().round(2))
 
