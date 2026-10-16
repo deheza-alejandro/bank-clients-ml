@@ -6,7 +6,7 @@ Todas las figuras se guardan como archivos SVG optimizados con SVGO a través de
 ## Funciones exportadas:
     plot_top_features: Genera un gráfico con las variables más importantes.
     plot_bivariate_charts: Genera gráficos bivariados para un conjunto de variables.
-    plot_evaluation_metrics: Genera una curva ROC con métricas de evaluación.
+    plot_roc_curve: Genera una curva ROC con métricas de evaluación.
     plot_deciles: Genera un gráfico con tablas de deciles de entrenamiento y prueba.
 """
 
@@ -14,22 +14,31 @@ import concurrent.futures
 import io
 import pathlib
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 
 import matplotlib
+import matplotlib.axes
 import matplotlib.pyplot as plt
 import matplotlib.style
-import numpy as np
 import polars as pl
 import polars.selectors as cs
 from matplotlib.figure import Figure
 
-from bank_clients_ml import config
+from bank_clients_ml import bivariate_table, config, evaluation
 
 matplotlib.use("Agg")
 matplotlib.style.use("default")
 matplotlib.rcParams["svg.hashsalt"] = "fixed_seed_for_this_project"
 matplotlib.rcParams["svg.fonttype"] = "path"
+
+
+@contextmanager
+def _closing_figure(fig: Figure) -> Generator[Figure]:
+    try:
+        yield fig
+    finally:
+        plt.close(fig)
 
 
 def _save_fig_as_svg(
@@ -60,21 +69,16 @@ def _save_fig_as_svg(
     output_folder.mkdir(parents=True, exist_ok=True)
     svg_path = output_folder / f"{plot_name}.svg"
 
-    buffer = io.BytesIO()
-    try:
+    with io.BytesIO() as buffer, _closing_figure(fig):
         fig.savefig(buffer, format="svg", bbox_inches="tight")
-    finally:
-        plt.close(fig)
+        svg_data = buffer.getvalue()
 
     cmd = ["bun", "run", "svgo", "--multipass", "-i", "-", "-o", "-"]
 
     try:
         with svg_path.open("wb") as out_file:
             subprocess.run(  # noqa: S603
-                cmd,
-                input=buffer.getvalue(),
-                stdout=out_file,
-                check=True,
+                cmd, input=svg_data, stdout=out_file, check=True
             )
     except FileNotFoundError as err:
         msg = (
@@ -87,9 +91,10 @@ def _save_fig_as_svg(
 def plot_top_features(
     variables_to_plot: pl.DataFrame,
     plot_name: str,
+    *,
     roc_auc: float,
     top_n: int = 20,
-    settings: config.Settings | None = None,
+    settings: config.Settings,
 ) -> None:
     """Genera un gráfico de barras horizontales con las variables más importantes.
 
@@ -111,9 +116,6 @@ def plot_top_features(
             y el directorio base donde se guarda la imagen.
             Si no se indica, se obtiene la configuración global.
     """
-    if settings is None:
-        settings = config.get_settings()
-
     top_n = min(top_n, variables_to_plot.height)
 
     top_vars = variables_to_plot.head(top_n)
@@ -162,10 +164,9 @@ def _format_floats(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def _plot_single_bivariate_chart(
-    table: pl.DataFrame,
-    variable_to_plot: str,
+    bivariate_table: bivariate_table.BivariateTable,
     analysis_name: str,
-    settings: config.Settings | None = None,
+    settings: config.Settings,
 ) -> None:
     """Genera el gráfico bivariado individual para una variable.
 
@@ -178,20 +179,17 @@ def _plot_single_bivariate_chart(
     {settings.paths.images}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
 
     ## Args:
-        table: Tabla de análisis bivariado con las columnas de intervalo,
-            conteo de clientes y porcentaje de la variable target.
-        variable_to_plot: Nombre de la variable analizada. Se usa como título
-            y como nombre del archivo generado.
+        bivariate_table: Análisis bivariado con el nombre de la variable
+            analizada, las columnas de intervalo, conteo de clientes y porcentaje
+            de la variable target. El nombre de la variable analizada se usa
+            como título y como nombre del archivo generado.
         analysis_name: Nombre del análisis. Define el subdirectorio de salida.
         settings: Configuración con el nombre de la columna target y el directorio
             base donde se guarda la imagen. Si no se indica, se obtiene la
             configuración global.
     """
-    if settings is None:
-        settings = config.get_settings()
-
     formatted_table = _format_floats(
-        table.with_columns(pl.col(settings.analysis.target_pct).round().cast(pl.Int64))
+        bivariate_table.with_rounded_int_column(settings.analysis.target_pct)
     )
 
     fig, (ax_table, ax_graph) = plt.subplots(
@@ -199,7 +197,7 @@ def _plot_single_bivariate_chart(
     )
 
     ax_table.axis("off")
-    ax_table.set_title(f"Variable analysis: {variable_to_plot}", pad=1)
+    ax_table.set_title(bivariate_table.title_for_plot, pad=1)
     ax_table.table(
         cellText=formatted_table.rows(),
         colLabels=formatted_table.columns,
@@ -231,17 +229,17 @@ def _plot_single_bivariate_chart(
     fig.tight_layout()
     _save_fig_as_svg(
         fig,
-        variable_to_plot,
+        bivariate_table.snake_case_name,
         settings.paths.images,
         f"bivariate_analysis/{analysis_name}",
     )
 
 
 def plot_bivariate_charts(
-    tables: Mapping[str, pl.DataFrame],
+    bivariate_tables: Sequence[bivariate_table.BivariateTable],
     analysis_name: str,
+    settings: config.Settings,
     max_workers: int | None = None,
-    settings: config.Settings | None = None,
 ) -> None:
     """Genera gráficos bivariados para un conjunto de variables.
 
@@ -254,8 +252,7 @@ def plot_bivariate_charts(
     {settings.paths.images}/bivariate_analysis/{analysis_name}/
 
     ## Args:
-        tables: Diccionario que asocia cada nombre de variable con su tabla de
-            análisis bivariado.
+        bivariate_tables: Tablas de análisis bivariados a graficar.
         analysis_name: Nombre del análisis. Define el subdirectorio de salida.
         max_workers: Cantidad máxima de procesos en paralelo. Si no se indica,
             se usan todos los núcleos disponibles. si len(tables) < 20 se usa
@@ -264,14 +261,10 @@ def plot_bivariate_charts(
             directorio base donde se guardan las imágenes. Si no se indica,
             se obtiene la configuración global.
     """
-    if settings is None:
-        settings = config.get_settings()
-
-    if max_workers == 1 or len(tables) < 20:
-        for variable_to_plot, table in tables.items():
+    if max_workers == 1 or len(bivariate_tables) < 20 or max_workers is None:
+        for bivariate_table in bivariate_tables:
             _plot_single_bivariate_chart(
-                table,
-                variable_to_plot,
+                bivariate_table,
                 analysis_name,
                 settings,
             )
@@ -280,25 +273,21 @@ def plot_bivariate_charts(
             futures = [
                 executor.submit(
                     _plot_single_bivariate_chart,
-                    table,
-                    variable_to_plot,
+                    bivariate_table,
                     analysis_name,
                     settings,
                 )
-                for variable_to_plot, table in tables.items()
+                for bivariate_table in bivariate_tables
             ]
 
             for future in concurrent.futures.as_completed(futures):
                 future.result()
 
 
-def plot_evaluation_metrics(
-    roc_auc: float,
-    accuracy: float,
-    fpr: np.ndarray,
-    tpr: np.ndarray,
+def plot_roc_curve(
+    evaluation_metrics: evaluation.EvaluationMetrics,
     plot_name: str,
-    settings: config.Settings | None = None,
+    settings: config.Settings,
 ) -> None:
     """Genera una curva ROC con las métricas resumidas de evaluación.
 
@@ -310,26 +299,20 @@ def plot_evaluation_metrics(
     {settings.paths.images}/plot_evaluation_metrics/{plot_name}.svg
 
     ## Args:
-        roc_auc: Métrica ROC AUC del modelo evaluado.
-        accuracy: Exactitud del modelo evaluado.
-        fpr: Tasas de falsos positivos de la curva ROC.
-        tpr: Tasas de verdaderos positivos de la curva ROC.
+        evaluation_metrics: Métricas del modelo.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
         settings: Configuración con el directorio base donde se guarda la imagen.
             Si no se indica, se obtiene la configuración global.
     """
-    if settings is None:
-        settings = config.get_settings()
-
     fig, ax = plt.subplots(figsize=(6, 5))
-    ax.plot(fpr, tpr)
+    ax.plot(evaluation_metrics.fpr, evaluation_metrics.tpr)
     ax.plot([0, 1], [0, 1], color="gray", linestyle="--", alpha=0.7)
     ax.set_xlabel("False Positive Rate (FPR)")
     ax.set_ylabel("True Positive Rate (TPR)")
     ax.set_title(f"ROC Curve - {plot_name}")
 
     ax.annotate(
-        f"Accuracy: {accuracy:.6f}\nROC AUC:  {roc_auc:.6f}",
+        f"Accuracy: {evaluation_metrics.accuracy:.6f}\nROC AUC: {evaluation_metrics.roc_auc:.6f}",
         xy=(0.04, 0.93),
         xycoords="axes fraction",
         verticalalignment="top",
@@ -343,7 +326,9 @@ def plot_evaluation_metrics(
     _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_evaluation_metrics")
 
 
-def _plot_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
+def _plot_single_deciles_table(
+    ax: matplotlib.axes.Axes, deciles: pl.DataFrame, title: str
+) -> None:
     """Genera una tabla de deciles con formato en un eje de Matplotlib.
 
     Convierte los valores numéricos a texto con dos decimales y representa el
@@ -382,18 +367,21 @@ def _plot_single_deciles_table(ax, deciles: pl.DataFrame, title: str) -> None:
         cell.set_facecolor("#1F4E78")
         cell.set_text_props(color="white", weight="bold")
 
+    ODD_COLOR = "#FFFFFF"
+    EVEN_COLOR = "#DCE0E8"
+
     for row in range(1, num_rows):
+        color = EVEN_COLOR if row % 2 == 0 else ODD_COLOR
         for col in range(num_cols):
-            table[row, col].set_facecolor("#DCE0E8" if row % 2 == 0 else "#FFFFFF")
+            table[row, col].set_facecolor(color)
 
     ax.set_title(title, fontsize=12, fontweight="bold", pad=10, loc="left")
 
 
 def plot_deciles(
-    train_deciles: pl.DataFrame,
-    test_deciles: pl.DataFrame,
+    evaluation_metrics: evaluation.EvaluationMetrics,
     plot_name: str,
-    settings: config.Settings | None = None,
+    settings: config.Settings,
 ) -> None:
     """Genera un gráfico con tablas de deciles de entrenamiento y prueba.
 
@@ -405,20 +393,19 @@ def plot_deciles(
     {settings.paths.images}/plot_evaluation_metrics/{plot_name}.svg
 
     ## Args:
-        train_deciles: Tabla de deciles calculada sobre el conjunto de
-            entrenamiento.
-        test_deciles: Tabla de deciles calculada sobre el conjunto de prueba.
+        evaluation_metrics: Métricas del modelo.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
         settings: Configuración con el directorio base donde se guarda la imagen.
             Si no se indica, se obtiene la configuración global.
     """
-    if settings is None:
-        settings = config.get_settings()
-
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8), dpi=300)
 
-    _plot_single_deciles_table(ax1, train_deciles, "Train Deciles")
-    _plot_single_deciles_table(ax2, test_deciles, "Test Deciles")
+    _plot_single_deciles_table(
+        ax1, evaluation_metrics.train_deciles_without_probs, "Train Deciles"
+    )
+    _plot_single_deciles_table(
+        ax2, evaluation_metrics.test_deciles_without_probs, "Test Deciles"
+    )
 
     plt.tight_layout()
     _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_evaluation_metrics")
