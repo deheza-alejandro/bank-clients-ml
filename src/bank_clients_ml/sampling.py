@@ -1,9 +1,8 @@
 """Ventanas temporales y muestreo para el modelo de "bank_clients_ml".
 
-Centraliza las funciones de muestreo del proyecto basadas en Polars
+Centraliza las funciones de muestreo del proyecto basadas en Polars.
 
 ## Funciones exportadas:
-    define_time_window_split: Genera la partición de ventanas de entrenamiento y predicción.
     stratified_train_test_split: Divide en sets de entrenamiento y prueba de forma estratificada.
     oversample_with_unique_ids: Aplica oversampling con identificadores únicos.
 
@@ -159,10 +158,12 @@ class TimeWindowSplit:
 
     @property
     def last_training_month(self) -> datetime.date:
+        """Retorna el último mes de la ventana de entrenamiento."""
         return self.training_months[-1]
 
     @property
     def first_prediction_month(self) -> datetime.date:
+        """Retorna el primer mes de la ventana de predicción."""
         return self.prediction_months[0]
 
 
@@ -218,7 +219,7 @@ def oversample_with_unique_ids(
 ) -> pl.DataFrame:
     """Aplica oversampling con identificadores únicos.
 
-    Mantiene intacta la clase mayoritaria  (target igual a 0) y muestrea con
+    Mantiene intacta la clase mayoritaria (target igual a 0) y muestrea con
     reemplazo la clase minoritaria (target igual a 1) hasta alcanzar la
     proporción deseada. A las filas duplicadas se les asignan identificadores
     nuevos y consecutivos a partir del máximo existente, y el resultado final
