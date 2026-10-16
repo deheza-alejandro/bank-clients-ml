@@ -1,3 +1,10 @@
+"""Análisis bivariado y selección de variables para "bank_clients_ml".
+
+## Clases exportadas:
+    FeaturesSelection: Selección de variables para el modelado.
+    BivariateAnalyzer: Analizador bivariado sobre conjuntos con variables correlacionadas.
+"""
+
 import dataclasses
 from collections.abc import Iterable
 from typing import Self
@@ -18,17 +25,18 @@ from bank_clients_ml import (
 class FeaturesSelection:
     """Selección de variables para el modelado.
 
-    Agrupa los conjuntos de entrenamiento y prueba ya filtrados con el
-    mapeo de renombres y la lista de variables seleccionadas.
+    Agrupa los conjuntos de entrenamiento y prueba ya transformados por bines
+    junto con el mapeo de nombres y el modelo entrenado y listo para la
+    visualización y evaluación final.
 
     ## Attributes:
-        train: Conjunto de entrenamiento con las columnas identificadora,
-            target y mejores variables.
-        test: Conjunto de prueba con las columnas identificadora,
-            target y mejores variables.
-        features_name_mapping: Mapeo entre el nombre original de cada variable
-            seleccionada y su nombre final.
-        features_names: Nombres originales de las variables seleccionadas.
+        test: Conjunto de prueba con las columnas identificadora, target y
+            variables transformadas.
+        name_mapping: Mapeo entre los nombres originales en snake_case y los
+            nombres finales.
+        trainer: Entrenador ya entrenado sobre el conjunto de entrenamiento.
+        settings: Configuración general del proyecto.
+        n_iter: Número de iteraciones usado en la optimización de hiperparámetros.
     """
 
     test: pl.DataFrame
@@ -47,6 +55,18 @@ class FeaturesSelection:
         settings: config.Settings,
         n_iter: int = 20,
     ) -> Self:
+        """Crea la selección y entrena el entrenador sobre el entrenamiento.
+
+        ## Args:
+            train: Conjunto de entrenamiento con las variables transformadas.
+            test: Conjunto de prueba con las variables transformadas.
+            name_mapping: Mapeo entre nombres originales y finales.
+            settings: Configuración general del proyecto.
+            n_iter: Número de iteraciones para la optimización.
+
+        ## Returns:
+            Instancia con el entrenador ya entrenado y los conjuntos asociados.
+        """
         trainer = training.LGBMTrainer.fit_and_build(
             train,
             name_mapping.snake_case_names,
@@ -57,10 +77,20 @@ class FeaturesSelection:
 
     @property
     def train(self) -> pl.DataFrame:
+        """Conjunto de entrenamiento utilizado por el entrenador.
+
+        ## Returns:
+            Conjunto de entrenamiento con las variables transformadas.
+        """
         return self.trainer.train
 
     @property
     def snake_case_names(self) -> tuple[str, ...]:
+        """Nombres finales de las variables seleccionadas.
+
+        ## Returns:
+            Nombres en snake_case definidos por el mapeo.
+        """
         return self.name_mapping.snake_case_names
 
     def plot_bivariate_analysis(
@@ -82,11 +112,22 @@ class FeaturesSelection:
         )
 
     def plot_top_features(self, plot_name: str) -> None:
+        """Genera el gráfico con las variables más importantes del modelo.
+
+        ## Args:
+            plot_name: Nombre del archivo de salida para el gráfico.
+        """
         self.trainer.plot_top_features(plot_name, self.name_mapping)
 
     def evaluate_and_plot_metrics(
         self, *, roc_curve_name: str, deciles_name: str
     ) -> None:
+        """Evalúa el modelo con el set de prueba y genera los gráficos de desempeño.
+
+        ## Args:
+            roc_curve_name: Nombre del archivo de salida para la curva ROC.
+            deciles_name: Nombre del archivo de salida para el análisis por deciles.
+        """
         self.trainer.evaluate_and_plot_metrics(
             self.test, roc_curve_name=roc_curve_name, deciles_name=deciles_name
         )
@@ -94,21 +135,54 @@ class FeaturesSelection:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BivariateAnalyzer:
+    """Analizador bivariado sobre conjuntos con variables correlacionadas.
+
+    Conserva los conjuntos previos a la eliminación por correlación, lo que
+    permite comparar variables descartadas con sus equivalentes conservadas
+    y definir la codificación por bines.
+
+    ## Attributes:
+        correlated_train: Conjunto de entrenamiento previo al filtrado por
+            correlación.
+        correlated_test: Conjunto de prueba previo al filtrado por correlación.
+        settings: Configuración general del proyecto.
+    """
+
     correlated_train: pl.DataFrame
     correlated_test: pl.DataFrame
     settings: config.Settings
 
     @classmethod
     def from_redundant_column_filter(
-        cls, col_filter: redundant_column_filter.RedundantColumnFilter
+        cls, column_filter: redundant_column_filter.RedundantColumnFilter
     ) -> Self:
+        """Crea un analizador a partir del filtro de columnas redundantes.
+
+        ## Args:
+            column_filter: Filtro con los conjuntos con variables
+                correlacionadas y la configuración.
+
+        ## Returns:
+            Instancia inicializada con los conjuntos con variables correlacionadas.
+        """
         return cls(
-            col_filter.correlated_train, col_filter.correlated_test, col_filter.settings
+            column_filter.correlated_train,
+            column_filter.correlated_test,
+            column_filter.settings,
         )
 
     def _build_bivariate_tables(
         self, name_mapping: binning.NameMapping, max_bins_quantity: int
     ) -> tuple[bivariate_table.BivariateTable, ...]:
+        """Construye las tablas de análisis bivariado para las variables indicadas.
+
+        ## Args:
+            name_mapping: Mapeo entre nombres originales y finales.
+            max_bins_quantity: Cantidad máxima de bines por variable.
+
+        ## Returns:
+            Tablas de análisis bivariado calculadas sobre el conjunto de entrenamiento.
+        """
         return bivariate_table.build_bivariate_tables(
             self.correlated_train,
             name_mapping,
@@ -129,7 +203,7 @@ class BivariateAnalyzer:
         posibles reemplazos más interpretables.
 
         ## Args:
-            columns: Columnas a analizar.
+            name_mapping: Mapeo entre nombres originales y finales.
             analysis_name: Nombre del análisis. Define el subdirectorio de salida
                 de las imágenes.
             max_bins_quantity: Cantidad máxima de bines por variable.
@@ -148,24 +222,22 @@ class BivariateAnalyzer:
         """Aplica transformaciones por bines a los conjuntos de entrenamiento y prueba.
 
         Reemplaza los valores originales de cada columna indicada por el porcentaje
-        de target del grupo de bines al que pertenecen, según el análisis bivariado
-        previamente acumulado. La misma lógica se aplica en forma consistente a
-        ambos conjuntos de entrenamiento y prueba.
+        de target del grupo de bines al que pertenecen. La misma lógica se aplica
+        en forma consistente a ambos conjuntos de entrenamiento y prueba.
 
         Conserva únicamente las columnas identificadora y target junto con las
         variables indicadas en el mapeo de renombres, tanto en entrenamiento
         como en prueba.
 
         ## Args:
-            binners: Lista con las columnas con los rangos de bines que
-                definen cada transformación.
-            features_name_mapping: Mapeo entre el nombre original de cada variable
-                seleccionada y su nombre final.
+            binners: Asociaciones entre columnas con sus intervalos de bines
+                que definen cada transformación.
+            max_bins_quantity: Cantidad máxima de bines por variable para el
+                cálculo de las tablas de análisis bivariado.
 
         ## Returns:
             Selección final con los conjuntos de entrenamiento y prueba
-            transformados y filtrados, el mapeo de renombres y la lista de
-            mejores variables.
+            transformados, el mapeo de nombres y el entrenador ya entrenado.
         """
         name_mapping = binning.NameMapping.from_dual_named(binners)
 
