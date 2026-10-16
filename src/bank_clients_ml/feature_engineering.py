@@ -98,8 +98,8 @@ def transform_date_features(
     ## Args:
         identity_features: DataFrame con las fechas de primer y último producto
             por cliente.
-        training_months: Lista de meses de entrenamiento; se utiliza el último
-            mes para calcular la recencia.
+        last_training_month: Último mes de entrenamiento utilizado como referencia
+            para calcular la recencia.
         settings: Configuración con los nombres de las columnas de fechas.
             Si no se indica, se obtiene la configuración global.
 
@@ -169,7 +169,7 @@ def _compute_percentage(
 
 
 def _min_max_normalize(column: str) -> pl.Expr:
-    """Normaliza una columna con min-max.
+    """Normaliza una columna con el método min-max.
 
     Resta el mínimo de la columna y divide por el rango entre el máximo y el mínimo
     (evitando división por cero).
@@ -178,7 +178,7 @@ def _min_max_normalize(column: str) -> pl.Expr:
         column: Nombre de la columna a normalizar.
 
     ## Returns:
-        Nueva Expresión de Polars con los valores normalizados.
+        Nueva Expresión de Polars con los valores normalizados entre 0 y 1.
     """
     column_expr = pl.col(column)
     min = column_expr.min()
@@ -203,15 +203,22 @@ def _min_max_normalize_weighted(column: str, weight: str) -> pl.Expr:
 
 
 def with_transformations(df: pl.DataFrame) -> pl.DataFrame:
-    """Genera variables transformadas mensuales.
+    """Genera variables transformadas a nivel mensual.
 
+    Calcula totales y agrupaciones de operaciones por canal presencial y remoto,
+    totales de pagos con tarjeta por canal, diferencias y porcentajes de saldos,
+    días y transacciones de caja de ahorro, porcentajes de operaciones y pagos
+    respecto de sus totales, proporciones de saldos y gastos respecto del límite
+    y del gasto total de tarjeta, y conteos de productos activos.
     Todas las divisiones utilizan denominadores protegidos contra ceros.
 
     ## Args:
-        df: DataFrame mensual con columnas base
+        df: Datos mensuales por cliente y mes con las columnas base de operaciones,
+            tarjeta de crédito, caja de ahorro y productos activos.
 
     ## Returns:
-        Nuevo DataFrame con las columnas originales más las variables transformadas mensuales.
+        Nuevo DataFrame con las columnas originales más las variables transformadas
+        mensuales, incluidos totales, porcentajes y conteos de productos.
     """
     result = df.with_columns(
         [
@@ -650,9 +657,9 @@ def aggregate_monthly_to_client(
 
 
 def with_extra_transformations(abt: pl.DataFrame) -> pl.DataFrame:
-    """Crea transformaciones adicionales.
+    """Crea transformaciones adicionales a nivel de cliente.
 
-    Combina variables agregadas a nivel de cliente.
+    Combina variables agregadas para medir intensidad de uso y montos ponderados.
 
     ## Args:
         abt: Tabla analítica a nivel de cliente con variables agregadas.
