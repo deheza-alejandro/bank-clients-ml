@@ -7,23 +7,24 @@ altamente correlacionadas.
 
 El flujo habitual consiste en crear `RedundantColumnFilter` con los conjuntos de
 entrenamiento y prueba, inspeccionar los descartes, graficar el análisis bivariado
-y finalmente aplicar transformaciones de bines con `apply_bin_transformations`.
+y finalmente aplicar transformaciones de bines con `apply_binning`.
 
 ## Clases exportadas:
-    BinRange: Rango inclusivo de bines que se agrupan en un mismo valor.
-    BinTransformation: Asociación entre una columna y sus rangos de bines.
     RedundantColumnFilter: Filtro secuencial de columnas redundantes con análisis bivariado.
 """
 
 import dataclasses
+import types
+from collections.abc import Iterable
+from typing import Self
 
 import numpy as np
 import polars as pl
 
-from bank_clients_ml import config, eda, visualization
+from bank_clients_ml import config, eda, training
 
 
-def _get_true_column_names(df: pl.DataFrame) -> list[str]:
+def _get_true_column_names(df: pl.DataFrame) -> tuple[str, ...]:
     """Obtiene los nombres de las columnas que contienen valores verdaderos.
 
     ## Args:
@@ -33,10 +34,10 @@ def _get_true_column_names(df: pl.DataFrame) -> list[str]:
     ## Returns:
         Lista con los nombres de las columnas cuyo valor es verdadero.
     """
-    return df.unpivot().filter(pl.col("value")).get_column("variable").to_list()
+    return tuple(df.unpivot().filter(pl.col("value")).get_column("variable").to_list())
 
 
-def _get_constant_columns(df: pl.DataFrame) -> list[str]:
+def _get_constant_columns(df: pl.DataFrame) -> tuple[str, ...]:
     """Retorna las columnas con un único valor.
 
     ## Args:
@@ -52,8 +53,8 @@ def _get_constant_columns(df: pl.DataFrame) -> list[str]:
 def _get_imbalanced_binary_columns(
     df: pl.DataFrame,
     threshold: float,
-    settings: config.Settings | None = None,
-) -> list[str]:
+    settings: config.Settings,
+) -> tuple[str, ...]:
     """Retorna las columnas binarias desbalanceadas.
 
     Detecta las columnas con exactamente dos valores únicos. La proporción se
@@ -79,9 +80,6 @@ def _get_imbalanced_binary_columns(
         msg = f"Invalid threshold {threshold}: must satisfy 0.0 < threshold < 0.5"
         raise ValueError(msg)
 
-    if settings is None:
-        settings = config.get_settings()
-
     c_threshold = 1.0 - threshold
     is_binary = pl.all().n_unique() == 2
     first_val_ratio = (pl.all() == pl.all().first()).mean()
@@ -94,7 +92,7 @@ def _get_imbalanced_binary_columns(
 
 def _get_redundant_correlated_columns(
     corr_df: pl.DataFrame, threshold: float
-) -> list[str]:
+) -> tuple[str, ...]:
     """Identifica columnas numéricas redundantes por correlación.
 
     Calcula el valor absoluto de la matriz de correlación y conserva el triángulo
@@ -119,372 +117,13 @@ def _get_redundant_correlated_columns(
 
     maximums_per_column = upper_triangle.max(axis=0)
     columns_and_maximums = zip(corr_df.columns, maximums_per_column, strict=True)
-    correlated_columns = [
-        col for col, max_val in columns_and_maximums if max_val > threshold
-    ]
+    correlated_columns = tuple(
+        [col for col, max_val in columns_and_maximums if max_val > threshold]
+    )
     return correlated_columns
 
 
-def _get_bivariate_tables(
-    df: pl.DataFrame,
-    columns: list[str],
-    max_bins_quantity: int,
-    settings: config.Settings | None = None,
-) -> dict[str, pl.DataFrame]:
-    """Construye tablas de análisis bivariado por variable.
-
-    ## Args:
-        df: DataFrame con la variable target y las columnas a analizar.
-        Cada fila representa a un cliente
-        columns: Columnas para las cuales se generan las tablas de análisis bivariado.
-        max_bins_quantity: Cantidad máxima de bines por variable. Para cada
-            columna, se generan bines cuando su cardinalidad supera este máximo
-            permitido, o se utilizan los valores originales en caso contrario.
-        settings: Configuración con el nombre de la columna target. Si no se
-            indica, se obtiene la configuración global.
-
-    ## Returns:
-        Diccionario que asocia cada nombre de columna con su tabla de análisis
-        bivariado, con las columnas de bin, mínimo, máximo, clientes, target
-        y porcentaje de target, numerando los bines en forma secuencial.
-    """
-    if settings is None:
-        settings = config.get_settings()
-
-    tables: dict[str, pl.DataFrame] = {}
-
-    for column in columns:
-        if df.get_column(column).n_unique() > max_bins_quantity:
-            group_expr = pl.col(column).qcut(
-                quantiles=max_bins_quantity, allow_duplicates=True
-            )
-        else:
-            group_expr = pl.col(column)
-
-        tables[column] = (
-            df.select(settings.dataset.target, column)
-            .group_by(group_expr.alias("_bin"))
-            .agg(
-                pl.col(column).min().alias("Min"),
-                pl.col(column).max().alias("Max"),
-                pl.len().alias(settings.analysis.clients),
-                pl.col(settings.dataset.target).sum().alias(settings.dataset.target),
-            )
-            .sort(by="Min", descending=False, nulls_last=True)
-            .with_columns(
-                pl.int_range(1, pl.len() + 1).alias(settings.analysis.bin),
-                (
-                    (
-                        pl.col(settings.dataset.target)
-                        / pl.col(settings.analysis.clients)
-                    )
-                    * 100
-                ).alias(settings.analysis.target_pct),
-            )
-            .select(
-                settings.analysis.bin,
-                "Min",
-                "Max",
-                settings.analysis.clients,
-                settings.dataset.target,
-                settings.analysis.target_pct,
-            )
-        )
-
-    return tables
-
-
-def _merge_without_duplicates(
-    dict_1: dict[str, pl.DataFrame], dict_2: dict[str, pl.DataFrame]
-) -> dict[str, pl.DataFrame]:
-    """Combina diccionarios sin claves repetidas.
-
-    Verifica que no existan nombres de claves comunes antes de combinar los
-    diccionarios, para preservar el análisis ya almacenado y evitar
-    sobrescrituras accidentales.
-
-    ## Args:
-        dict_1: Diccionario base con las tablas ya acumuladas.
-        dict_2: Diccionario con las nuevas tablas a incorporar.
-
-    ## Returns:
-        Nuevo diccionario con la unión de ambos contenidos.
-
-    ## Raises:
-        KeyError: Si ambos diccionarios comparten una o más claves.
-    """
-    common_keys = dict_1.keys() & dict_2.keys()
-    if common_keys:
-        msg = (
-            f"Cannot merge tables to save analysis before plot: "
-            f"Duplicate {len(common_keys)} keys on merge:"
-            f"\n{sorted(common_keys)}"
-        )
-        raise KeyError(msg)
-
-    return dict_1 | dict_2
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
-class BinRange:
-    """Rango inclusivo de bines que se agrupan en un mismo valor.
-
-    Representa un intervalo cerrado sobre la numeración de bines generada por
-    el análisis bivariado. Los bines comprendidos entre ambos extremos reciben
-    el mismo porcentaje de target durante la transformación.
-
-    ## Attributes:
-        start: Número de bin inicial del intervalo.
-        end: Número de bin final del intervalo.
-
-    ## Raises:
-        ValueError: Si `start` o `end` son menores a 1, o si `start` es mayor que `end`.
-    """
-
-    start: int
-    end: int
-
-    def __post_init__(self):
-        """Valida los extremos del rango."""
-        if self.start < 1 or self.end < 1:
-            msg = f"Both 'start' and 'end' must be >= 1. start: {self.start}, end: {self.end}"
-            raise ValueError(msg)
-        if self.start > self.end:
-            msg = f"'start' must be <= 'end'. start: {self.start}, end: {self.end}"
-            raise ValueError(msg)
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class BinTransformation:
-    """Asociación entre una columna y sus rangos de bines.
-
-    Define cómo deben combinarse los bines de una variable analizada para
-    reemplazar sus valores originales por el porcentaje de target de cada grupo.
-
-    ## Attributes:
-        column: Nombre de la columna a transformar.
-        bin_ranges: Rangos de bines que conforman cada grupo.
-    """
-
-    column: str
-    bin_ranges: tuple[BinRange, ...]
-
-    def __post_init__(self):
-        """Valida los rangos de bines.
-
-        ## Raises:
-            ValueError si `bin_ranges` está vacía o si se solapan bines.
-        """
-        if not self.bin_ranges:
-            msg = f"Column {self.column!r}: 'bin_ranges' must not be empty."
-            raise ValueError(msg)
-
-        seen: set[int] = set()
-        overlapping: set[int] = set()
-        for bin_range in self.bin_ranges:
-            for bin_number in range(bin_range.start, bin_range.end + 1):
-                if bin_number in seen:
-                    overlapping.add(bin_number)
-                seen.add(bin_number)
-        if overlapping:
-            msg = f"Column {self.column!r}: overlapping bins {sorted(overlapping)}"
-            raise ValueError(msg)
-
-
-def _validate_bin_transformation(
-    bin_transformation: BinTransformation, n_bins: int
-) -> None:
-    """Valida la transformación de bines contra la tabla de análisis.
-
-    ## Args:
-        bin_transformation: Asociación entre la columna a transformar y los
-            rangos de bines a validar.
-        n_bins: Cantidad de bines de la tabla.
-
-    ## Raises:
-        ValueError: Si algún rango excede `n_bins`.
-    """
-    for bin_range in bin_transformation.bin_ranges:
-        if bin_range.end > n_bins:
-            msg = (
-                f"Column {bin_transformation.column!r}: invalid range "
-                f"BinRange({bin_range.start}, {bin_range.end}): "
-                f"table has {n_bins} bins."
-            )
-            raise ValueError(msg)
-
-
-def _calculate_target_pct(table: pl.DataFrame, settings: config.Settings) -> float:
-    """Calcula el porcentaje de target de un grupo de bines.
-
-    ## Args:
-        table: Tabla con un grupo de bines con las columnas
-            `settings.analysis.clients` y `settings.dataset.target`.
-
-    ## Returns:
-        Porcentaje de target del grupo, o `0.0` si el grupo está vacío.
-    """
-    clients = float(table.get_column(settings.analysis.clients).sum())
-    target = float(table.get_column(settings.dataset.target).sum())
-    return target / clients * 100.0 if clients > 0.0 else 0.0
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class _BinGroup:
-    """Estadísticas agregadas de un rango de bines.
-
-    ## Attributes:
-        min: Mínimo del grupo (`Min`).
-        max: Máximo del grupo (`Max`).
-        target_pct: Porcentaje de target del grupo.
-    """
-
-    min: int | float | None = dataclasses.field(init=False)
-    max: int | float | None = dataclasses.field(init=False)
-    target_pct: float = dataclasses.field(init=False)
-    table: dataclasses.InitVar[pl.DataFrame]
-    bin_range: dataclasses.InitVar[BinRange]
-    settings: dataclasses.InitVar[config.Settings]
-
-    def __post_init__(
-        self,
-        table: pl.DataFrame,
-        bin_range: BinRange,
-        settings: config.Settings,
-    ) -> None:
-        """Agrega las estadísticas de un rango de bines.
-
-        Filtra la tabla de análisis bivariado por número de bin y resume el
-        intervalo con los límites `[min, max]` con el porcentaje de target del
-        grupo.
-
-        ## Args:
-            table: Tabla de análisis bivariado de la columna.
-            bin_range: Rango de bines a agregar.
-            settings: Configuración con los nombres de las columnas.
-        """
-        if not table.schema["Min"].is_numeric() or not table.schema["Max"].is_numeric():
-            msg = (
-                f"Columns 'Min' and 'Max' must be numeric. "
-                f"Found types: Min={table.schema['Min']}, Max={table.schema['Max']}"
-            )
-            raise TypeError(msg)
-
-        group = table.filter(
-            pl.col(settings.analysis.bin).is_between(
-                bin_range.start, bin_range.end, closed="both"
-            )
-        )
-        object.__setattr__(self, "min", group.get_column("Min").min())
-        object.__setattr__(self, "max", group.get_column("Max").max())
-        object.__setattr__(self, "target_pct", _calculate_target_pct(group, settings))
-
-    def get_range_condition(self, column: str) -> pl.Expr:
-        """Construye la condición de pertenencia al intervalo del grupo.
-
-        ## Args:
-            column: Columna sobre la que se construye la condición.
-
-        ## Returns:
-            Expresión de pertenencia al intervalo `[low, high]` con ambos extremos
-            incluidos, o `False` si el grupo no tiene límites (por ejemplo, si solo
-            agrupa bines de nulos).
-        """
-        if self.min is None or self.max is None:
-            return pl.lit(False)
-        return pl.col(column).is_between(self.min, self.max, closed="both")
-
-
-def _calculate_default_target_pct(
-    table: pl.DataFrame,
-    bin_transformation: BinTransformation,
-    settings: config.Settings,
-) -> float:
-    """Calcula el porcentaje de target del grupo residual.
-
-    Identifica los bines de la tabla que no pertenecen a ningún rango de la
-    transformación y calcula su porcentaje de target agregado. Este valor se
-    utiliza como valor por defecto para las filas cuyos valores quedan fuera
-    de todos los intervalos definidos, incluidos los nulos y los huecos entre grupos.
-
-    ## Args:
-        table: Tabla de análisis bivariado de la columna.
-        bin_transformation: Asociación entre la columna a transformar y los
-            rangos de bines que definen cada grupo de agregación.
-        settings: Configuración con los nombres de las columnas.
-
-    ## Returns:
-        Porcentaje de target del grupo residual, o `0.0` si no quedan bines
-        sin cubrir.
-    """
-    bin_match = [
-        pl.col(settings.analysis.bin).is_between(
-            bin_range.start, bin_range.end, closed="both"
-        )
-        for bin_range in bin_transformation.bin_ranges
-    ]
-    residual_group = table.filter(~pl.any_horizontal(bin_match))
-    return _calculate_target_pct(residual_group, settings)
-
-
-def _group_bins_by_ranges(
-    bin_transformation: BinTransformation,
-    table: pl.DataFrame,
-    settings: config.Settings | None = None,
-) -> pl.Expr:
-    """Construye una expresión de transformación por rangos de bines.
-
-    Agrupa las estadísticas de la tabla de análisis bivariado según los rangos
-    indicados y calcula el porcentaje de target de cada grupo. Cada grupo cubre
-    el intervalo `[min, max]` agregado de sus bines, con ambos extremos
-    incluidos. Los huecos entre bines del mismo grupo quedan incluidos en el
-    intervalo. Los valores fuera de todos los rangos, así como los nulos,
-    reciben el porcentaje del grupo residual.
-
-    Si un valor cae exactamente en la frontera compartida por dos grupos
-    (`max` de uno igual al `min` del siguiente), gana el primer rango de la
-    lista, según el orden de la cadena `when/then`.
-
-    La columna debe ser numérica. Los rangos con límites `None` (por ejemplo,
-    los que solo agrupan bines de nulos) nunca hacen match y esos valores van
-    al grupo residual.
-
-    ## Args:
-        bin_transformation: Asociación entre una columna a transformar y los
-            rangos de bines que definen cada grupo de agregación.
-        table: Tabla de análisis bivariado de la columna, con las columnas de
-            bin, mínimo, máximo, clientes y target.
-        settings: Configuración con el nombre de la columna target. Si no se
-            indica, se obtiene la configuración global.
-
-    ## Returns:
-        Expresión de Polars que asigna a cada fila el porcentaje de target
-        del rango al que pertenece.
-
-    ## Raises:
-        ValueError: Si algún rango excede la cantidad de bines de la tabla.
-    """
-    if settings is None:
-        settings = config.get_settings()
-
-    _validate_bin_transformation(bin_transformation, table.height)
-
-    groups = [
-        _BinGroup(table, bin_range, settings)
-        for bin_range in bin_transformation.bin_ranges
-    ]
-    column = bin_transformation.column
-
-    expr = pl.when(groups[0].get_range_condition(column)).then(groups[0].target_pct)
-    for group in groups[1:]:
-        expr = expr.when(group.get_range_condition(column)).then(group.target_pct)
-
-    default_target_pct = _calculate_default_target_pct(
-        table, bin_transformation, settings
-    )
-    return expr.otherwise(default_target_pct)
-
-
 class RedundantColumnFilter:
     """Filtro secuencial de columnas redundantes con análisis bivariado.
 
@@ -501,14 +140,28 @@ class RedundantColumnFilter:
         imbalanced_binary_columns: Nombres de las columnas binarias desbalanceadas.
     """
 
-    def __init__(
-        self,
+    reduced_train: pl.DataFrame
+    correlated_train: pl.DataFrame
+    correlated_test: pl.DataFrame
+    uncorrelated_train: pl.DataFrame
+    constant_cols: tuple[str, ...]
+    imbalanced_binary_columns: tuple[str, ...]
+    correlated_columns: tuple[str, ...]
+    imbalanced_binary_threshold: float
+    correlation_threshold: float
+    settings: config.Settings
+    _corr_df: pl.DataFrame
+
+    @classmethod
+    def generate(
+        cls,
+        *,
         train: pl.DataFrame,
         test: pl.DataFrame,
         imbalanced_binary_threshold: float = 0.10,
         correlation_threshold: float = 0.80,
         settings: config.Settings | None = None,
-    ) -> None:
+    ) -> Self:
         """Ejecuta las etapas de reducción.
 
         Detecta columnas constantes, columnas binarias desbalanceadas y columnas
@@ -526,43 +179,42 @@ class RedundantColumnFilter:
             settings: Configuración con los nombres de las columnas identificadora
                 y target. Si no se indica, se obtiene la configuración global.
         """
-        self._settings = settings or config.get_settings()
+        settings = settings or config.get_settings()
 
-        self.constant_cols = _get_constant_columns(train)
-        self.reduced_train = train.drop(self.constant_cols)
-        self.reduced_test = test.drop(self.constant_cols)
-        self.imbalanced_binary_columns = _get_imbalanced_binary_columns(
-            self.reduced_train, imbalanced_binary_threshold, self._settings
+        constant_cols = _get_constant_columns(train)
+        reduced_train = train.drop(constant_cols)
+        reduced_test = test.drop(constant_cols)
+
+        imbalanced_binary_columns = _get_imbalanced_binary_columns(
+            reduced_train, imbalanced_binary_threshold, settings
         )
-        self._corr_df = self.correlated_train.drop(
-            self._settings.dataset.id, self._settings.dataset.target
+        correlated_train = reduced_train.drop(imbalanced_binary_columns)
+        correlated_test = reduced_test.drop(imbalanced_binary_columns)
+
+        _corr_df = correlated_train.drop(
+            settings.dataset.id, settings.dataset.target
         ).corr()
-        self._to_delete = _get_redundant_correlated_columns(
-            self._corr_df, correlation_threshold
+        correlated_columns = _get_redundant_correlated_columns(
+            _corr_df, correlation_threshold
         )
-        self._train_analysis: dict[str, pl.DataFrame] = {}
+        uncorrelated_train = correlated_train.drop(correlated_columns)
+
+        return cls(
+            reduced_train,
+            correlated_train,
+            correlated_test,
+            uncorrelated_train,
+            constant_cols,
+            imbalanced_binary_columns,
+            correlated_columns,
+            imbalanced_binary_threshold,
+            correlation_threshold,
+            settings,
+            _corr_df,
+        )
 
     @property
-    def correlated_train(self) -> pl.DataFrame:
-        """Devuelve el conjunto de entrenamiento sin columnas desbalanceadas."""
-        return self.reduced_train.drop(self.imbalanced_binary_columns)
-
-    @property
-    def correlated_test(self) -> pl.DataFrame:
-        """Devuelve el conjunto de prueba sin columnas desbalanceadas."""
-        return self.reduced_test.drop(self.imbalanced_binary_columns)
-
-    @property
-    def uncorrelated_train(self) -> pl.DataFrame:
-        """Devuelve el conjunto de entrenamiento sin columnas correlacionadas."""
-        return self.correlated_train.drop(self._to_delete)
-
-    @property
-    def uncorrelated_test(self) -> pl.DataFrame:
-        """Devuelve el conjunto de prueba sin columnas correlacionadas."""
-        return self.correlated_test.drop(self._to_delete)
-
-    def get_imbalanced_binary_counts(self) -> pl.DataFrame:
+    def imbalanced_binary_counts(self) -> pl.DataFrame:
         """Calcula la frecuencia de cada valor en las columnas binarias desbalanceadas.
 
         Filtra y cuenta las ocurrencias de los valores presentes en las columnas
@@ -576,120 +228,7 @@ class RedundantColumnFilter:
             self.reduced_train.select(self.imbalanced_binary_columns)
         )
 
-    def _build_tables_and_plot(
-        self,
-        df: pl.DataFrame,
-        columns: list[str],
-        analysis_name: str,
-        max_bins_quantity: int,
-        save_analysis: bool = True,
-    ) -> None:
-        """Construye tablas de análisis bivariado y genera los gráficos.
-
-        ## Args:
-            df: DataFrame base para el análisis bivariado.
-            columns: Columnas a analizar y graficar.
-            analysis_name: Nombre del análisis. Define el subdirectorio de salida
-                de las imágenes.
-            max_bins_quantity: Cantidad máxima de bines por variable.
-            save_analysis: Indica si las tablas generadas se guardan para su
-                uso posterior en transformaciones.
-        """
-        temp_tables = _get_bivariate_tables(
-            df, columns, max_bins_quantity, settings=self._settings
-        )
-        if save_analysis:
-            self._train_analysis = _merge_without_duplicates(
-                self._train_analysis, temp_tables
-            )
-        visualization.plot_bivariate_charts(
-            temp_tables, analysis_name, settings=self._settings
-        )
-
-    def plot_uncorrelated(
-        self, columns: list[str], analysis_name: str, max_bins_quantity: int = 20
-    ) -> None:
-        """Genera gráficos de análisis bivariado de variables no correlacionadas.
-
-        Utiliza el conjunto de entrenamiento sin columnas redundantes y guarda
-        las tablas generadas para su reutilización en transformaciones por bines.
-
-        ## Args:
-            columns: Columnas del conjunto sin correlación a analizar.
-            analysis_name: Nombre del análisis. Define el subdirectorio de salida
-                de las imágenes.
-            max_bins_quantity: Cantidad máxima de bines por variable.
-        """
-        self._build_tables_and_plot(
-            self.uncorrelated_train, columns, analysis_name, max_bins_quantity
-        )
-
-    def plot_correlated(
-        self,
-        correlated_columns: list[str],
-        analysis_name: str,
-        max_bins_quantity: int = 20,
-    ) -> None:
-        """Genera gráficos de análisis bivariado de variables correlacionadas eliminadas.
-
-        Utiliza el conjunto previo a la eliminación por correlación, lo que permite
-        comparar variables descartadas con sus equivalentes conservadas y evaluar
-        posibles reemplazos más interpretables.
-
-        ## Args:
-            correlated_columns: Columnas eliminadas por correlación a analizar.
-                No deben pertenecer al conjunto sin correlación.
-            analysis_name: Nombre del análisis. Define el subdirectorio de salida
-                de las imágenes.
-            max_bins_quantity: Cantidad máxima de bines por variable.
-
-        ## Raises:
-            ValueError: Si alguna columna indicada aún existe en el conjunto sin
-                correlación.
-        """
-        overlapping = [
-            col for col in correlated_columns if col in self.uncorrelated_train.columns
-        ]
-
-        if overlapping:
-            msg = (
-                f"Correlated_columns must not overlap uncorrelated_train columns. "
-                f"Expected only removed columns, got overlap:"
-                f"\n{overlapping}"
-            )
-            raise ValueError(msg)
-
-        self._build_tables_and_plot(
-            self.correlated_train, correlated_columns, analysis_name, max_bins_quantity
-        )
-
-    def plot_adhoc(
-        self,
-        df: pl.DataFrame,
-        columns: list[str],
-        analysis_name: str,
-        max_bins_quantity: int = 20,
-    ) -> None:
-        """Genera gráficos de análisis bivariado de forma puntual sin guardarlo.
-
-        Permite visualizar variables de un DataFrame arbitrario, como el conjunto
-        final transformado, sin modificar las tablas acumuladas para
-        transformaciones posteriores.
-
-        ## Args:
-            df: DataFrame arbitrario a analizar.
-            columns: Columnas a analizar y graficar.
-            analysis_name: Nombre del análisis. Define el subdirectorio de salida
-                de las imágenes.
-            max_bins_quantity: Cantidad máxima de bines por variable.
-        """
-        self._build_tables_and_plot(
-            df, columns, analysis_name, max_bins_quantity, save_analysis=False
-        )
-
-    def _get_correlations_for(
-        self, column: str, threshold: float = 0.80
-    ) -> pl.DataFrame:
+    def _get_correlations_for(self, column: str, threshold: float) -> pl.DataFrame:
         """Obtiene las variables correlacionadas con una columna dada.
 
         ## Args:
@@ -713,7 +252,9 @@ class RedundantColumnFilter:
             .sort(pl.col("correlation").abs(), descending=True)
         )
 
-    def correlations_for_each(self, columns: list[str]) -> dict[str, pl.DataFrame]:
+    def correlations_for_each(
+        self, columns: Iterable[str], threshold: float
+    ) -> types.MappingProxyType[str, pl.DataFrame]:
         """Obtiene las variables correlacionadas de cada columna indicada.
 
         ## Args:
@@ -724,98 +265,36 @@ class RedundantColumnFilter:
             Diccionario que mapea cada columna con sus resultados de
             correlación correspondientes.
         """
-        correlations_dict: dict[str, pl.DataFrame] = {}
+        return types.MappingProxyType(
+            {
+                column: self._get_correlations_for(column, threshold)
+                for column in columns
+            }
+        )
 
-        for column in columns:
-            correlations_dict[f'Correlated with "{column}"'] = (
-                self._get_correlations_for(column)
-            )
+    def heavy_operations_and_correlations(
+        self, top_grouped_features_name: str
+    ) -> tuple[
+        training.GroupsLGBMTrainer,
+        training.LGBMTrainer,
+        types.MappingProxyType[str, pl.DataFrame],
+    ]:
+        """Add docs."""
+        group_trainers = training.GroupsLGBMTrainer.fit_and_build(
+            self.uncorrelated_train, settings=self.settings
+        )
+        group_trainers.plot_top_features()
 
-        return correlations_dict
+        top_grouped_features = group_trainers.get_top_grouped_features()
+        trainer = training.LGBMTrainer.fit_and_build(
+            self.uncorrelated_train, top_grouped_features, self.settings
+        )
+        trainer.plot_top_features(top_grouped_features_name)
 
-    def apply_bin_transformations(
-        self, bins_transformations: list[BinTransformation]
-    ) -> tuple[pl.DataFrame, pl.DataFrame]:
-        """Aplica transformaciones por bines a los conjuntos de entrenamiento y prueba.
+        top_ranked_features = trainer.get_top_ranked_features()
 
-        Reemplaza los valores originales de cada columna indicada por el porcentaje
-        de target del grupo de bines al que pertenecen, según el análisis bivariado
-        previamente acumulado. La misma lógica se aplica en forma consistente a
-        ambos conjuntos de entrenamiento y prueba.
-
-        ## Args:
-            bins_transformations: Lista con las columnas con los rangos de bines que
-                definen cada transformación.
-
-        ## Returns:
-            Tupla con los conjuntos de entrenamiento y prueba transformados.
-        """
-        expr = [
-            _group_bins_by_ranges(
-                bin_transformation,
-                table=self._train_analysis[bin_transformation.column],
-                settings=self._settings,
-            ).alias(bin_transformation.column)
-            for bin_transformation in bins_transformations
-        ]
-        final_train = self.correlated_train.with_columns(expr)
-        final_test = self.correlated_test.with_columns(expr)
-
-        return final_train, final_test
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class FeaturesSelection:
-    """Selección de variables para el modelado.
-
-    Agrupa los conjuntos de entrenamiento y prueba ya filtrados con el
-    mapeo de renombres y la lista de variables seleccionadas.
-
-    ## Attributes:
-        train: Conjunto de entrenamiento con las columnas identificadora,
-            target y mejores variables.
-        test: Conjunto de prueba con las columnas identificadora,
-            target y mejores variables.
-        features_renames: Mapeo entre el nombre original de cada variable
-            seleccionada y su nombre final.
-        features_names: Nombres originales de las variables seleccionadas.
-    """
-
-    train: pl.DataFrame
-    test: pl.DataFrame
-    features_renames: dict[str, str]
-    features_names: list[str]
-
-
-def select_features(
-    train: pl.DataFrame,
-    test: pl.DataFrame,
-    features_renames: dict[str, str],
-    settings: config.Settings | None = None,
-) -> FeaturesSelection:
-    """Selecciona las variables para el modelado.
-
-    Conserva únicamente las columnas identificadora y target junto con las
-    variables indicadas en el mapeo de renombres, tanto en entrenamiento
-    como en prueba.
-
-    ## Args:
-        train: Conjunto de entrenamiento a filtrar.
-        test: Conjunto de prueba a filtrar.
-        features_renames: Mapeo entre el nombre original de cada variable
-            seleccionada y su nombre final.
-        settings: Configuración con los nombres de las columnas identificadora
-            y target. Si no se indica, se obtiene la configuración global.
-
-    ## Returns:
-        Selección final con los conjuntos filtrados, el mapeo de renombres
-        y la lista de mejores variables.
-    """
-    settings = settings or config.get_settings()
-
-    features_names = list(features_renames.keys())
-    _final_cols = [settings.dataset.id, settings.dataset.target, *features_names]
-    final_train = train.select(_final_cols)
-    final_test = test.select(_final_cols)
-
-    return FeaturesSelection(final_train, final_test, features_renames, features_names)
+        return (
+            group_trainers,
+            trainer,
+            self.correlations_for_each(top_ranked_features, self.correlation_threshold),
+        )
