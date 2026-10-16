@@ -13,17 +13,18 @@ Centraliza las funciones de muestreo del proyecto basadas en Polars
 
 import dataclasses
 import datetime
+from typing import Self
 
 import polars as pl
 
 from bank_clients_ml import config
 
 
-def _get_date_windows(
+def _build_date_windows(
     df: pl.DataFrame,
     prediction_window_size: int,
-    settings: config.Settings | None = None,
-) -> tuple[list[datetime.date], list[datetime.date]]:
+    settings: config.Settings,
+) -> tuple[tuple[datetime.date, ...], tuple[datetime.date, ...]]:
     """Calcula las ventanas de entrenamiento y predicción a partir de los meses disponibles.
 
     Toma el mes mínimo y el mes máximo de la columna de meses y reserva los
@@ -42,9 +43,6 @@ def _get_date_windows(
         Tupla con la lista de meses de entrenamiento seguida de la lista de
             meses de predicción, ambas en orden cronológico ascendente.
     """
-    if settings is None:
-        settings = config.get_settings()
-
     pred_offset = f"-{prediction_window_size - 1}mo"
     train_offset = f"-{prediction_window_size + 1}mo"
 
@@ -63,7 +61,7 @@ def _get_date_windows(
     prediction_months = windows.get_column("prediction_months").item(0).to_list()
     training_months = windows.get_column("training_months").item(0).to_list()
 
-    return training_months, prediction_months
+    return tuple(training_months), tuple(prediction_months)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -85,78 +83,87 @@ class TimeWindowSplit:
             predicción.
     """
 
-    training_months: list[datetime.date]
-    prediction_months: list[datetime.date]
+    training_months: tuple[datetime.date, ...]
+    prediction_months: tuple[datetime.date, ...]
     universe_and_target: pl.DataFrame
     universe_and_target_data: pl.DataFrame
     training_data: pl.DataFrame
     prediction_data: pl.DataFrame
 
+    @classmethod
+    def generate(
+        cls,
+        clean_data: pl.DataFrame,
+        prediction_window_size: int,
+        settings: config.Settings | None = None,
+    ) -> Self:
+        """Define la partición temporal en ventanas de entrenamiento y predicción.
 
-def define_time_window_split(
-    clean_data: pl.DataFrame,
-    prediction_window_size: int,
-    settings: config.Settings | None = None,
-) -> TimeWindowSplit:
-    """Define la partición temporal en ventanas de entrenamiento y predicción.
+        Construye el universo de clientes, conserva únicamente a los clientes con
+        historial completo y sin el producto en el último mes de entrenamiento, e
+        incorpora la variable target. Posteriormente restringe los datos del
+        universo a cada ventana.
 
-    Construye el universo de clientes, conserva únicamente a los clientes con
-    historial completo y sin el producto en el último mes de entrenamiento, e
-    incorpora la variable target. Posteriormente restringe los datos del
-    universo a cada ventana.
+        ## Args:
+            clean_data: Datos limpios con todos los meses, identificadores y
+                variable objetivo.
+            prediction_window_size: Cantidad de meses reservados para predicción.
+            settings: Configuración con los nombres de las columnas relevantes.
+                Si no se indica, se obtiene la configuración global.
 
-    ## Args:
-        clean_data: Datos limpios con todos los meses, identificadores y
-            variable objetivo.
-        prediction_window_size: Cantidad de meses reservados para predicción.
-        settings: Configuración con los nombres de las columnas relevantes.
-            Si no se indica, se obtiene la configuración global.
+        ## Returns:
+            Partición temporal con los meses de cada ventana, el universo con su
+            target y los datos correspondientes de entrenamiento y predicción.
+        """
+        settings = settings or config.get_settings()
 
-    ## Returns:
-        Partición temporal con los meses de cada ventana, el universo con su
-        target y los datos correspondientes de entrenamiento y predicción.
-    """
-    settings = settings or config.get_settings()
-
-    training_months, prediction_months = _get_date_windows(
-        clean_data, prediction_window_size, settings
-    )
-
-    is_valid_client = (
-        (pl.col(settings.dataset.month) == training_months[-1])
-        & (pl.col(settings.dataset.package_active) == "No")
-        & (pl.col(settings.dataset.credit_card_co_branding) == "No")
-    )
-    universe_and_target = (
-        clean_data.filter(
-            (pl.len().over(settings.dataset.id) == 9)
-            & is_valid_client.any().over(settings.dataset.id)
-            & pl.col(settings.dataset.month).is_in(prediction_months)
+        training_months, prediction_months = _build_date_windows(
+            clean_data, prediction_window_size, settings
         )
-        .select(settings.dataset.id, settings.dataset.target)
-        .unique()
-    )
 
-    universe_and_target_data = clean_data.drop(settings.dataset.target).join(
-        universe_and_target, on=settings.dataset.id, how="inner"
-    )
+        is_valid_client = (
+            (pl.col(settings.dataset.month) == training_months[-1])
+            & (pl.col(settings.dataset.package_active) == "No")
+            & (pl.col(settings.dataset.credit_card_co_branding) == "No")
+        )
+        universe_and_target = (
+            clean_data.filter(
+                (pl.len().over(settings.dataset.id) == 9)
+                & is_valid_client.any().over(settings.dataset.id)
+                & pl.col(settings.dataset.month).is_in(prediction_months)
+            )
+            .select(settings.dataset.id, settings.dataset.target)
+            .unique()
+        )
 
-    training_data = universe_and_target_data.filter(
-        pl.col(settings.dataset.month).is_in(training_months)
-    )
+        universe_and_target_data = clean_data.drop(settings.dataset.target).join(
+            universe_and_target, on=settings.dataset.id, how="inner"
+        )
 
-    prediction_data = universe_and_target_data.filter(
-        pl.col(settings.dataset.month).is_in(prediction_months)
-    )
+        training_data = universe_and_target_data.filter(
+            pl.col(settings.dataset.month).is_in(training_months)
+        )
 
-    return TimeWindowSplit(
-        training_months,
-        prediction_months,
-        universe_and_target,
-        universe_and_target_data,
-        training_data,
-        prediction_data,
-    )
+        prediction_data = universe_and_target_data.filter(
+            pl.col(settings.dataset.month).is_in(prediction_months)
+        )
+
+        return cls(
+            training_months,
+            prediction_months,
+            universe_and_target,
+            universe_and_target_data,
+            training_data,
+            prediction_data,
+        )
+
+    @property
+    def last_training_month(self) -> datetime.date:
+        return self.training_months[-1]
+
+    @property
+    def first_prediction_month(self) -> datetime.date:
+        return self.prediction_months[0]
 
 
 def stratified_train_test_split(
@@ -185,8 +192,7 @@ def stratified_train_test_split(
         msg = f"Invalid test_ratio {test_ratio}: must satisfy 0 < test_ratio < 1"
         raise ValueError(msg)
 
-    if settings is None:
-        settings = config.get_settings()
+    settings = settings or config.get_settings()
 
     df_flagged = df.sample(
         fraction=1.0, shuffle=True, seed=settings.random_state
@@ -244,8 +250,7 @@ def oversample_with_unique_ids(
         msg = f"Invalid target_proportion {target_proportion}: must satisfy 0 < proportion < 1"
         raise ValueError(msg)
 
-    if settings is None:
-        settings = config.get_settings()
+    settings = settings or config.get_settings()
 
     df_majority = train.filter(pl.col(settings.dataset.target) == 0)
     df_minority = train.filter(pl.col(settings.dataset.target) == 1)
