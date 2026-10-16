@@ -1,16 +1,16 @@
-"""Filtrado de columnas redundantes y transformación por bines con Polars.
+"""Filtrado de columnas redundantes con Polars.
 
-Este módulo implementa el proceso de selección de variables utilizado en el notebook
-para reducir la dimensionalidad antes del modelado. Elimina en forma secuencial
-columnas constantes, columnas binarias desbalanceadas y columnas numéricas
-altamente correlacionadas.
+Este módulo implementa el proceso de selección de variables utilizado antes del
+modelado para reducir la dimensionalidad. Elimina en forma secuencial columnas
+constantes, columnas binarias desbalanceadas y columnas numéricas altamente
+correlacionadas.
 
 El flujo habitual consiste en crear `RedundantColumnFilter` con los conjuntos de
-entrenamiento y prueba, inspeccionar los descartes, graficar el análisis bivariado
-y finalmente aplicar transformaciones de bines con `apply_binning`.
+entrenamiento y prueba, inspeccionar los descartes y analizar las correlaciones
+de las variables más relevantes.
 
 ## Clases exportadas:
-    RedundantColumnFilter: Filtro secuencial de columnas redundantes con análisis bivariado.
+    RedundantColumnFilter: Filtro secuencial de columnas redundantes con análisis de correlación.
 """
 
 import dataclasses
@@ -25,14 +25,14 @@ from bank_clients_ml import config, eda, training
 
 
 def _get_true_column_names(df: pl.DataFrame) -> tuple[str, ...]:
-    """Obtiene los nombres de las columnas que contienen valores verdaderos.
+    """Obtiene los nombres de las columnas con valor verdadero.
 
     ## Args:
         df: DataFrame booleano donde cada celda indica si una columna cumple
             una condición evaluada previamente.
 
     ## Returns:
-        Lista con los nombres de las columnas cuyo valor es verdadero.
+        Nombres de las columnas cuyo valor es verdadero.
     """
     return tuple(df.unpivot().filter(pl.col("value")).get_column("variable").to_list())
 
@@ -44,8 +44,8 @@ def _get_constant_columns(df: pl.DataFrame) -> tuple[str, ...]:
         df: DataFrame sobre el que se evalúa la cardinalidad.
 
     ## Returns:
-        Lista con los nombres de las columnas constantes, las cuales no aportan
-        información para el modelado.
+        Nombres de las columnas constantes, las cuales no aportan información
+        para el modelado.
     """
     return _get_true_column_names(df.select(pl.all().n_unique() == 1))
 
@@ -59,19 +59,18 @@ def _get_imbalanced_binary_columns(
 
     Detecta las columnas con exactamente dos valores únicos. La proporción se
     calcula contra el primer valor de cada columna y se considera desbalanceada
-    cuando cae fuera del intervalo definido por el `threshold` y su complemento.
+    cuando cae fuera del intervalo definido por `threshold` y su complemento.
     La columna target se excluye del análisis.
 
     ## Args:
         df: DataFrame sobre el que se buscan columnas binarias desbalanceadas.
         threshold: Proporción mínima aceptada para la clase minoritaria. Debe
             encontrarse entre 0 y 0.5.
-        settings: Configuración con el nombre de la columna target. Si no se
-            indica, se obtiene la configuración global.
+        settings: Configuración con el nombre de la columna target.
 
     ## Returns:
-        Lista con los nombres de las columnas binarias desbalanceadas,
-        las cuales no aportan información para el modelado.
+        Nombres de las columnas binarias desbalanceadas, las cuales no aportan
+        información suficiente para el modelado.
 
     ## Raises:
         ValueError: Si threshold no está en el intervalo abierto entre 0.0 y 0.5.
@@ -99,10 +98,10 @@ def _get_redundant_correlated_columns(
     superior para evaluar cada columna únicamente contra las columnas previas.
     Toda columna cuyo máximo de correlación supere el umbral se considera redundante.
 
-    Deja siempre la primer columna fuera de la lista.
-    Si N columnas están correlacionadas entre sí, devolverá N-1 en la lista.
-    El triángulo inferior y la diagonal quedan en 0.0,
-    lo que no afecta al max() ya que |r| >= 0
+    Deja siempre la primera columna fuera del resultado. Si N columnas están
+    correlacionadas entre sí, se devuelven N-1 nombres. El triángulo inferior y
+    la diagonal quedan en 0.0, lo que no afecta al máximo ya que el valor absoluto
+    de la correlación es mayor o igual a cero.
 
     ## Args:
         corr_df: Matriz de correlación cuadrada entre variables numéricas.
@@ -110,7 +109,7 @@ def _get_redundant_correlated_columns(
             se considera redundante.
 
     ## Returns:
-        Lista con los nombres de las columnas redundantes a eliminar.
+        Nombres de las columnas redundantes a eliminar.
     """
     abs_corr_np = np.abs(corr_df.to_numpy())
     upper_triangle = np.triu(abs_corr_np, k=1)
@@ -125,19 +124,35 @@ def _get_redundant_correlated_columns(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RedundantColumnFilter:
-    """Filtro secuencial de columnas redundantes con análisis bivariado.
+    """Filtro secuencial de columnas redundantes con análisis de correlación.
 
     Aplica tres etapas de reducción sobre los conjuntos de entrenamiento y prueba:
     eliminación de columnas constantes, eliminación de columnas binarias
     desbalanceadas y eliminación de columnas numéricas altamente correlacionadas.
-    Conserva los resultados intermedios para su inspección y acumula las tablas
-    de análisis bivariado para usarlas posteriormente en la transformación por bines.
+    Conserva los resultados intermedios para su inspección y la matriz de
+    correlación para el análisis posterior de variables relevantes.
+
+    Se instancia preferentemente mediante `generate`, que ejecuta las etapas de
+    detección y construye los DataFrames reducidos.
 
     ## Attributes:
-        constant_cols: Nombres de las columnas constantes detectadas.
         reduced_train: Conjunto de entrenamiento sin columnas constantes.
-        reduced_test: Conjunto de prueba sin columnas constantes.
-        imbalanced_binary_columns: Nombres de las columnas binarias desbalanceadas.
+        correlated_train: Conjunto de entrenamiento sin columnas constantes ni
+            binarias desbalanceadas.
+        correlated_test: Conjunto de prueba sin columnas constantes ni binarias
+            desbalanceadas.
+        uncorrelated_train: Conjunto de entrenamiento sin columnas redundantes
+            por correlación.
+        constant_cols: Nombres de las columnas constantes detectadas.
+        imbalanced_binary_columns: Nombres de las columnas binarias desbalanceadas
+            detectadas.
+        correlated_columns: Nombres de las columnas numéricas descartadas por alta
+            correlación.
+        imbalanced_binary_threshold: Proporción mínima aceptada para la clase
+            minoritaria en columnas binarias.
+        correlation_threshold: Umbral de correlación absoluta utilizado para
+            considerar redundante una columna numérica.
+        settings: Configuración con los nombres de las columnas identificadora y target.
     """
 
     reduced_train: pl.DataFrame
@@ -162,11 +177,12 @@ class RedundantColumnFilter:
         correlation_threshold: float = 0.80,
         settings: config.Settings | None = None,
     ) -> Self:
-        """Ejecuta las etapas de reducción.
+        """Crea una instancia ejecutando las etapas de reducción.
 
         Detecta columnas constantes, columnas binarias desbalanceadas y columnas
-        correlacionadas, y genera las versiones reducidas de los conjuntos de
-        entrenamiento y prueba.
+        correlacionadas sobre el conjunto de entrenamiento, y aplica las mismas
+        eliminaciones al conjunto de prueba. Calcula además la matriz de
+        correlación de las variables numéricas restantes.
 
         ## Args:
             train: Conjunto de entrenamiento sobre el que se detectan las columnas
@@ -174,10 +190,17 @@ class RedundantColumnFilter:
             test: Conjunto de prueba al que se aplican las mismas eliminaciones.
             imbalanced_binary_threshold: Proporción mínima aceptada para la clase
                 minoritaria en columnas binarias.
-            correlation_threshold: Umbral de correlación para considerar
+            correlation_threshold: Umbral de correlación absoluta para considerar
                 redundante una columna numérica.
             settings: Configuración con los nombres de las columnas identificadora
                 y target. Si no se indica, se obtiene la configuración global.
+
+        ## Returns:
+            Instancia con los conjuntos reducidos, las columnas descartadas en cada
+            etapa y los umbrales utilizados.
+
+        ## Raises:
+            ValueError: Si el umbral para columnas binarias no está entre 0.0 y 0.5.
         """
         settings = settings or config.get_settings()
 
@@ -218,11 +241,11 @@ class RedundantColumnFilter:
         """Calcula la frecuencia de cada valor en las columnas binarias desbalanceadas.
 
         Filtra y cuenta las ocurrencias de los valores presentes en las columnas
-        definidas en `imbalanced_binary_columns`.
+        definidas en `imbalanced_binary_columns` sobre el conjunto reducido.
 
         ## Returns:
-            DataFrame con la distribución de frecuencias conteniendo las columnas
-            `column`, `value` y `count`.
+            Distribución de frecuencias con las columnas de nombre de variable,
+            valor y conteo.
         """
         return eda.low_cardinality_value_counts(
             self.reduced_train.select(self.imbalanced_binary_columns)
@@ -231,14 +254,19 @@ class RedundantColumnFilter:
     def _get_correlations_for(self, column: str, threshold: float) -> pl.DataFrame:
         """Obtiene las variables correlacionadas con una columna dada.
 
+        Busca en la matriz de correlación las variables cuya correlación absoluta
+        con la columna de referencia supera el umbral, ordenadas de mayor a menor
+        correlación absoluta.
+
         ## Args:
             column: Nombre de la columna de referencia presente en la matriz
                 de correlación.
-            threshold: Umbral mínimo de correlación para incluir una variable
-                en el resultado.
+            threshold: Umbral mínimo de correlación absoluta para incluir una
+                variable en el resultado.
 
         ## Returns:
-            Nuevo DataFrame con las columnas de nombre de variable y correlación.
+            Nuevo DataFrame con el nombre de la variable y su correlación con la
+            columna de referencia.
         """
         return (
             self._corr_df.select(
@@ -257,13 +285,18 @@ class RedundantColumnFilter:
     ) -> types.MappingProxyType[str, pl.DataFrame]:
         """Obtiene las variables correlacionadas de cada columna indicada.
 
+        Aplica la búsqueda de correlaciones a cada columna solicitada y reúne los
+        resultados en un mapeo de solo lectura.
+
         ## Args:
-            target_columns: Nombres de las columnas sobre las cuales se buscan
+            columns: Nombres de las columnas sobre las cuales se buscan
                 correlaciones altas.
+            threshold: Umbral mínimo de correlación absoluta para incluir una
+                variable en cada resultado.
 
         ## Returns:
-            Diccionario que mapea cada columna con sus resultados de
-            correlación correspondientes.
+            Mapeo de solo lectura que asocia cada columna solicitada con su DataFrame
+            de variables correlacionadas.
         """
         return types.MappingProxyType(
             {
@@ -279,7 +312,22 @@ class RedundantColumnFilter:
         training.LGBMTrainer,
         types.MappingProxyType[str, pl.DataFrame],
     ]:
-        """Add docs."""
+        """Ejecuta el análisis de importancia y correlación de variables relevantes.
+
+        Entrena el modelo por grupos de variables sobre el conjunto sin correlaciones,
+        obtiene las variables agrupadas más importantes y con ellas entrena el modelo
+        principal. Genera los gráficos de importancia correspondientes y finalmente
+        recupera las correlaciones altas de las variables mejor posicionadas.
+
+        ## Args:
+            top_grouped_features_name: Nombre base del archivo de gráfico para las
+                variables agrupadas más importantes, sin extensión.
+
+        ## Returns:
+            Tupla con el entrenador por grupos, el entrenador principal entrenado con
+            las variables agrupadas más importantes y el mapeo de correlaciones de
+            las variables mejor posicionadas según el umbral de correlación de la instancia.
+        """
         group_trainers = training.GroupsLGBMTrainer.fit_and_build(
             self.uncorrelated_train, settings=self.settings
         )
