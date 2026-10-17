@@ -13,7 +13,7 @@ import dataclasses
 import io
 import types
 from collections.abc import ItemsView, Iterable
-from typing import Self, cast
+from typing import Self
 
 import lightgbm as lgb
 import numpy as np
@@ -22,7 +22,7 @@ import scipy.stats
 import sklearn.metrics
 import sklearn.model_selection
 
-from bank_clients_ml import binning, column_groups, config, evaluation, visualization
+from bank_clients_ml import binning, column_groups, config, visualization
 
 
 def _fit_lgbm_random_search(
@@ -119,8 +119,6 @@ class LGBMTrainer:
     sobre un conjunto de prueba.
 
     ## Attributes:
-        train: Datos de entrenamiento que incluyen la variable target.
-        columns: Columnas utilizadas para el entrenamiento.
         importances: Tabla de importancias ordenada de mayor a menor.
         search_logs: Registros capturados durante la búsqueda de hiperparámetros.
         n_iter: Cantidad de combinaciones de hiperparámetros evaluadas.
@@ -128,8 +126,6 @@ class LGBMTrainer:
         settings: Configuración global del proyecto.
     """
 
-    train: pl.DataFrame
-    columns: tuple[str, ...]
     importances: pl.DataFrame
     search_logs: str
     n_iter: int
@@ -179,8 +175,6 @@ class LGBMTrainer:
         )
 
         return cls(
-            train,
-            tuple(columns),
             importances,
             search_logs,
             n_iter,
@@ -188,6 +182,23 @@ class LGBMTrainer:
             settings,
             _searcher,
         )
+
+    @property
+    def features(self) -> tuple[str, ...]:
+        """Nombres de las variables utilizadas para el entrenamiento."""
+        return tuple(
+            self.importances.get_column(self.settings.analysis.feature).to_list()
+        )
+
+    @property
+    def number_of_features(self):
+        """Cantidad de variables utilizadas para el entrenamiento."""
+        return len(self.importances)
+
+    @property
+    def best_model(self) -> lgb.LGBMClassifier:
+        """Mejor clasificador LightGBM encontrado durante la búsqueda."""
+        return self._searcher.best_estimator_
 
     @property
     def cv_results(self) -> pl.DataFrame:
@@ -258,41 +269,6 @@ class LGBMTrainer:
             self.importances.head(top_n)
             .get_column(self.settings.analysis.feature)
             .to_list()
-        )
-
-    def evaluate_and_plot_metrics(
-        self, test: pl.DataFrame, *, roc_curve_name: str, deciles_name: str
-    ) -> None:
-        """Evalúa el mejor modelo sobre el conjunto de prueba y genera los gráficos.
-
-        Calcula las probabilidades predichas para entrenamiento y prueba, obtiene
-        las métricas globales y las tablas de deciles, y genera el gráfico de la
-        curva ROC y el gráfico de deciles con los nombres indicados.
-
-        ## Args:
-            test: Datos de prueba que incluyen la variable target.
-            roc_curve_name: Nombre base del archivo SVG de la curva ROC, sin
-                extensión.
-            deciles_name: Nombre base del archivo SVG de la tabla de deciles,
-                sin extensión.
-        """
-        best_model: lgb.LGBMClassifier = self._searcher.best_estimator_
-        X_train = self.train.select(self.columns)
-        X_test = test.select(self.columns)
-        probabilities_train = cast(np.ndarray, best_model.predict_proba(X_train))[:, 1]
-        probabilities_test = cast(np.ndarray, best_model.predict_proba(X_test))[:, 1]
-
-        evaluation_metrics = evaluation.evaluate(
-            train=self.train,
-            test=test,
-            probabilities_train=probabilities_train,
-            probabilities_test=probabilities_test,
-            settings=self.settings,
-        )
-
-        visualization.plot_roc_curve(evaluation_metrics, roc_curve_name, self.settings)
-        visualization.plot_deciles(
-            evaluation_metrics, deciles_name, settings=self.settings
         )
 
 
@@ -413,12 +389,8 @@ class GroupsLGBMTrainer:
 
     @property
     def others_columns(self) -> tuple[str, ...]:
-        """Columnas utilizadas por el entrenador del grupo residual.
-
-        ## Returns:
-            Nombres de las columnas asignadas al grupo residual de otras variables.
-        """
-        return self.trainers[column_groups.ValidColumnGroup.OTHERS].columns
+        """Variables utilizadas por el entrenador del grupo residual."""
+        return self.trainers[column_groups.ValidColumnGroup.OTHERS].features
 
     @property
     def groups_name_mapping(self) -> binning.NameMapping:
@@ -434,15 +406,15 @@ class GroupsLGBMTrainer:
 
     @property
     def groups_lengths(self) -> tuple[str, ...]:
-        """Textos descriptivos con la cantidad de columnas de cada grupo.
+        """Textos descriptivos con la cantidad de variables de cada grupo.
 
         ## Returns:
             Textos con el nombre descriptivo de cada grupo junto con su
-                cantidad de columnas.
+                cantidad de variables.
         """
         return tuple(
             [
-                f"{group.pretty_name}: {len(trainer.columns)}"
+                f"{group.pretty_name}: {trainer.number_of_features}"
                 for group, trainer in self.trainers.items()
             ]
         )

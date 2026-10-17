@@ -7,14 +7,16 @@
 
 import dataclasses
 from collections.abc import Iterable
-from typing import Self
+from typing import Self, cast
 
+import numpy as np
 import polars as pl
 
 from bank_clients_ml import (
     binning,
     bivariate_table,
     config,
+    evaluation,
     redundant_column_filter,
     training,
     visualization,
@@ -30,6 +32,8 @@ class FeaturesSelection:
     visualización y evaluación final.
 
     ## Attributes:
+        train: Conjunto de entrenamiento con las columnas identificadora,
+            target y variables transformadas.
         test: Conjunto de prueba con las columnas identificadora, target y
             variables transformadas.
         name_mapping: Mapeo entre los nombres originales en snake_case y los
@@ -39,6 +43,7 @@ class FeaturesSelection:
         n_iter: Número de iteraciones usado en la optimización de hiperparámetros.
     """
 
+    train: pl.DataFrame
     test: pl.DataFrame
     name_mapping: binning.NameMapping
     trainer: training.LGBMTrainer
@@ -73,16 +78,7 @@ class FeaturesSelection:
             settings,
             n_iter=n_iter,
         )
-        return cls(test, name_mapping, trainer, settings, n_iter)
-
-    @property
-    def train(self) -> pl.DataFrame:
-        """Conjunto de entrenamiento utilizado por el entrenador.
-
-        ## Returns:
-            Conjunto de entrenamiento con las variables transformadas.
-        """
-        return self.trainer.train
+        return cls(train, test, name_mapping, trainer, settings, n_iter)
 
     @property
     def snake_case_names(self) -> tuple[str, ...]:
@@ -122,14 +118,36 @@ class FeaturesSelection:
     def evaluate_and_plot_metrics(
         self, *, roc_curve_name: str, deciles_name: str
     ) -> None:
-        """Evalúa el modelo con el set de prueba y genera los gráficos de desempeño.
+        """Evalúa el mejor modelo sobre el set de prueba y genera los gráficos.
+
+        Calcula las probabilidades predichas para entrenamiento y prueba, obtiene
+        las métricas globales y las tablas de deciles, y genera el gráfico de la
+        curva ROC y el gráfico de deciles con los nombres indicados.
 
         ## Args:
-            roc_curve_name: Nombre del archivo de salida para la curva ROC.
-            deciles_name: Nombre del archivo de salida para el análisis por deciles.
+            test: Datos de prueba que incluyen la variable target.
+            roc_curve_name: Nombre del archivo de salida SVG de la curva ROC,
+                sin extensión.
+            deciles_name: Nombre del archivo de salida SVG de la tabla de
+                análisis por deciles, sin extensión.
         """
-        self.trainer.evaluate_and_plot_metrics(
-            self.test, roc_curve_name=roc_curve_name, deciles_name=deciles_name
+        best_model = self.trainer.best_model
+        X_train = self.train.select(self.snake_case_names)
+        X_test = self.test.select(self.snake_case_names)
+        probabilities_train = cast(np.ndarray, best_model.predict_proba(X_train))[:, 1]
+        probabilities_test = cast(np.ndarray, best_model.predict_proba(X_test))[:, 1]
+
+        evaluation_metrics = evaluation.evaluate(
+            train=self.train,
+            test=self.test,
+            probabilities_train=probabilities_train,
+            probabilities_test=probabilities_test,
+            settings=self.settings,
+        )
+
+        visualization.plot_roc_curve(evaluation_metrics, roc_curve_name, self.settings)
+        visualization.plot_deciles(
+            evaluation_metrics, deciles_name, settings=self.settings
         )
 
 
