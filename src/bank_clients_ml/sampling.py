@@ -40,7 +40,17 @@ def _build_date_windows(
     ## Returns:
         Tupla con la lista de meses de entrenamiento seguida de la lista de
             meses de predicción, ambas en orden cronológico ascendente.
+
+    ## Raises:
+        ValueError: Si prediction_window_size es menor a 1.
     """
+    if prediction_window_size < 1:
+        msg = (
+            f"Invalid prediction_window_size {prediction_window_size}: "
+            f"must satisfy prediction_window_size >= 1"
+        )
+        raise ValueError(msg)
+
     pred_offset = f"-{prediction_window_size - 1}mo"
     train_offset = f"-{prediction_window_size + 1}mo"
 

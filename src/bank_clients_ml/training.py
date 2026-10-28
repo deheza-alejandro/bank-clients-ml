@@ -161,12 +161,27 @@ class LGBMTrainer:
         ## Returns:
             Nueva instancia con el modelo entrenado.
 
+        ## Raises:
+            ValueError: Si n_iter es menor a 1 o si splits_cross_validation es
+            menor a 2.
+
         ## Example:
             from bank_clients_ml import training
 
             trainer = training.LGBMTrainer.fit_and_build(train_df, columns, settings)
             top_features = trainer.get_top_ranked_features()
         """
+        if n_iter < 1:
+            msg = f"Invalid n_iter {n_iter}: must satisfy n_iter >= 1"
+            raise ValueError(msg)
+
+        if splits_cross_validation < 2:
+            msg = (
+                f"Invalid splits_cross_validation {splits_cross_validation}: "
+                f"must satisfy splits_cross_validation >= 2"
+            )
+            raise ValueError(msg)
+
         _searcher, importances, search_logs = _fit_lgbm_random_search(
             train,
             columns,
@@ -265,7 +280,15 @@ class LGBMTrainer:
 
         ## Returns:
             Nombres de las variables mejor posicionadas, en orden de importancia.
+
+        ## Raises:
+            ValueError: Si top_n no está en el intervalo cerrado entre 0 y la
+            cantidad de variables utilizadas para el entrenamiento.
         """
+        if not (0 <= top_n <= self.number_of_features):
+            msg = f"Invalid top_n {top_n}: must satisfy 0 <= top_n <= {self.number_of_features}"
+            raise ValueError(msg)
+
         return tuple(
             self.importances.head(top_n)
             .get_column(self.settings.analysis.feature)

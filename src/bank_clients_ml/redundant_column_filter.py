@@ -110,7 +110,14 @@ def _get_redundant_correlated_columns(
 
     ## Returns:
         Nombres de las columnas redundantes a eliminar.
+
+    ## Raises:
+        ValueError: Si threshold no está en el intervalo abierto entre 0.0 y 1.0.
     """
+    if not (0.0 < threshold < 1.0):
+        msg = f"Invalid threshold {threshold}: must satisfy 0.0 < threshold < 1.0"
+        raise ValueError(msg)
+
     abs_corr_np = np.abs(corr_df.to_numpy())
     upper_triangle = np.triu(abs_corr_np, k=1)
 
