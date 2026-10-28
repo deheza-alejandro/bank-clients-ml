@@ -51,6 +51,7 @@ def target_encode_columns(
     """
     settings = settings or config.get_settings()
     categorical_cols = categorical_cols or column_groups.CATEGORICAL_COLS
+    categorical_cols = tuple(categorical_cols)
 
     expressions = []
 
@@ -619,12 +620,14 @@ def aggregate_monthly_to_client(
     columns_with_monetary_values = (
         columns_with_monetary_values or column_groups.COLUMNS_WITH_MONETARY_VALUES
     )
+    columns_with_monetary_values = tuple(columns_with_monetary_values)
     columns_with_quantities = (
         columns_with_quantities
         or column_groups.get_columns_with_quantities(
             transformed_training_data, settings
         )
     )
+    columns_with_quantities = tuple(columns_with_quantities)
 
     cols = pl.col([*columns_with_quantities, *columns_with_monetary_values])
 

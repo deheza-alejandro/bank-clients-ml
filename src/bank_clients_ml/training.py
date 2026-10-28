@@ -88,7 +88,8 @@ def _fit_lgbm_random_search(
         random_state=settings.random_state,
     )
 
-    X_train = train.select(columns)
+    columns_tuple = tuple(columns)
+    X_train = train.select(columns_tuple)
     y_train = train.get_column(settings.dataset.target)
 
     with (
@@ -102,7 +103,7 @@ def _fit_lgbm_random_search(
     fitted_classifier: lgb.LGBMClassifier = searcher.best_estimator_
     importances = pl.DataFrame(
         {
-            settings.analysis.feature: columns,
+            settings.analysis.feature: columns_tuple,
             settings.analysis.importance: fitted_classifier.feature_importances_,
         }
     ).sort(settings.analysis.importance, descending=True)
