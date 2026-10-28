@@ -209,7 +209,9 @@ class Binner:
         ## Returns:
             La misma instancia para permitir llamadas encadenadas.
         """
-        end = end or start
+        if end is None:
+            end = start
+
         self.bin_intervals.append(_BinInterval(start, end))
         return self
 
