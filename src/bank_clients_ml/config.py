@@ -27,6 +27,8 @@ class DirectoryPaths(pydantic.BaseModel):
         images: Directorio de imágenes calculado dinámicamente a partir de project.
     """
 
+    model_config = pydantic.ConfigDict(frozen=True)
+
     project: pathlib.Path = pathlib.Path(__file__).parent.parent.parent
 
     @pydantic.computed_field
@@ -62,6 +64,8 @@ class DatasetColumns(pydantic.BaseModel):
             tiene "credit card co branding".
     """
 
+    model_config = pydantic.ConfigDict(frozen=True)
+
     id: str = "client_id"
     target: str = "Target"
     month: str = "Month"
@@ -84,6 +88,8 @@ class AnalysisColumns(pydantic.BaseModel):
         target_pct: Nombre de la columna de porcentaje de target.
         column_name: Nombre de la columna "Column name".
     """
+
+    model_config = pydantic.ConfigDict(frozen=True)
 
     feature: str = "Feature"
     importance: str = "Importance"
