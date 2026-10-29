@@ -236,7 +236,7 @@ def low_cardinality_value_counts(
     settings = settings or config.get_settings()
 
     cols_to_keep = (
-        filter_columns_by_cardinality(df, "<=", max_unique_values)
+        filter_columns_by_cardinality(df, "<=", max_unique_values, settings)
         .get_column(settings.analysis.column_name)
         .to_list()
     )
