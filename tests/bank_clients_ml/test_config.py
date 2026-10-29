@@ -1,4 +1,4 @@
-"""Tests para la configuración global del proyecto."""
+"""Tests unitarios para el módulo de configuración global del proyecto."""
 
 import pathlib
 from collections.abc import Iterator
@@ -11,7 +11,7 @@ from bank_clients_ml import config
 
 @pytest.fixture(autouse=True)
 def _clear_settings_cache() -> Iterator[None]:
-    """Borrar la caché de la configuración global antes y después de cada prueba."""
+    """Limpia la caché de la configuración global antes y después de cada test."""
     config.get_settings.cache_clear()
     yield
     config.get_settings.cache_clear()
@@ -25,7 +25,7 @@ def _clear_settings_cache() -> Iterator[None]:
 def test_should_derive_data_and_images_paths_from_project(
     project: pathlib.Path,
 ) -> None:
-    """Obtener ambas rutas calculadas a partir del proyecto configurado."""
+    """Verifica que las rutas de datos e imágenes se deriven correctamente a partir del proyecto."""
     paths = config.DirectoryPaths(project=project)
 
     data_path = paths.data
@@ -39,9 +39,9 @@ def test_should_resolve_paths_from_project_and_not_from_working_directory(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: pathlib.Path,
 ) -> None:
-    """Resuelve las rutas a partir del proyecto.
+    """Verifica que las rutas se resuelvan desde el directorio del proyecto.
 
-    Incluso cuando el directorio de trabajo actual (cwd) cambie.
+    Y no desde el directorio de trabajo (cwd).
     """
     project = tmp_path / "project"
     monkeypatch.chdir(tmp_path)
@@ -53,7 +53,7 @@ def test_should_resolve_paths_from_project_and_not_from_working_directory(
 
 
 def test_should_return_cached_settings_instance() -> None:
-    """Devuelve la misma instancia de configuración almacenada en caché ante llamadas repetidas."""
+    """Verifica se devuelva la misma instancia ante llamadas repetidas."""
     first_settings = config.get_settings()
 
     second_settings = config.get_settings()
@@ -76,7 +76,7 @@ def test_should_reject_mutation_of_frozen_configuration_models(
     attribute: str,
     new_value: object,
 ) -> None:
-    """Rechazar los cambios en los modelos de configuración inmutables."""
+    """Verifica que se rechacen los intentos de mutación en modelos de configuración inmutables."""
     model = model_factory()
 
     with pytest.raises(pydantic.ValidationError):
