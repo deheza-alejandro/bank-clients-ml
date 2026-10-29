@@ -370,7 +370,7 @@ class NameMapping:
         ## Returns:
             Nuevo mapeo inmutable con el contenido indicado.
         """
-        return cls(types.MappingProxyType(mapping))
+        return cls(types.MappingProxyType(dict(mapping)))
 
     @classmethod
     def from_dual_named(cls, dual_named_iterable: Iterable[DualNamed]) -> Self:
