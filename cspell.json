@@ -35,6 +35,7 @@
     ],
     // words - list of words to be always considered correct
     "words": [
+        "allclose",
         "autouse",
         "binner",
         "Binner",
@@ -54,6 +55,7 @@
         "desbalanceadas",
         "dimensionalidad",
         "edgecolor",
+        "equiespaciados",
         "facecolor",
         "figsize",
         "fonttype",
