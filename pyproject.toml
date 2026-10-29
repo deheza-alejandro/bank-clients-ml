@@ -87,7 +87,7 @@ max-line-length = 100
     "E501",     # Line too long
     "D100",     # Missing docstring in public module
 ]
-# "tests/*" = ["S101", "C901", "PLR0911", "PLR0915"]
+"tests/*" = ["S101"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
