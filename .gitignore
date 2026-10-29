@@ -23,3 +23,8 @@ node_modules
 
 # Marimo
 __marimo__/
+
+# Tests
+.coverage
+htmlcov/
+.pytest_cache/
