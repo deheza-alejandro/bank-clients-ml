@@ -28,6 +28,7 @@ dev = [
     "marimo>=0.24.2",
     "pyrefly>=1.2.0",
     "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.16.1",
     "rumdl>=0.2.73",
 ]
