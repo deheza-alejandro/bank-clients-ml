@@ -35,6 +35,7 @@
     ],
     // words - list of words to be always considered correct
     "words": [
+        "autouse",
         "binner",
         "Binner",
         "binners",
