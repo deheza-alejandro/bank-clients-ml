@@ -37,12 +37,11 @@ def describe(df: pl.DataFrame) -> pl.DataFrame:
         df: DataFrame a analizar.
 
     ## Returns:
-        Nuevo DataFrame con una fila por columna del DataFrame original y una
-        columna `statistic` que identifica cada medida estadística.
+        Nuevo DataFrame con una fila por columna del DataFrame original.
     """
     return (
         df.describe()
-        .transpose(include_header=True, column_names="statistic")
+        .transpose(include_header=True, header_name="column", column_names="statistic")
         .with_columns(pl.col("null_count").cast(pl.Float64).cast(pl.Int64))
     )
 
