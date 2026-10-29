@@ -15,7 +15,7 @@ def bivariate_table() -> pl.DataFrame:
     el grupo de bines [1, 2] representa el 25 %, el grupo [4, 5] el 42.5 %
     y el bin residual [3] el 10 %.
 
-    Returns:
+    ## Returns:
         Tabla con las columnas de bin, mínimo, máximo, clientes y target.
     """
     return pl.DataFrame(
@@ -38,13 +38,13 @@ def encode(
 ) -> pl.Series:
     """Aplica la expresión de codificación a una columna de valores.
 
-    Args:
+    ## Args:
         binner: Asociación entre la feature y los intervalos de bines.
         bivariate_table: Tabla bivariada de referencia.
         values: Valores de la feature que se desean codificar.
         settings: Configuración con los nombres de las columnas.
 
-    Returns:
+    ## Returns:
         Serie codificada con el nombre de la feature.
     """
     feature = binner.snake_case_name
@@ -105,7 +105,7 @@ def test_should_raise_value_error_when_any_bound_is_less_than_one(
 ) -> None:
     """Verifica que se rechacen intervalos con extremos menores que uno.
 
-    Args:
+    ## Args:
         start: Número de bin inicial.
         end: Número de bin final, o None para un único bin.
     """
@@ -125,7 +125,7 @@ def test_should_raise_value_error_when_no_bin_intervals_are_defined(
 ) -> None:
     """Verifica que se rechace una feature sin intervalos de bines.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
     """
@@ -150,7 +150,7 @@ def test_should_raise_value_error_when_interval_exceeds_available_bins(
 ) -> None:
     """Verifica que se rechace un intervalo fuera de la cantidad de bines.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
         start: Número de bin inicial.
@@ -168,7 +168,7 @@ def test_should_allow_interval_ending_at_last_bin(
 ) -> None:
     """Verifica que se permita un intervalo que termina en el último bin.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
     """
@@ -195,7 +195,7 @@ def test_should_raise_value_error_when_intervals_overlap(
 ) -> None:
     """Verifica que se rechacen intervalos con bines solapados.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
         intervals: Pares de extremos de los intervalos a validar.
@@ -214,7 +214,7 @@ def test_should_allow_adjacent_intervals(
 ) -> None:
     """Verifica que dos intervalos contiguos no se consideren solapados.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
     """
@@ -232,7 +232,7 @@ def test_should_use_weighted_target_pct_when_bins_have_different_sizes(
 ) -> None:
     """Verifica que el porcentaje de target se pondere por clientes.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
     """
@@ -250,7 +250,7 @@ def test_should_encode_values_on_both_interval_boundaries(
 ) -> None:
     """Verifica que se incluyan ambos extremos del intervalo.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
     """
@@ -267,7 +267,7 @@ def test_should_include_gap_values_when_bins_are_not_contiguous(
 ) -> None:
     """Verifica que un valor entre bines del mismo grupo reciba su porcentaje.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
     """
     table = pl.DataFrame(
@@ -295,7 +295,7 @@ def test_should_use_residual_target_pct_when_value_is_outside_all_intervals(
 ) -> None:
     """Verifica que los valores externos reciban el porcentaje residual.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
         value: Valor externo a todos los intervalos.
@@ -314,7 +314,7 @@ def test_should_use_residual_target_pct_when_bin_is_not_in_any_interval(
 ) -> None:
     """Verifica que un bin no cubierto reciba el porcentaje residual.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
     """
@@ -332,7 +332,7 @@ def test_should_use_residual_target_pct_when_value_is_null(
 ) -> None:
     """Verifica que los valores nulos reciban el porcentaje residual.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
     """
@@ -350,7 +350,7 @@ def test_should_use_zero_as_residual_when_all_bins_are_covered(
 ) -> None:
     """Verifica que el residual sea cero cuando se cubren todos los bines.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
     """
@@ -367,7 +367,7 @@ def test_should_prefer_first_interval_when_intervals_share_boundary(
 ) -> None:
     """Verifica que prevalezca el primer intervalo ante una frontera compartida.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
     """
     table = pl.DataFrame(
@@ -392,7 +392,7 @@ def test_should_ignore_interval_with_null_bounds_and_use_residual_target_pct(
 ) -> None:
     """Verifica que un intervalo sin límites no coincida con ningún valor.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
     """
     table = pl.DataFrame(
@@ -418,7 +418,7 @@ def test_should_alias_result_with_feature_name(
 ) -> None:
     """Verifica que la expresión resultante conserve el nombre de la feature.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
     """
@@ -436,7 +436,7 @@ def test_should_replace_feature_column_when_expression_is_applied_with_columns(
 ) -> None:
     """Verifica que la expresión reemplace la columna original sin duplicarla.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
     """
@@ -458,7 +458,7 @@ def test_should_raise_type_error_when_bound_column_is_not_numeric(
 ) -> None:
     """Verifica que se rechacen columnas de límites no numéricas.
 
-    Args:
+    ## Args:
         settings: Configuración con los nombres de las columnas.
         bivariate_table: Tabla bivariada de referencia.
         column: Nombre de la columna que se reemplaza por valores de texto.
