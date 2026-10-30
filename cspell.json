@@ -37,6 +37,7 @@
     "words": [
         "allclose",
         "autouse",
+        "axison",
         "binner",
         "Binner",
         "binners",
@@ -58,6 +59,7 @@
         "edgecolor",
         "equiespaciados",
         "facecolor",
+        "fignum",
         "figsize",
         "fonttype",
         "fontweight",
@@ -94,13 +96,16 @@
         "twinx",
         "unpivot",
         "verticalalignment",
+        "xdata",
         "xlabel",
         "xlim",
         "xticklabels",
         "xticks",
         "xycoords",
+        "ydata",
         "ylabel",
-        "ylim"
+        "ylim",
+        "yticklabels"
     ],
     // flagWords - list of words to be always considered incorrect
     // This is useful for offensive words and common spelling errors.
