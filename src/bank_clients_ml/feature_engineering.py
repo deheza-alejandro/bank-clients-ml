@@ -590,14 +590,12 @@ def aggregate_monthly_to_client(
     """Genera agregaciones para la historia mensual a una fila por cliente.
 
     Ordena por identificador y mes, agrupa por cliente y calcula estadísticas
-    para cada variable. Protege las divisiones contra ceros.
+    para cada variable.
 
     Las estadísticas incluyen mínimo, máximo, media, mediana, suma, conteo de
     no ceros, varianza, desvío estándar, cantidad de valores únicos (valores
     únicos redondeados para montos), diferencia entre valor máximo y valor
-    mínimo, diferencia entre último y primer mes,
-    diferencia relativa (último / primero) y
-    variación porcentual (1 - diferencia relativa).
+    mínimo, y diferencia entre último y primer mes.
 
     ## Args:
         transformed_training_data: DataFrame ya transformado con la historia
@@ -647,10 +645,6 @@ def aggregate_monthly_to_client(
         .name.suffix("_rounded_nunique"),
         (cols.max() - cols.min()).name.suffix("_ptp"),
         (cols.last() - cols.first()).name.suffix("_diff"),
-        _compute_percentage(cols.last(), cols.first()).name.suffix("_diff_rel"),
-        (_compute_percentage(cols.last(), cols.first()) - 100.0).name.suffix(
-            "_percent_var"
-        ),
     ]
 
     data_agg = (
@@ -699,16 +693,6 @@ def with_extra_transformations(abt: pl.DataFrame) -> pl.DataFrame:
             "SavingAccount_CreditCard_Payment_Amount_max",
             "CreditCard_Payment_total_max",
         ).alias("Amount_payment"),
-        _min_max_normalize_weighted(
-            "CreditCard_Total_Limit_diff_rel", "Operations_total_count_nonzero"
-        ).alias("Limit_operations"),
-        _min_max_normalize_weighted(
-            "CreditCard_Total_Limit_diff_rel",
-            "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",
-        ).alias("Limit_transactions"),
-        _min_max_normalize_weighted(
-            "CreditCard_Total_Limit_diff_rel", "CreditCard_Payment_total_max"
-        ).alias("Limit_payment"),
     )
 
     return result

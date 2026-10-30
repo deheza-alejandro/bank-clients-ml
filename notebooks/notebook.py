@@ -704,7 +704,7 @@ def _(bivariate_analyzer, top_grouped_features_trainer):
             "CreditCard_Balance_ARG_SP_pct_max": "Credit Card (Balance ARS / Total spendings) (Max)",
             "CreditCard_Payment_total_max": "Credit Card Total Payment (Max)",
             "CreditCard_Product": "Credit Card Product",
-            "CreditCard_Total_Limit_diff_rel": "Credit Card Limit (Relative Diff)",
+            "CreditCard_Total_Limit_min": "Credit Card Limit (Min)",
             "Operations_total_min": "Total Operations (Min)",
             "Quantity_Active_Products_min": "Active Products Quantity (Min)",
             "SavingAccount_Transfer_In_Amount_max": "Savings Account Transfer-In Amount (Max)",

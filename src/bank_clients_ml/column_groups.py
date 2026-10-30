@@ -212,7 +212,7 @@ class ValidColumnGroup(enum.Enum):
 
     CREDIT_CARD_PAYMENT = ColumnGroup(1, "Credit Card (Payment)")
 
-    CREDIT_CARD_MONETARY = ColumnGroup(2, "Credit Card (Monetary)")
+    CREDIT_CARD_MONETARY = ColumnGroup(3, "Credit Card (Monetary)")
 
     OTHERS = ColumnGroup(3, "Others")
 
