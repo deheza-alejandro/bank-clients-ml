@@ -394,6 +394,35 @@ def test_should_take_universe_target_from_prediction_months(
     assert prediction_targets == [1]
 
 
+def test_should_return_one_row_per_client_when_target_varies_across_prediction_months(
+    clean_data: pl.DataFrame,
+    settings: config.Settings,
+) -> None:
+    """Verifica que el universo agregue el target variable de predicción.
+
+    Si el cliente tiene target 1 en al menos un mes de predicción, debe quedar
+    una única fila con target 1. Si no tiene ningún target 1, debe quedar una
+    única fila con target 0.
+
+    ## Args:
+        clean_data: Datos limpios con clientes válidos e inválidos.
+        settings: Configuración con los nombres de las columnas.
+    """
+    data = clean_data.with_columns(
+        pl.when((pl.col("client_id") == 1) & (pl.col("Month") == date(2024, 10, 1)))
+        .then(pl.lit(0, dtype=pl.Int64))
+        .otherwise(pl.col("Target"))
+        .alias("Target")
+    )
+
+    split = sampling.TimeWindowSplit.generate(data, 2, settings=settings)
+
+    universe = split.universe_and_target
+
+    assert universe.height == universe["client_id"].n_unique()
+    assert universe.sort("client_id")["Target"].to_list() == [1, 0]
+
+
 def test_should_ignore_product_flags_outside_last_training_month(
     settings: config.Settings,
 ) -> None:
