@@ -287,7 +287,7 @@ def with_transformations(df: pl.DataFrame) -> pl.DataFrame:
                 "SavingAccount_Transactions_Transactions",
             ).alias("SavingAccount_Debits_Transactions_pct"),
             (
-                pl.col("SavingAccount_Credits_Transactions")
+                pl.col("SavingAccount_Transactions_Transactions")
                 / _safe_denominator("SavingAccount_Days_with_use")
             ).alias("SavingAccount_Transactions_Transactions_DAYS_prom"),
             (
