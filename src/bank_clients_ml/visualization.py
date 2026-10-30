@@ -4,10 +4,10 @@ Este módulo centraliza las visualizaciones utilizadas en el notebook.
 Todas las figuras se guardan como archivos SVG optimizados con SVGO a través de Bun.
 
 ## Funciones exportadas:
-    plot_top_features: Genera un gráfico con las variables más importantes.
-    plot_bivariate_charts: Genera gráficos bivariados para un conjunto de variables.
-    plot_roc_curve: Genera una curva ROC con métricas de evaluación.
-    plot_deciles: Genera un gráfico con tablas de deciles de entrenamiento y prueba.
+    plot_top_features: Genera y guarda un gráfico con las variables más importantes.
+    plot_bivariate_charts: Genera y guarda gráficos bivariados para un conjunto de variables.
+    plot_roc_curve: Genera y guarda una curva ROC con métricas de evaluación.
+    plot_deciles: Genera y guarda un gráfico con tablas de deciles de entrenamiento y prueba.
 """
 
 import concurrent.futures
@@ -99,32 +99,31 @@ def _save_fig_as_svg(
         raise RuntimeError(msg) from err
 
 
-def plot_top_features(
+def _build_top_features_figure(
     variables_to_plot: pl.DataFrame,
     plot_name: str,
     *,
     roc_auc: float,
     top_n: int = 20,
     settings: config.Settings,
-) -> None:
-    """Genera un gráfico de barras horizontales con las variables más importantes.
+) -> Figure:
+    """Construye un gráfico de barras horizontales con las variables más importantes.
 
     Selecciona las primeras filas del DataFrame de importancias, ya ordenado de
     forma descendente, y representa cada variable como una barra horizontal. El
     título incluye el nombre del gráfico y el valor de ROC AUC. Los tamaños de
     fuente y de figura se ajustan según la cantidad de variables a mostrar.
 
-    El resultado se exporta a:
-    {settings.paths.images}/plot_top_features/{plot_name}.svg
-
     ## Args:
         variables_to_plot: Tabla con las variables y sus importancias,
             ordenada de mayor a menor importancia.
-        plot_name: Nombre base del archivo SVG a generar, sin extensión.
+        plot_name: Nombre del gráfico que se muestra en el título.
         roc_auc: Métrica ROC AUC a mostrar en el título del gráfico.
         top_n: Cantidad máxima de variables a incluir en el gráfico.
-        settings: Configuración con los nombres de columnas de variable e importancia,
-            y el directorio base donde se guarda la imagen.
+        settings: Configuración con los nombres de columnas de variable e importancia.
+
+    ## Returns:
+        Figura construida, sin guardar en disco.
     """
     top_n = min(top_n, variables_to_plot.height)
 
@@ -157,6 +156,38 @@ def plot_top_features(
         fontsize=label_fontsize,
     )
 
+    return fig
+
+
+def plot_top_features(
+    variables_to_plot: pl.DataFrame,
+    plot_name: str,
+    *,
+    roc_auc: float,
+    top_n: int = 20,
+    settings: config.Settings,
+) -> None:
+    """Genera y guarda un gráfico con las variables más importantes.
+
+    La figura se exporta a:
+    {settings.paths.images}/plot_top_features/{plot_name}.svg
+
+    ## Args:
+        variables_to_plot: Tabla con las variables y sus importancias,
+            ordenada de mayor a menor importancia.
+        plot_name: Nombre base del archivo SVG a generar, sin extensión.
+        roc_auc: Métrica ROC AUC a mostrar en el título del gráfico.
+        top_n: Cantidad máxima de variables a incluir en el gráfico.
+        settings: Configuración con los nombres de columnas de variable e importancia,
+            y el directorio base donde se guarda la imagen.
+    """
+    fig = _build_top_features_figure(
+        variables_to_plot,
+        plot_name,
+        roc_auc=roc_auc,
+        top_n=top_n,
+        settings=settings,
+    )
     _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_top_features")
 
 
@@ -172,29 +203,25 @@ def _format_floats(df: pl.DataFrame) -> pl.DataFrame:
     return df.with_columns(cs.float().round(2))
 
 
-def _plot_single_bivariate_chart(
+def _build_bivariate_chart_figure(
     bivariate_table: bivariate_table.BivariateTable,
-    analysis_name: str,
     settings: config.Settings,
-) -> None:
-    """Genera el gráfico bivariado individual para una variable.
+) -> Figure:
+    """Construye el gráfico bivariado individual para una variable.
 
     Construye una figura con dos secciones: una tabla de análisis en la parte
     superior, y en la parte inferior un gráfico bivariado de barras con la cantidad de
     clientes por bin junto con una línea del porcentaje de la variable
     target en un eje secundario.
 
-    El resultado se exporta a:
-    {settings.paths.images}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
-
     ## Args:
         bivariate_table: Análisis bivariado con el nombre de la variable
             analizada, las columnas de intervalo, conteo de clientes y porcentaje
-            de la variable target. El nombre de la variable analizada se usa
-            como título y como nombre del archivo generado.
-        analysis_name: Nombre del análisis. Define el subdirectorio de salida.
-        settings: Configuración con el nombre de la columna target y el directorio
-            base donde se guarda la imagen.
+            de la variable target.
+        settings: Configuración con el nombre de la columna target.
+
+    ## Returns:
+        Figura construida, sin guardar en disco.
     """
     formatted_table = _format_floats(
         bivariate_table.with_rounded_int_column(settings.analysis.target_pct)
@@ -235,6 +262,29 @@ def _plot_single_bivariate_chart(
     ax_graph_target_pct.set_ylabel(f"{settings.dataset.target} pct (%)")
 
     fig.tight_layout()
+    return fig
+
+
+def _plot_single_bivariate_chart(
+    bivariate_table: bivariate_table.BivariateTable,
+    analysis_name: str,
+    settings: config.Settings,
+) -> None:
+    """Genera y guarda el gráfico bivariado individual para una variable.
+
+    La figura se exporta a:
+    {settings.paths.images}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
+
+    ## Args:
+        bivariate_table: Análisis bivariado con el nombre de la variable
+            analizada, las columnas de intervalo, conteo de clientes y porcentaje
+            de la variable target. El nombre de la variable analizada se usa
+            como nombre del archivo generado.
+        analysis_name: Nombre del análisis. Define el subdirectorio de salida.
+        settings: Configuración con el nombre de la columna target y el directorio
+            base donde se guarda la imagen.
+    """
+    fig = _build_bivariate_chart_figure(bivariate_table, settings)
     _save_fig_as_svg(
         fig,
         bivariate_table.snake_case_name,
@@ -291,24 +341,22 @@ def plot_bivariate_charts(
                 future.result()
 
 
-def plot_roc_curve(
+def _build_roc_curve_figure(
     evaluation_metrics: evaluation.EvaluationMetrics,
     plot_name: str,
-    settings: config.Settings,
-) -> None:
-    """Genera una curva ROC con las métricas resumidas de evaluación.
+) -> Figure:
+    """Construye una curva ROC con las métricas resumidas de evaluación.
 
     Dibuja la tasa de verdaderos positivos frente a la tasa de falsos positivos,
     junto con la línea de referencia diagonal de un clasificador aleatorio.
     Incluye una anotación con los valores de accuracy y ROC AUC.
 
-    El resultado se exporta a:
-    {settings.paths.images}/plot_evaluation_metrics/{plot_name}.svg
-
     ## Args:
         evaluation_metrics: Métricas del modelo.
-        plot_name: Nombre base del archivo SVG a generar, sin extensión.
-        settings: Configuración con el directorio base donde se guarda la imagen.
+        plot_name: Nombre del gráfico que se muestra en el título.
+
+    ## Returns:
+        Figura construida, sin guardar en disco.
     """
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.plot(evaluation_metrics.fpr, evaluation_metrics.tpr)
@@ -329,6 +377,25 @@ def plot_roc_curve(
     ax.set_ylim(0, 1)
     ax.grid(True, linestyle=":", alpha=0.6)
 
+    return fig
+
+
+def plot_roc_curve(
+    evaluation_metrics: evaluation.EvaluationMetrics,
+    plot_name: str,
+    settings: config.Settings,
+) -> None:
+    """Genera y guarda una curva ROC con las métricas resumidas de evaluación.
+
+    La figura se exporta a:
+    {settings.paths.images}/plot_evaluation_metrics/{plot_name}.svg
+
+    ## Args:
+        evaluation_metrics: Métricas del modelo.
+        plot_name: Nombre base del archivo SVG a generar, sin extensión.
+        settings: Configuración con el directorio base donde se guarda la imagen.
+    """
+    fig = _build_roc_curve_figure(evaluation_metrics, plot_name)
     _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_evaluation_metrics")
 
 
@@ -384,24 +451,19 @@ def _plot_single_deciles_table(
     ax.set_title(title, fontsize=12, fontweight="bold", pad=10, loc="left")
 
 
-def plot_deciles(
+def _build_deciles_figure(
     evaluation_metrics: evaluation.EvaluationMetrics,
-    plot_name: str,
-    settings: config.Settings,
-) -> None:
-    """Genera un gráfico con tablas de deciles de entrenamiento y prueba.
+) -> Figure:
+    """Construye un gráfico con tablas de deciles de entrenamiento y prueba.
 
     Crea dos tablas formateadas apiladas verticalmente, una para el conjunto de
-    entrenamiento y otra para el conjunto de prueba, y guarda el resultado como
-    un único archivo SVG optimizado.
-
-    El resultado se exporta a:
-    {settings.paths.images}/plot_evaluation_metrics/{plot_name}.svg
+    entrenamiento y otra para el conjunto de prueba.
 
     ## Args:
         evaluation_metrics: Métricas del modelo.
-        plot_name: Nombre base del archivo SVG a generar, sin extensión.
-        settings: Configuración con el directorio base donde se guarda la imagen.
+
+    ## Returns:
+        Figura construida, sin guardar en disco.
     """
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8), dpi=300)
 
@@ -412,5 +474,24 @@ def plot_deciles(
         ax2, evaluation_metrics.test_deciles_without_probs, "Test Deciles"
     )
 
-    plt.tight_layout()
+    fig.tight_layout()
+    return fig
+
+
+def plot_deciles(
+    evaluation_metrics: evaluation.EvaluationMetrics,
+    plot_name: str,
+    settings: config.Settings,
+) -> None:
+    """Genera y guarda un gráfico con tablas de deciles de entrenamiento y prueba.
+
+    La figura se exporta a:
+    {settings.paths.images}/plot_evaluation_metrics/{plot_name}.svg
+
+    ## Args:
+        evaluation_metrics: Métricas del modelo.
+        plot_name: Nombre base del archivo SVG a generar, sin extensión.
+        settings: Configuración con el directorio base donde se guarda la imagen.
+    """
+    fig = _build_deciles_figure(evaluation_metrics)
     _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_evaluation_metrics")
