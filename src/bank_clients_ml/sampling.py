@@ -83,6 +83,9 @@ class TimeWindowSplit:
         training_months: Meses incluidos en la ventana de entrenamiento.
         prediction_months: Meses incluidos en la ventana de predicción.
         universe_and_target: Universo de clientes con su variable target.
+            Si un cliente del universo es target en al menos un mes de
+            predicción, este cliente mantiene una única fila con target 1.
+            Caso contrario mantiene una única fila con target 0.
         universe_and_target_data: Datos completos del universo con la variable
             target incorporada.
         training_data: Registros del universo restringidos a los meses de
@@ -141,7 +144,9 @@ class TimeWindowSplit:
                 & pl.col(settings.dataset.month).is_in(prediction_months)
             )
             .select(settings.dataset.id, settings.dataset.target)
-            .unique()
+            .group_by(settings.dataset.id)
+            .agg(pl.col(settings.dataset.target).max())
+            .sort(settings.dataset.id)
         )
 
         universe_and_target_data = clean_data.drop(settings.dataset.target).join(
