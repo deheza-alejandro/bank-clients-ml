@@ -4,8 +4,8 @@ from datetime import date
 from typing import cast
 
 import polars as pl
+import polars.testing
 import pytest
-from polars.testing import assert_frame_equal
 
 from bank_clients_ml import config, sampling
 
@@ -540,7 +540,7 @@ def test_should_preserve_all_rows_after_split(
 
     combined = pl.concat([train, test]).sort("client_id")
     expected = abt_data.sort("client_id")
-    assert_frame_equal(combined, expected)
+    polars.testing.assert_frame_equal(combined, expected)
 
 
 def test_should_return_only_original_columns_after_split(
@@ -576,8 +576,8 @@ def test_should_produce_same_split_for_same_random_state(
         abt_data, 0.3, settings=settings
     )
 
-    assert_frame_equal(first_train, second_train)
-    assert_frame_equal(first_test, second_test)
+    polars.testing.assert_frame_equal(first_train, second_train)
+    polars.testing.assert_frame_equal(first_test, second_test)
 
 
 def test_should_split_single_class_data_according_to_test_ratio(
@@ -680,7 +680,7 @@ def test_should_keep_all_majority_rows_unchanged(
 
     expected_majority = imbalanced_train.filter(pl.col("Target") == 0).sort("client_id")
     actual_majority = balanced.filter(pl.col("Target") == 0).sort("client_id")
-    assert_frame_equal(actual_majority, expected_majority)
+    polars.testing.assert_frame_equal(actual_majority, expected_majority)
 
 
 @pytest.mark.parametrize(
@@ -772,7 +772,7 @@ def test_should_produce_same_balanced_data_for_same_random_state(
         imbalanced_train, 0.5, settings=settings
     )
 
-    assert_frame_equal(first_balanced, second_balanced)
+    polars.testing.assert_frame_equal(first_balanced, second_balanced)
 
 
 def test_should_use_custom_column_names_in_oversampling(

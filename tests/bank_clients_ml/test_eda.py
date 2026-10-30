@@ -5,8 +5,8 @@ from datetime import date
 from typing import cast
 
 import polars as pl
+import polars.testing
 import pytest
-from polars.testing import assert_frame_equal
 
 from bank_clients_ml import config, eda
 
@@ -404,7 +404,7 @@ def test_should_count_values_of_low_cardinality_columns(
         },
         schema_overrides={"count": pl.UInt32},
     )
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_cast_low_cardinality_values_to_string() -> None:
@@ -437,7 +437,7 @@ def test_should_return_empty_value_counts_with_expected_schema_when_no_column_is
             "count": pl.UInt32,
         }
     )
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_use_custom_analysis_column_name_in_low_cardinality_value_counts(
@@ -493,7 +493,7 @@ def test_should_count_clients_grouped_by_number_of_registered_months(
         },
         schema_overrides={"month_count": pl.UInt32, "clients_count": pl.UInt32},
     )
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_use_custom_client_identifier_when_summarizing_months(
@@ -541,7 +541,7 @@ def test_should_return_numeric_columns_whose_minimum_is_inside_open_interval(
             "minimum": [-0.5, 0.5],
         }
     )
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_apply_custom_bounds_to_minimum_detection(
@@ -587,7 +587,7 @@ def test_should_return_empty_minimum_result_when_no_column_matches(
             "minimum": pl.Float64,
         }
     )
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_use_custom_analysis_column_name_in_minimum_result(
@@ -629,7 +629,7 @@ def test_should_count_zeros_in_numeric_columns(settings: config.Settings) -> Non
         },
         schema_overrides={"zeros_quantity": pl.UInt32},
     )
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_return_empty_zero_count_when_no_numeric_column_has_zeros(
@@ -650,7 +650,7 @@ def test_should_return_empty_zero_count_when_no_numeric_column_has_zeros(
             "zeros_quantity": pl.UInt32,
         }
     )
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_use_custom_analysis_column_name_in_zero_count(
@@ -675,7 +675,7 @@ def test_should_keep_rows_where_all_columns_are_nonzero() -> None:
     result = eda.filter_nonzero(df)
 
     expected = pl.DataFrame({"a": [1, 3], "b": [3, 5]})
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_keep_negative_values_when_filtering_nonzero_rows() -> None:

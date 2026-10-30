@@ -1,8 +1,8 @@
 """Tests unitarios para el módulo de agrupación de bines."""
 
 import polars as pl
+import polars.testing
 import pytest
-from polars.testing import assert_frame_equal, assert_series_equal
 
 from bank_clients_ml import binning, config
 
@@ -177,7 +177,7 @@ def test_should_allow_interval_ending_at_last_bin(
     result = encode(binner, bivariate_table, [45.0], settings)
 
     expected = pl.Series("feature", [50.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -223,7 +223,7 @@ def test_should_allow_adjacent_intervals(
     result = encode(binner, bivariate_table, [5.0, 25.0, 45.0], settings)
 
     expected = pl.Series("feature", [25.0, 28.0, 50.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 def test_should_use_weighted_target_pct_when_bins_have_different_sizes(
@@ -241,7 +241,7 @@ def test_should_use_weighted_target_pct_when_bins_have_different_sizes(
     result = encode(binner, bivariate_table, [5.0, 15.0], settings)
 
     expected = pl.Series("feature", [25.0, 25.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 def test_should_encode_values_on_both_interval_boundaries(
@@ -259,7 +259,7 @@ def test_should_encode_values_on_both_interval_boundaries(
     result = encode(binner, bivariate_table, [0.0, 20.0], settings)
 
     expected = pl.Series("feature", [25.0, 25.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 def test_should_include_gap_values_when_bins_are_not_contiguous(
@@ -284,7 +284,7 @@ def test_should_include_gap_values_when_bins_are_not_contiguous(
     result = encode(binner, table, [0.0, 15.0, 30.0, 35.0], settings)
 
     expected = pl.Series("feature", [15.0, 15.0, 15.0, 30.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 @pytest.mark.parametrize("value", [-1.0, 51.0])
@@ -305,7 +305,7 @@ def test_should_use_residual_target_pct_when_value_is_outside_all_intervals(
     result = encode(binner, bivariate_table, [value], settings)
 
     expected = pl.Series("feature", [10.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 def test_should_use_residual_target_pct_when_bin_is_not_in_any_interval(
@@ -323,7 +323,7 @@ def test_should_use_residual_target_pct_when_bin_is_not_in_any_interval(
     result = encode(binner, bivariate_table, [25.0], settings)
 
     expected = pl.Series("feature", [10.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 def test_should_use_residual_target_pct_when_value_is_null(
@@ -341,7 +341,7 @@ def test_should_use_residual_target_pct_when_value_is_null(
     result = encode(binner, bivariate_table, [None], settings)
 
     expected = pl.Series("feature", [10.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 def test_should_use_zero_as_residual_when_all_bins_are_covered(
@@ -359,7 +359,7 @@ def test_should_use_zero_as_residual_when_all_bins_are_covered(
     result = encode(binner, bivariate_table, [25.0, -1.0, 51.0, None], settings)
 
     expected = pl.Series("feature", [29.0, 0.0, 0.0, 0.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 def test_should_prefer_first_interval_when_intervals_share_boundary(
@@ -384,7 +384,7 @@ def test_should_prefer_first_interval_when_intervals_share_boundary(
     result = encode(binner, table, [0.0, 10.0, 20.0], settings)
 
     expected = pl.Series("feature", [10.0, 10.0, 20.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 def test_should_ignore_interval_with_null_bounds_and_use_residual_target_pct(
@@ -409,7 +409,7 @@ def test_should_ignore_interval_with_null_bounds_and_use_residual_target_pct(
     result = encode(binner, table, [5.0, 25.0, None], settings)
 
     expected = pl.Series("feature", [10.0, 30.0, 30.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 def test_should_alias_result_with_feature_name(
@@ -497,7 +497,7 @@ def test_should_use_column_names_from_settings() -> None:
     result = encode(binner, table, [5.0], settings)
 
     expected = pl.Series("feature", [15.0], dtype=pl.Float64)
-    assert_series_equal(result, expected)
+    polars.testing.assert_series_equal(result, expected)
 
 
 def test_should_preserve_order_when_created_from_dict() -> None:
@@ -557,7 +557,7 @@ def test_should_replace_mapped_values_and_keep_unmapped_values() -> None:
         {"feature": ["Age", "other"]},
         schema={"feature": pl.String},
     )
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_keep_null_values_when_applying_mapping() -> None:
@@ -574,7 +574,7 @@ def test_should_keep_null_values_when_applying_mapping() -> None:
         {"feature": ["Age", None]},
         schema={"feature": pl.String},
     )
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_not_reflect_mutations_of_source_dict() -> None:

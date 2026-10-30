@@ -3,8 +3,8 @@
 from datetime import date
 
 import polars as pl
+import polars.testing
 import pytest
-from polars.testing import assert_series_equal
 
 from bank_clients_ml import cleaning, config
 
@@ -103,7 +103,7 @@ def test_should_cast_client_id_to_int64(
     result = cleaning.clean_up_data(raw_data, settings)
 
     expected = pl.Series("client_id", [1, 3], dtype=pl.Int64)
-    assert_series_equal(result.get_column("client_id"), expected)
+    polars.testing.assert_series_equal(result.get_column("client_id"), expected)
 
 
 @pytest.mark.parametrize(
@@ -139,7 +139,7 @@ def test_should_convert_date_column_to_date_type(
     result = cleaning.clean_up_data(raw_data, settings)
 
     expected = pl.Series(column, expected_dates, dtype=pl.Date)
-    assert_series_equal(result.get_column(column), expected)
+    polars.testing.assert_series_equal(result.get_column(column), expected)
 
 
 def test_should_preserve_columns_unrelated_to_cleaning(
@@ -155,7 +155,7 @@ def test_should_preserve_columns_unrelated_to_cleaning(
     result = cleaning.clean_up_data(raw_data, settings)
 
     expected = pl.Series("Balance", [100.0, 300.0], dtype=pl.Float64)
-    assert_series_equal(result.get_column("Balance"), expected)
+    polars.testing.assert_series_equal(result.get_column("Balance"), expected)
 
 
 def test_should_return_empty_frame_when_all_targets_are_null(

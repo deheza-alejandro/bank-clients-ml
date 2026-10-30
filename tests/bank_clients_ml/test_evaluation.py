@@ -2,8 +2,8 @@
 
 import numpy as np
 import polars as pl
+import polars.testing
 import pytest
-from polars.testing import assert_frame_equal
 
 from bank_clients_ml import config, evaluation
 
@@ -87,7 +87,7 @@ def test_should_compute_all_decile_metrics_ordered_by_descending_probability(
         }
     )
 
-    assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(result, expected)
 
 
 def test_should_assign_probability_equal_to_break_to_lower_decile(
@@ -333,6 +333,6 @@ def test_should_drop_probability_columns_from_deciles(
     source = getattr(metrics, source_attribute)
     result = getattr(metrics, attribute)
 
-    assert_frame_equal(result, source.drop("min_prob", "max_prob"))
+    polars.testing.assert_frame_equal(result, source.drop("min_prob", "max_prob"))
     assert "min_prob" in source.columns
     assert "max_prob" in source.columns
