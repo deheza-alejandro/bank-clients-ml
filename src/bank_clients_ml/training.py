@@ -13,16 +13,117 @@ import dataclasses
 import io
 import types
 from collections.abc import ItemsView, Iterable
-from typing import Self
+from typing import Any, Self
 
 import lightgbm as lgb
 import numpy as np
 import polars as pl
 import scipy.stats
-import sklearn.metrics
 import sklearn.model_selection
 
 from bank_clients_ml import binning, column_groups, config, visualization
+
+
+def _build_cross_validation(
+    splits_cross_validation: int,
+    settings: config.Settings,
+) -> sklearn.model_selection.StratifiedKFold:
+    """Construye la validación cruzada estratificada reproducible.
+
+    ## Args:
+        splits_cross_validation: Cantidad de particiones de la validación cruzada.
+        settings: Configuración con la semilla del proyecto.
+
+    ## Returns:
+        Validador cruzado estratificado con la cantidad de particiones indicada.
+    """
+    return sklearn.model_selection.StratifiedKFold(
+        n_splits=splits_cross_validation,
+        shuffle=True,
+        random_state=settings.random_state,
+    )
+
+
+def _build_param_distributions(
+    n_samples: int,
+    splits_cross_validation: int,
+) -> dict[str, Any]:
+    """Construye el espacio de búsqueda de hiperparámetros de LightGBM.
+
+    Ajusta el rango de `min_child_samples` al tamaño de los pliegues de la
+    validación cruzada para evitar combinaciones que no pueden producir ninguna
+    partición.
+
+    ## Args:
+        n_samples: Cantidad de filas del conjunto de entrenamiento.
+        splits_cross_validation: Cantidad de particiones de la validación cruzada.
+
+    ## Returns:
+        Distribuciones de hiperparámetros para `RandomizedSearchCV`.
+    """
+    fold_size = n_samples * (splits_cross_validation - 1) // splits_cross_validation
+    max_child_samples = max(2, min(2900, fold_size // 3))
+    lower_child_samples = max(1, min(1000, max_child_samples // 3))
+
+    return {
+        "n_estimators": np.arange(6, 50, 1),
+        "max_depth": np.arange(4, 10, 1),
+        "num_leaves": np.arange(3, 20, 1),
+        "subsample": scipy.stats.uniform(loc=0.2, scale=0.8),
+        "learning_rate": [0.01, 0.05, 0.1, 0.2],
+        "min_child_samples": np.unique(
+            np.linspace(
+                lower_child_samples,
+                max_child_samples,
+                num=20,
+                dtype=int,
+            )
+        ),
+    }
+
+
+def _build_searcher(
+    *,
+    n_iter: int,
+    splits_cross_validation: int,
+    n_samples: int,
+    settings: config.Settings,
+) -> sklearn.model_selection.RandomizedSearchCV:
+    """Construye el buscador de hiperparámetros de LightGBM.
+
+    El clasificador interno usa `n_jobs=1` para no competir con los procesos
+    que `RandomizedSearchCV` utiliza para evaluar las combinaciones.
+
+    ## Args:
+        n_iter: Cantidad de combinaciones de hiperparámetros a evaluar.
+        splits_cross_validation: Cantidad de particiones de la validación cruzada.
+        n_samples: Cantidad de filas del conjunto de entrenamiento.
+        settings: Configuración con semilla, nivel de detalle y nivel de paralelismo.
+
+    ## Returns:
+        Buscador configurado con el clasificador, el espacio de búsqueda y la
+        validación cruzada estratificada.
+    """
+    classifier = lgb.LGBMClassifier(
+        random_state=settings.random_state,
+        n_jobs=1,
+        verbose=-1,
+        metric="auc",
+    )
+
+    return sklearn.model_selection.RandomizedSearchCV(
+        estimator=classifier,
+        param_distributions=_build_param_distributions(
+            n_samples, splits_cross_validation
+        ),
+        n_iter=n_iter,
+        scoring="roc_auc",
+        n_jobs=settings.n_jobs,
+        refit=True,
+        cv=_build_cross_validation(splits_cross_validation, settings),
+        verbose=3 if settings.debug else 1,
+        random_state=settings.random_state,
+    )
 
 
 def _fit_lgbm_random_search(
@@ -46,51 +147,23 @@ def _fit_lgbm_random_search(
             con `RandomizedSearchCV`.
         splits_cross_validation: Cantidad de particiones de la validación cruzada
             para usar con ``RandomizedSearchCV``.
-        settings: Configuración con semilla, nivel de detalle y nombres de columnas.
+        settings: Configuración con semilla, nivel de detalle, nivel de paralelismo
+            y nombres de columnas.
 
     ## Returns:
         Tupla con el buscador entrenado, la tabla de importancias ordenada de
-            forma descendente y los registros capturados durante el entrenamiento.
+        forma descendente y los registros capturados durante el entrenamiento.
     """
-    verbose: int = 3 if settings.debug else 1
-
-    classifier = lgb.LGBMClassifier(
-        random_state=settings.random_state,
-        n_jobs=1,
-        verbose=-1,
-        metric="auc",
-    )
-
-    param_distributions = {
-        "n_estimators": np.arange(6, 50, 1),
-        "max_depth": np.arange(
-            4, 10, 1
-        ),  # [4, 5, 6, 7, 8, 9] from 4 to (10-1) increasing by 1
-        "num_leaves": np.arange(3, 20, 1),
-        "subsample": scipy.stats.uniform(loc=0.2, scale=0.8),
-        "learning_rate": [0.01, 0.05, 0.1, 0.2],
-        "min_child_samples": np.arange(1000, 3000, 100),
-    }
-
-    searcher = sklearn.model_selection.RandomizedSearchCV(
-        estimator=classifier,
-        param_distributions=param_distributions,
-        n_iter=n_iter,
-        scoring="roc_auc",
-        n_jobs=-1,
-        refit=True,
-        cv=sklearn.model_selection.StratifiedKFold(
-            n_splits=splits_cross_validation,
-            shuffle=True,
-            random_state=settings.random_state,
-        ),
-        verbose=verbose,
-        random_state=settings.random_state,
-    )
-
     columns_tuple = tuple(columns)
     X_train = train.select(columns_tuple)
     y_train = train.get_column(settings.dataset.target)
+
+    searcher = _build_searcher(
+        n_iter=n_iter,
+        splits_cross_validation=splits_cross_validation,
+        n_samples=train.height,
+        settings=settings,
+    )
 
     with (
         io.StringIO() as log_buffer,
@@ -130,7 +203,6 @@ class LGBMTrainer:
     importances: pl.DataFrame
     search_logs: str
     n_iter: int
-    splits_cross_validation: int
     settings: config.Settings
     _searcher: sklearn.model_selection.RandomizedSearchCV
 
@@ -194,7 +266,6 @@ class LGBMTrainer:
             importances,
             search_logs,
             n_iter,
-            splits_cross_validation,
             settings,
             _searcher,
         )
@@ -215,6 +286,21 @@ class LGBMTrainer:
     def best_model(self) -> lgb.LGBMClassifier:
         """Mejor clasificador LightGBM encontrado durante la búsqueda."""
         return self._searcher.best_estimator_
+
+    @property
+    def best_score(self) -> float:
+        """Mejor puntuación obtenida en la validación cruzada."""
+        return self._searcher.best_score_
+
+    @property
+    def splits_cross_validation(self) -> int:
+        """Cantidad de particiones utilizadas en la validación cruzada."""
+        return self._searcher.n_splits_
+
+    @property
+    def random_state(self) -> int:
+        """Semilla configurada."""
+        return self.settings.random_state
 
     @property
     def cv_results(self) -> pl.DataFrame:
@@ -265,7 +351,7 @@ class LGBMTrainer:
         visualization.plot_top_features(
             temp_importances,
             plot_name,
-            roc_auc=self._searcher.best_score_,
+            roc_auc=self.best_score,
             settings=self.settings,
         )
 
