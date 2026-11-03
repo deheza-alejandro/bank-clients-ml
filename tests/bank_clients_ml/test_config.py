@@ -61,6 +61,11 @@ def test_should_return_cached_settings_instance() -> None:
     assert second_settings is first_settings
 
 
+def test_should_use_all_cores_for_parallel_search_by_default() -> None:
+    """Verifica que la búsqueda use todos los núcleos por defecto."""
+    assert config.Settings().n_jobs == -1
+
+
 @pytest.mark.parametrize(
     ("model_factory", "attribute", "new_value"),
     [
