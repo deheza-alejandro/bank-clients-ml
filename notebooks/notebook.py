@@ -868,12 +868,12 @@ def _():
     ### Testing
 
     - Ordenamiento correcto en todos los deciles, con una distribución relativamente homogénea.
-    - Lift del 1er decil de 2,36 y KS de 47,22 en el 4to decil.
+    - Lift del 1er decil de 2,39 y KS de 48,19 en el 4to decil.
 
     ### Stability Gap
 
-    - Diferencia de lift de 0,04 en el mismo decil.
-    - Diferencia de KS de 0,19, con 1 decil de diferencia.
+    - Diferencia de lift de 0,01 en el mismo decil.
+    - Diferencia de KS de 1,16, con 1 decil de diferencia.
     """)
     return
 
