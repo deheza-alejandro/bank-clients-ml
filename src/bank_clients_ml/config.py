@@ -111,6 +111,8 @@ class Settings(pydantic_settings.BaseSettings):
     ## Attributes:
         debug: Indica si el modo de depuración está activado.
         random_state: Semilla utilizada para garantizar reproducibilidad.
+        n_jobs: Cantidad de procesos paralelos para la búsqueda de
+            hiperparámetros. El valor -1 utiliza todos los núcleos disponibles.
         paths: Rutas base de directorios del proyecto.
         dataset: Nombres de columnas del conjunto de datos principal.
         analysis: Nombres de columnas genéricas para resultados de análisis.
@@ -118,6 +120,7 @@ class Settings(pydantic_settings.BaseSettings):
 
     debug: bool = False
     random_state: int = 314
+    n_jobs: int = -1
 
     paths: DirectoryPaths = pydantic.Field(default_factory=DirectoryPaths)
     dataset: DatasetColumns = pydantic.Field(default_factory=DatasetColumns)
