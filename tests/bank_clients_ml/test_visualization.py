@@ -5,15 +5,15 @@ import pathlib
 from collections.abc import Generator
 from typing import cast
 
+import matplotlib.figure
+import matplotlib.patches
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing
 import polars as pl
 import polars.testing
 import pytest
 import pytest_mock
-from matplotlib.figure import Figure
-from matplotlib.patches import Rectangle
-from numpy.typing import NDArray
 
 from bank_clients_ml import bivariate_table, config, evaluation, visualization
 
@@ -251,7 +251,9 @@ def test_should_build_top_features_figure_with_requested_limit_and_expected_titl
 
     ax = fig.axes[0]
     assert [label.get_text() for label in ax.get_yticklabels()] == expected_features
-    widths = [cast(Rectangle, patch).get_width() for patch in ax.patches]
+    widths = [
+        cast(matplotlib.patches.Rectangle, patch).get_width() for patch in ax.patches
+    ]
     assert widths == pytest.approx(
         top_features_table.get_column("Importance")
         .head(len(expected_features))
@@ -303,7 +305,10 @@ def test_should_build_bivariate_figure_with_table_bars_and_target_percentage_lin
     assert headers == ["Bin", "Min", "Max", "Clients", "Target", "Target_pct"]
     assert table[1, 1].get_text().get_text() == "18.46"
     assert table[1, 5].get_text().get_text() == "10"
-    heights = [cast(Rectangle, patch).get_height() for patch in ax_graph.patches]
+    heights = [
+        cast(matplotlib.patches.Rectangle, patch).get_height()
+        for patch in ax_graph.patches
+    ]
     assert heights == [10.0, 20.0, 30.0]
     assert [label.get_text() for label in ax_graph.get_xticklabels()] == [
         "1",
@@ -312,7 +317,7 @@ def test_should_build_bivariate_figure_with_table_bars_and_target_percentage_lin
     ]
     assert ax_graph.get_ylabel() == settings.analysis.clients
     target_pct_values = cast(
-        NDArray[np.float64],
+        numpy.typing.NDArray[np.float64],
         ax_target_pct.lines[0].get_ydata(),
     )
     np.testing.assert_allclose(
@@ -440,11 +445,13 @@ def test_should_process_all_tables_with_process_pool_when_many_tables_are_reques
     )
 
 
-def _line_data(line) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+def _line_data(
+    line,
+) -> tuple[numpy.typing.NDArray[np.float64], numpy.typing.NDArray[np.float64]]:
     """Devuelve los datos de una línea con el tipo esperado por NumPy."""
     return (
-        cast(NDArray[np.float64], line.get_xdata()),
-        cast(NDArray[np.float64], line.get_ydata()),
+        cast(numpy.typing.NDArray[np.float64], line.get_xdata()),
+        cast(numpy.typing.NDArray[np.float64], line.get_ydata()),
     )
 
 
@@ -546,7 +553,7 @@ def _assert_saved_figure(
     """
     assert save_mock.call_count == 1
     figure, actual_plot_name, images_dir, actual_sub_dir = save_mock.call_args.args
-    assert isinstance(figure, Figure)
+    assert isinstance(figure, matplotlib.figure.Figure)
     assert actual_plot_name == plot_name
     assert images_dir == settings.paths.images
     assert actual_sub_dir == images_sub_dir
