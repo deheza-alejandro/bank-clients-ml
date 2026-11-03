@@ -132,12 +132,21 @@ def bivariate_analyzer(
     )
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "expected_n_iter"),
+    [
+        pytest.param({"n_iter": 7}, 7, id="explicit-iterations"),
+        pytest.param({}, 20, id="default-iterations"),
+    ],
+)
 def test_should_fit_trainer_with_mapped_features_when_building_features_selection(
     mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
     name_mapping: binning.NameMapping,
     train_data: pl.DataFrame,
     test_data: pl.DataFrame,
+    kwargs: dict[str, int],
+    expected_n_iter: int,
 ) -> None:
     """Verifica que la selección entrene al modelo con las variables mapeadas.
 
@@ -147,6 +156,8 @@ def test_should_fit_trainer_with_mapped_features_when_building_features_selectio
         name_mapping: Mapeo entre nombres internos y descriptivos.
         train_data: Conjunto de entrenamiento.
         test_data: Conjunto de prueba.
+        kwargs: Argumentos opcionales enviados a `fit_and_build`.
+        expected_n_iter: Cantidad esperada de iteraciones de la búsqueda.
     """
     trainer = mocker.Mock()
     fit = mocker.patch.object(
@@ -160,61 +171,22 @@ def test_should_fit_trainer_with_mapped_features_when_building_features_selectio
         test=test_data,
         name_mapping=name_mapping,
         settings=settings,
-        n_iter=7,
+        **kwargs,
     )
 
     fit.assert_called_once_with(
         train_data,
         ("age", "income"),
         settings,
-        n_iter=7,
+        n_iter=expected_n_iter,
     )
     assert result.train is train_data
     assert result.test is test_data
     assert result.name_mapping is name_mapping
     assert result.trainer is trainer
     assert result.settings is settings
-    assert result.n_iter == 7
+    assert result.n_iter == expected_n_iter
     assert result.snake_case_names == ("age", "income")
-
-
-def test_should_use_twenty_iterations_by_default_when_building_features_selection(
-    mocker: pytest_mock.MockerFixture,
-    settings: config.Settings,
-    name_mapping: binning.NameMapping,
-    train_data: pl.DataFrame,
-    test_data: pl.DataFrame,
-) -> None:
-    """Verifica que la selección use veinte iteraciones si no se indica otra cantidad.
-
-    ## Args:
-        mocker: Utilidad para sustituir el entrenamiento de LightGBM.
-        settings: Configuración global del proyecto.
-        name_mapping: Mapeo entre nombres internos y descriptivos.
-        train_data: Conjunto de entrenamiento.
-        test_data: Conjunto de prueba.
-    """
-    trainer = mocker.Mock()
-    fit = mocker.patch.object(
-        training.LGBMTrainer,
-        "fit_and_build",
-        return_value=trainer,
-    )
-
-    result = bivariate_analysis.FeaturesSelection.fit_and_build(
-        train=train_data,
-        test=test_data,
-        name_mapping=name_mapping,
-        settings=settings,
-    )
-
-    fit.assert_called_once_with(
-        train_data,
-        ("age", "income"),
-        settings,
-        n_iter=20,
-    )
-    assert result.n_iter == 20
 
 
 def test_should_build_train_tables_and_plot_charts_with_requested_bin_limit(

@@ -1,5 +1,6 @@
 """Tests unitarios para el módulo de limpieza inicial de datos."""
 
+from collections.abc import Callable
 from datetime import date
 
 import polars as pl
@@ -191,17 +192,14 @@ def test_should_return_empty_frame_when_all_targets_are_null(
     assert result.schema["Month"] == pl.Date
 
 
-def test_should_use_column_names_from_settings_when_provided() -> None:
-    """Verifica que se respeten los nombres de columna de la configuración."""
-    custom_settings = config.Settings(
-        dataset=config.DatasetColumns(
-            id="customer_id",
-            target="churn",
-            month="snapshot_month",
-            first_product_date="first_seen",
-            last_product_date="last_seen",
-        )
-    )
+def test_should_use_column_names_from_settings_when_provided(
+    custom_dataset_settings: config.Settings,
+) -> None:
+    """Verifica que se respeten los nombres de columna de la configuración.
+
+    ## Args:
+        custom_dataset_settings: Configuración con los nombres alternativos.
+    """
     raw_data = pl.DataFrame(
         {
             "customer_id": ["7", "8"],
@@ -219,22 +217,22 @@ def test_should_use_column_names_from_settings_when_provided() -> None:
         },
     )
 
-    result = cleaning.clean_up_data(raw_data, custom_settings)
+    result = cleaning.clean_up_data(raw_data, custom_dataset_settings)
 
     assert result.get_column("customer_id").to_list() == [7]
     assert result.get_column("snapshot_month").to_list() == [date(2024, 5, 1)]
 
 
 def test_should_use_global_settings_when_settings_is_not_provided(
-    monkeypatch: pytest.MonkeyPatch,
+    patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que se use la configuración global si no se recibe una explícita.
 
     ## Args:
-        monkeypatch: Utilidad para reemplazar la configuración global.
+        patch_global_settings: Helper para reemplazar la configuración global.
     """
     global_settings = config.Settings(dataset=config.DatasetColumns(target="label"))
-    monkeypatch.setattr(config, "get_settings", lambda: global_settings)
+    patch_global_settings(global_settings)
     raw_data = pl.DataFrame(
         {
             "client_id": ["1", "2"],

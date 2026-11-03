@@ -1,5 +1,6 @@
 """Tests unitarios para el módulo de feature engineering."""
 
+from collections.abc import Callable
 from datetime import date
 
 import polars as pl
@@ -102,24 +103,6 @@ def _build_float_frame(
     return pl.DataFrame(
         [{column: row.get(column, 0.0) for column in columns} for row in rows],
         schema={column: pl.Float64 for column in columns},
-    )
-
-
-@pytest.fixture
-def custom_settings() -> config.Settings:
-    """Devuelve una configuración con nombres de columnas alternativos.
-
-    ## Returns:
-        Configuración con identificador, target, mes y fechas personalizados.
-    """
-    return config.Settings(
-        dataset=config.DatasetColumns(
-            id="customer_id",
-            target="churn",
-            month="snapshot_month",
-            first_product_date="first_seen",
-            last_product_date="last_seen",
-        )
     )
 
 
@@ -321,14 +304,14 @@ def test_should_use_default_categorical_columns_from_column_groups(
 def test_should_use_custom_target_column_in_target_encoding(
     identity_features: pl.DataFrame,
     training_data: pl.DataFrame,
-    custom_settings: config.Settings,
+    custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que se use el target configurado para calcular los porcentajes.
 
     ## Args:
         identity_features: Identity features con target y categorías.
         training_data: Historia mensual con las columnas categóricas.
-        custom_settings: Configuración con el target alternativo.
+        custom_dataset_settings: Configuración con el target alternativo.
     """
     renamed_identity = identity_features.rename({"Target": "churn"})
 
@@ -336,7 +319,7 @@ def test_should_use_custom_target_column_in_target_encoding(
         identity_features=renamed_identity,
         training_data=training_data,
         categorical_cols=["Region"],
-        settings=custom_settings,
+        settings=custom_dataset_settings,
     )
 
     expected = [66.667, 66.667, 66.667, 33.333, 33.333, 33.333]
@@ -346,18 +329,18 @@ def test_should_use_custom_target_column_in_target_encoding(
 def test_should_use_global_settings_when_settings_is_not_provided_for_target_encoding(
     identity_features: pl.DataFrame,
     training_data: pl.DataFrame,
-    custom_settings: config.Settings,
-    monkeypatch: pytest.MonkeyPatch,
+    custom_dataset_settings: config.Settings,
+    patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que se use la configuración global si no se recibe una explícita.
 
     ## Args:
         identity_features: Identity features con target y categorías.
         training_data: Historia mensual con las columnas categóricas.
-        custom_settings: Configuración con el target alternativo.
-        monkeypatch: Utilidad para reemplazar la configuración global.
+        custom_dataset_settings: Configuración con el target alternativo.
+        patch_global_settings: Helper para reemplazar la configuración global.
     """
-    monkeypatch.setattr(config, "get_settings", lambda: custom_settings)
+    patch_global_settings(custom_dataset_settings)
     renamed_identity = identity_features.rename({"Target": "churn"})
 
     result, _ = feature_engineering.target_encode_columns(
@@ -437,12 +420,12 @@ def test_should_compute_recency_across_year_boundary(
 
 
 def test_should_use_custom_date_columns_in_date_features(
-    custom_settings: config.Settings,
+    custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que se usen las columnas de fecha configuradas.
 
     ## Args:
-        custom_settings: Configuración con las fechas alternativas.
+        custom_dataset_settings: Configuración con las fechas alternativas.
     """
     data = pl.DataFrame(
         {
@@ -458,7 +441,7 @@ def test_should_use_custom_date_columns_in_date_features(
     )
 
     result = feature_engineering.transform_date_features(
-        data, date(2024, 6, 1), settings=custom_settings
+        data, date(2024, 6, 1), settings=custom_dataset_settings
     )
 
     assert result["Days_between_first_and_last_product"].item() == 152
@@ -468,16 +451,16 @@ def test_should_use_custom_date_columns_in_date_features(
 
 
 def test_should_use_global_settings_when_settings_is_not_provided_for_date_features(
-    custom_settings: config.Settings,
-    monkeypatch: pytest.MonkeyPatch,
+    custom_dataset_settings: config.Settings,
+    patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que se use la configuración global si no se recibe una explícita.
 
     ## Args:
-        custom_settings: Configuración con las fechas alternativas.
-        monkeypatch: Utilidad para reemplazar la configuración global.
+        custom_dataset_settings: Configuración con las fechas alternativas.
+        patch_global_settings: Helper para reemplazar la configuración global.
     """
-    monkeypatch.setattr(config, "get_settings", lambda: custom_settings)
+    patch_global_settings(custom_dataset_settings)
     data = pl.DataFrame(
         {
             "customer_id": [7],
@@ -847,13 +830,13 @@ def test_should_round_monetary_values_before_counting_unique_values(
 
 def test_should_use_custom_identifier_and_month_columns_in_aggregation(
     monthly_history: pl.DataFrame,
-    custom_settings: config.Settings,
+    custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que se usen el identificador y el mes configurados.
 
     ## Args:
         monthly_history: Historia mensual de dos clientes.
-        custom_settings: Configuración con identificador y mes alternativos.
+        custom_dataset_settings: Configuración con identificador y mes alternativos.
     """
     data = monthly_history.rename(
         {"client_id": "customer_id", "Month": "snapshot_month"}
@@ -863,7 +846,7 @@ def test_should_use_custom_identifier_and_month_columns_in_aggregation(
         data,
         columns_with_monetary_values=["Balance"],
         columns_with_quantities=["Operations_total"],
-        settings=custom_settings,
+        settings=custom_dataset_settings,
     ).sort("customer_id")
 
     assert result["customer_id"].to_list() == [1, 2]
@@ -873,17 +856,17 @@ def test_should_use_custom_identifier_and_month_columns_in_aggregation(
 
 def test_should_use_global_settings_when_settings_is_not_provided_for_aggregation(
     monthly_history: pl.DataFrame,
-    custom_settings: config.Settings,
-    monkeypatch: pytest.MonkeyPatch,
+    custom_dataset_settings: config.Settings,
+    patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que se use la configuración global si no se recibe una explícita.
 
     ## Args:
         monthly_history: Historia mensual de dos clientes.
-        custom_settings: Configuración con identificador y mes alternativos.
-        monkeypatch: Utilidad para reemplazar la configuración global.
+        custom_dataset_settings: Configuración con identificador y mes alternativos.
+        patch_global_settings: Helper para reemplazar la configuración global.
     """
-    monkeypatch.setattr(config, "get_settings", lambda: custom_settings)
+    patch_global_settings(custom_dataset_settings)
     data = monthly_history.rename(
         {"client_id": "customer_id", "Month": "snapshot_month"}
     )
@@ -1047,12 +1030,12 @@ def test_should_standardize_with_sample_standard_deviation_when_ddof_is_one(
 
 
 def test_should_use_custom_identifier_and_target_columns_in_standardization(
-    custom_settings: config.Settings,
+    custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que se excluyan el identificador y el target configurados.
 
     ## Args:
-        custom_settings: Configuración con identificador y target alternativos.
+        custom_dataset_settings: Configuración con identificador y target alternativos.
     """
     data = pl.DataFrame(
         {
@@ -1067,7 +1050,9 @@ def test_should_use_custom_identifier_and_target_columns_in_standardization(
         },
     )
 
-    result = feature_engineering.standardize(data, ddof=0, settings=custom_settings)
+    result = feature_engineering.standardize(
+        data, ddof=0, settings=custom_dataset_settings
+    )
 
     assert result["customer_id"].to_list() == [10, 20, 30]
     assert result["churn"].to_list() == [1.0, 0.0, 1.0]
@@ -1077,16 +1062,16 @@ def test_should_use_custom_identifier_and_target_columns_in_standardization(
 
 
 def test_should_use_global_settings_when_settings_is_not_provided_for_standardization(
-    custom_settings: config.Settings,
-    monkeypatch: pytest.MonkeyPatch,
+    custom_dataset_settings: config.Settings,
+    patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que se use la configuración global si no se recibe una explícita.
 
     ## Args:
-        custom_settings: Configuración con identificador y target alternativos.
-        monkeypatch: Utilidad para reemplazar la configuración global.
+        custom_dataset_settings: Configuración con identificador y target alternativos.
+        patch_global_settings: Helper para reemplazar la configuración global.
     """
-    monkeypatch.setattr(config, "get_settings", lambda: custom_settings)
+    patch_global_settings(custom_dataset_settings)
     data = pl.DataFrame(
         {
             "customer_id": [10, 20, 30],

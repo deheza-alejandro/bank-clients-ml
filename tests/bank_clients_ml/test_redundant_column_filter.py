@@ -80,6 +80,16 @@ def correlation_matrix() -> pl.DataFrame:
 
 
 @pytest.fixture
+def binary_frame() -> pl.DataFrame:
+    """Devuelve un DataFrame con target y feature binarios.
+
+    Returns:
+        DataFrame con una fila por valor binario.
+    """
+    return pl.DataFrame({"Target": [0, 1], "feature": [0, 1]})
+
+
+@pytest.fixture
 def redundant_filter(
     train_data: pl.DataFrame,
     test_data: pl.DataFrame,
@@ -245,18 +255,20 @@ def test_should_exclude_target_from_imbalanced_binary_detection(
 )
 def test_should_raise_value_error_for_invalid_imbalanced_threshold(
     settings: config.Settings,
+    binary_frame: pl.DataFrame,
     threshold: float,
 ) -> None:
     """Verifica que se rechacen umbrales fuera del intervalo permitido.
 
     Args:
         settings: Configuración con el nombre de la columna target.
+        binary_frame: DataFrame con target y feature binarios.
         threshold: Umbral inválido para columnas binarias.
     """
-    df = pl.DataFrame({"Target": [0, 1], "feature": [0, 1]})
-
     with pytest.raises(ValueError, match="Invalid threshold"):
-        redundant_column_filter._get_imbalanced_binary_columns(df, threshold, settings)
+        redundant_column_filter._get_imbalanced_binary_columns(
+            binary_frame, threshold, settings
+        )
 
 
 @pytest.mark.parametrize(
@@ -488,20 +500,20 @@ def test_should_exclude_custom_id_and_target_from_correlation_analysis() -> None
 )
 def test_should_raise_value_error_during_generate_for_invalid_imbalanced_threshold(
     settings: config.Settings,
+    binary_frame: pl.DataFrame,
     threshold: float,
 ) -> None:
     """Verifica que la generación falle con un umbral binario inválido.
 
     Args:
         settings: Configuración global del proyecto.
+        binary_frame: DataFrame con target y feature binarios.
         threshold: Umbral inválido para columnas binarias.
     """
-    df = pl.DataFrame({"Target": [0, 1], "feature": [0, 1]})
-
     with pytest.raises(ValueError, match="Invalid threshold"):
         redundant_column_filter.RedundantColumnFilter.generate(
-            train=df,
-            test=df,
+            train=binary_frame,
+            test=binary_frame,
             imbalanced_binary_threshold=threshold,
             settings=settings,
         )

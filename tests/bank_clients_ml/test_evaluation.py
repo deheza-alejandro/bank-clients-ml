@@ -22,17 +22,52 @@ def decile_bins() -> list[float]:
 
 
 @pytest.fixture
-def train_with_ordered_probabilities() -> tuple[pl.DataFrame, np.ndarray]:
+def balanced_target_train() -> pl.DataFrame:
+    """Devuelve un entrenamiento con cinco ceros y cinco unos.
+
+    ## Returns:
+        DataFrame con un target binario balanceado.
+    """
+    return pl.DataFrame({"Target": [0] * 5 + [1] * 5})
+
+
+@pytest.fixture
+def ordered_probabilities() -> np.ndarray:
+    """Devuelve diez probabilidades crecientes y separables.
+
+    ## Returns:
+        Array con probabilidades ordenadas de 0.05 a 0.95.
+    """
+    return np.array([0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95])
+
+
+@pytest.fixture
+def train_with_ordered_probabilities(
+    balanced_target_train: pl.DataFrame,
+    ordered_probabilities: np.ndarray,
+) -> tuple[pl.DataFrame, np.ndarray]:
     """Devuelve un entrenamiento con probabilidades y target ordenados.
+
+    ## Args:
+        balanced_target_train: Entrenamiento con target binario balanceado.
+        ordered_probabilities: Probabilidades crecientes y separables.
 
     ## Returns:
         Datos de entrenamiento y probabilidades crecientes separables.
     """
-    probabilities = np.array(
-        [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
-    )
-    train = pl.DataFrame({"Target": [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]})
-    return train, probabilities
+    return balanced_target_train, ordered_probabilities
+
+
+@pytest.fixture
+def binary_test_with_probabilities() -> tuple[pl.DataFrame, np.ndarray]:
+    """Devuelve un conjunto de prueba binario con sus probabilidades.
+
+    ## Returns:
+        DataFrame de prueba y probabilidades asociadas.
+    """
+    test = pl.DataFrame({"Target": [0, 0, 1, 1]})
+    probabilities = np.array([0.1, 0.4, 0.35, 0.8])
+    return test, probabilities
 
 
 def _min_prob_for_decile(deciles: pl.DataFrame, decile: str) -> float:
@@ -51,20 +86,19 @@ def _min_prob_for_decile(deciles: pl.DataFrame, decile: str) -> float:
 def test_should_compute_all_decile_metrics_ordered_by_descending_probability(
     settings: config.Settings,
     decile_bins: list[float],
+    ordered_probabilities: np.ndarray,
 ) -> None:
     """Verifica todas las métricas por decil con cortes explícitos.
 
     ## Args:
         settings: Configuración con el nombre de la columna target.
         decile_bins: Cortes que separan las diez categorías de decil.
+        ordered_probabilities: Probabilidades crecientes y separables.
     """
-    probabilities = np.array(
-        [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
-    )
     train = pl.DataFrame({"Target": [0, 0, 0, 0, 1, 1, 1, 1, 1, 1]})
 
     result = evaluation._compute_prediction_deciles(
-        train, probabilities, settings, decile_bins
+        train, ordered_probabilities, settings, decile_bins
     )
 
     expected = pl.DataFrame(
@@ -156,16 +190,17 @@ def test_should_allow_duplicate_probabilities_when_bins_are_not_provided(
 def test_should_compute_roc_auc_and_accuracy_from_test_probabilities(
     settings: config.Settings,
     train_with_ordered_probabilities: tuple[pl.DataFrame, np.ndarray],
+    binary_test_with_probabilities: tuple[pl.DataFrame, np.ndarray],
 ) -> None:
     """Verifica que las métricas globales se calculen sobre el conjunto de prueba.
 
     ## Args:
         settings: Configuración con el nombre de la columna target.
         train_with_ordered_probabilities: Entrenamiento y sus probabilidades.
+        binary_test_with_probabilities: Prueba y sus probabilidades asociadas.
     """
     train, probabilities_train = train_with_ordered_probabilities
-    test = pl.DataFrame({"Target": [0, 0, 1, 1]})
-    probabilities_test = np.array([0.1, 0.4, 0.35, 0.8])
+    test, probabilities_test = binary_test_with_probabilities
 
     metrics = evaluation.evaluate(
         train=train,
@@ -208,16 +243,17 @@ def test_should_treat_probability_equal_to_half_as_positive(
 def test_should_return_roc_curve_points_for_test_probabilities(
     settings: config.Settings,
     train_with_ordered_probabilities: tuple[pl.DataFrame, np.ndarray],
+    binary_test_with_probabilities: tuple[pl.DataFrame, np.ndarray],
 ) -> None:
     """Verifica que se devuelvan los puntos ROC calculados sobre la prueba.
 
     ## Args:
         settings: Configuración con el nombre de la columna target.
         train_with_ordered_probabilities: Entrenamiento y sus probabilidades.
+        binary_test_with_probabilities: Prueba y sus probabilidades asociadas.
     """
     train, probabilities_train = train_with_ordered_probabilities
-    test = pl.DataFrame({"Target": [0, 0, 1, 1]})
-    probabilities_test = np.array([0.1, 0.4, 0.35, 0.8])
+    test, probabilities_test = binary_test_with_probabilities
 
     metrics = evaluation.evaluate(
         train=train,
@@ -233,13 +269,15 @@ def test_should_return_roc_curve_points_for_test_probabilities(
 
 def test_should_use_train_quantiles_to_bin_test_deciles(
     settings: config.Settings,
+    balanced_target_train: pl.DataFrame,
 ) -> None:
     """Verifica que los deciles de prueba usen los cortes del entrenamiento.
 
     ## Args:
         settings: Configuración con el nombre de la columna target.
+        balanced_target_train: Entrenamiento con target binario balanceado.
     """
-    train = pl.DataFrame({"Target": [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]})
+    train = balanced_target_train
     probabilities_train = np.linspace(0.01, 0.10, 10)
     test = pl.DataFrame({"Target": [1, 0, 1]})
     probabilities_test = np.array([0.8, 0.85, 0.9])

@@ -29,16 +29,6 @@ def custom_analysis_settings() -> config.Settings:
     return config.Settings(analysis=config.AnalysisColumns(column_name="Variable"))
 
 
-@pytest.fixture
-def custom_dataset_settings() -> config.Settings:
-    """Devuelve una configuración con un identificador de cliente distinto.
-
-    ## Returns:
-        Configuración con la columna identificadora renombrada.
-    """
-    return config.Settings(dataset=config.DatasetColumns(id="customer_id"))
-
-
 def _metric_values(result: pl.DataFrame, metric: str) -> list[str]:
     """Devuelve los valores asociados a una métrica de inspección.
 

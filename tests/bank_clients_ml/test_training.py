@@ -52,6 +52,16 @@ def importances() -> pl.DataFrame:
     )
 
 
+@pytest.fixture
+def minimal_train() -> pl.DataFrame:
+    """Devuelve un entrenamiento mínimo con target binario.
+
+    ## Returns:
+        DataFrame con una fila por clase del target.
+    """
+    return pl.DataFrame({"Target": [0, 1]})
+
+
 def _build_trainer(
     settings: config.Settings,
     importances: pl.DataFrame,
@@ -209,6 +219,7 @@ def test_should_expose_search_metrics(
 def test_should_raise_value_error_when_n_iter_is_less_than_one(
     mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
+    minimal_train: pl.DataFrame,
     n_iter: int,
 ) -> None:
     """Verifica que no se entrene con una cantidad inválida de combinaciones.
@@ -216,13 +227,13 @@ def test_should_raise_value_error_when_n_iter_is_less_than_one(
     ## Args:
         mocker: Utilidad para comprobar que no se ejecuta la búsqueda.
         settings: Configuración global del proyecto.
+        minimal_train: Entrenamiento mínimo con target binario.
         n_iter: Cantidad inválida de combinaciones a evaluar.
     """
     search_mock = mocker.patch.object(training, "_fit_lgbm_random_search")
-    train = pl.DataFrame({"Target": [0, 1]})
 
     with pytest.raises(ValueError, match="Invalid n_iter"):
-        training.LGBMTrainer.fit_and_build(train, [], settings, n_iter=n_iter)
+        training.LGBMTrainer.fit_and_build(minimal_train, [], settings, n_iter=n_iter)
 
     search_mock.assert_not_called()
 
@@ -234,6 +245,7 @@ def test_should_raise_value_error_when_n_iter_is_less_than_one(
 def test_should_raise_value_error_when_splits_cross_validation_is_less_than_two(
     mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
+    minimal_train: pl.DataFrame,
     splits_cross_validation: int,
 ) -> None:
     """Verifica que no se entrene con una validación cruzada insuficiente.
@@ -241,14 +253,14 @@ def test_should_raise_value_error_when_splits_cross_validation_is_less_than_two(
     ## Args:
         mocker: Utilidad para comprobar que no se ejecuta la búsqueda.
         settings: Configuración global del proyecto.
+        minimal_train: Entrenamiento mínimo con target binario.
         splits_cross_validation: Cantidad inválida de particiones.
     """
     search_mock = mocker.patch.object(training, "_fit_lgbm_random_search")
-    train = pl.DataFrame({"Target": [0, 1]})
 
     with pytest.raises(ValueError, match="Invalid splits_cross_validation"):
         training.LGBMTrainer.fit_and_build(
-            train,
+            minimal_train,
             [],
             settings,
             splits_cross_validation=splits_cross_validation,

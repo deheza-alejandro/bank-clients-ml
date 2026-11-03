@@ -1,29 +1,12 @@
 """Tests unitarios para el módulo de agrupación de columnas por fuente."""
 
 import types
+from collections.abc import Callable
 
 import polars as pl
 import pytest
 
 from bank_clients_ml import column_groups, config
-
-
-@pytest.fixture
-def custom_settings() -> config.Settings:
-    """Devuelve una configuración con nombres de columnas personalizados.
-
-    ## Returns:
-        Configuración con identificador, target, mes y fechas no estándar.
-    """
-    return config.Settings(
-        dataset=config.DatasetColumns(
-            id="customer_id",
-            target="churn",
-            month="snapshot_month",
-            first_product_date="first_product_dt",
-            last_product_date="last_product_dt",
-        )
-    )
 
 
 def _build_generated_groups(
@@ -63,37 +46,37 @@ def test_should_return_identity_features_in_expected_order(
 
 
 def test_should_use_custom_dataset_names_in_identity_features(
-    custom_settings: config.Settings,
+    custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que se respeten los nombres personalizados del dataset."""
     expected = (
         "customer_id",
         "churn",
         *column_groups.CATEGORICAL_COLS,
-        "first_product_dt",
-        "last_product_dt",
+        "first_seen",
+        "last_seen",
         *column_groups.BINARY_IDENTITY_FEATURES_COLS,
     )
 
-    result = column_groups.get_identity_features_cols(custom_settings)
+    result = column_groups.get_identity_features_cols(custom_dataset_settings)
 
     assert result == expected
 
 
 def test_should_use_global_settings_when_none_is_provided(
-    custom_settings: config.Settings,
-    monkeypatch: pytest.MonkeyPatch,
+    custom_dataset_settings: config.Settings,
+    patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que se use la configuración global si no se recibe una explícita."""
     expected = (
         "customer_id",
         "churn",
         *column_groups.CATEGORICAL_COLS,
-        "first_product_dt",
-        "last_product_dt",
+        "first_seen",
+        "last_seen",
         *column_groups.BINARY_IDENTITY_FEATURES_COLS,
     )
-    monkeypatch.setattr(config, "get_settings", lambda: custom_settings)
+    patch_global_settings(custom_dataset_settings)
 
     result = column_groups.get_identity_features_cols()
 
@@ -128,7 +111,7 @@ def test_should_return_columns_with_quantities_in_dataframe_order(
 
 
 def test_should_use_custom_settings_to_exclude_columns_without_quantities(
-    custom_settings: config.Settings,
+    custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que las exclusiones respeten los nombres personalizados del dataset."""
     dataframe = pl.DataFrame(
@@ -136,8 +119,8 @@ def test_should_use_custom_settings_to_exclude_columns_without_quantities(
             "customer_id": [1],
             "churn": [0],
             "snapshot_month": [1],
-            "first_product_dt": [1],
-            "last_product_dt": [1],
+            "first_seen": [1],
+            "last_seen": [1],
             "Operations_total_mean": [1],
             "Client_Age_grp": ["young"],
             "Sex": [1],
@@ -145,7 +128,9 @@ def test_should_use_custom_settings_to_exclude_columns_without_quantities(
         }
     )
 
-    result = column_groups.get_columns_with_quantities(dataframe, custom_settings)
+    result = column_groups.get_columns_with_quantities(
+        dataframe, custom_dataset_settings
+    )
 
     assert result == ("Operations_total_mean",)
 
@@ -358,7 +343,7 @@ def test_should_group_all_columns_by_source_and_exclude_id_and_target(
 
 
 def test_should_exclude_only_columns_from_custom_settings_id_and_target(
-    custom_settings: config.Settings,
+    custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que solo se excluyan el identificador y target configurados."""
     dataframe = pl.DataFrame(
@@ -371,7 +356,9 @@ def test_should_exclude_only_columns_from_custom_settings_id_and_target(
     )
 
     groups = dict(
-        column_groups.group_columns_by_source(dataframe, custom_settings).items()
+        column_groups.group_columns_by_source(
+            dataframe, custom_dataset_settings
+        ).items()
     )
 
     assert groups[column_groups.ValidColumnGroup.ALL] == ("client_id", "Target")
