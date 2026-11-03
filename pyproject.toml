@@ -92,6 +92,11 @@ max-line-length = 100
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.pytest.ini_options]
+markers = [
+    "integration_lgbm: integration tests that run actual LightGBM",
+]
+
 [tool.marimo.runtime]
 on_cell_change = "lazy"
 auto_reload = "lazy"
