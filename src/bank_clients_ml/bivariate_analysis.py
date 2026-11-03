@@ -257,13 +257,17 @@ class BivariateAnalyzer:
             Selección final con los conjuntos de entrenamiento y prueba
             transformados, el mapeo de nombres y el entrenador ya entrenado.
         """
-        name_mapping = binning.NameMapping.from_dual_named(binners)
+        binners_tuple = tuple(binners)
+
+        name_mapping = binning.NameMapping.from_dual_named(binners_tuple)
 
         bivariate_tables = self._build_bivariate_tables(name_mapping, max_bins_quantity)
 
         expr = [
             binner.build_encoding_expr(bivariate_table.table, self.settings)
-            for binner, bivariate_table in zip(binners, bivariate_tables, strict=True)
+            for binner, bivariate_table in zip(
+                binners_tuple, bivariate_tables, strict=True
+            )
         ]
 
         final_cols = [
