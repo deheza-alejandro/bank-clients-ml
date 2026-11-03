@@ -1,10 +1,10 @@
 """Tests unitarios para el módulo de entrenamiento de modelos LightGBM."""
 
-import sys
 import types
 from typing import cast
 from unittest import mock
 
+import lightgbm as lgb
 import numpy as np
 import polars as pl
 import polars.testing
@@ -22,19 +22,19 @@ class _StubSearcher:
         self,
         *,
         best_score: float = 0.75,
+        n_splits: int = 3,
         cv_results: dict[str, list] | None = None,
-        best_estimator: object | None = None,
     ) -> None:
         """Inicializa el buscador con los resultados simulados indicados.
 
         ## Args:
             best_score: Mejor puntuación de la validación cruzada.
+            n_splits: Cantidad de particiones de la validación cruzada.
             cv_results: Resultados de la validación cruzada.
-            best_estimator: Mejor estimador encontrado por la búsqueda.
         """
         self.best_score_ = best_score
+        self.n_splits_ = n_splits
         self.cv_results_ = cv_results if cv_results is not None else {}
-        self.best_estimator_ = best_estimator
 
 
 @pytest.fixture
@@ -71,7 +71,6 @@ def _build_trainer(
         importances=importances,
         search_logs="captured logs",
         n_iter=2,
-        splits_cross_validation=3,
         settings=settings,
         _searcher=cast(
             sklearn.model_selection.RandomizedSearchCV,
@@ -80,194 +79,127 @@ def _build_trainer(
     )
 
 
-def _patch_random_search(
-    mocker: pytest_mock.MockerFixture,
-    feature_importances: np.ndarray,
-) -> tuple[mock.Mock, mock.Mock]:
-    """Sustituye RandomizedSearchCV por un buscador simulado.
+def test_should_build_expected_hyperparameter_distributions() -> None:
+    """Verifica que el espacio de búsqueda incluya todos los hiperparámetros."""
+    distributions = training._build_param_distributions(12_000, 2)
 
-    ## Args:
-        mocker: Utilidad para crear los dobles de prueba.
-        feature_importances: Importancias que devolverá el mejor estimador.
-
-    ## Returns:
-        Buscador simulado y clase de búsqueda sustituida.
-    """
-    searcher = mocker.Mock()
-    searcher.best_estimator_ = types.SimpleNamespace(
-        feature_importances_=feature_importances
-    )
-    search_class = mocker.patch.object(
-        training.sklearn.model_selection,
-        "RandomizedSearchCV",
-        return_value=searcher,
-    )
-    return searcher, search_class
+    assert set(distributions) == {
+        "n_estimators",
+        "max_depth",
+        "num_leaves",
+        "subsample",
+        "learning_rate",
+        "min_child_samples",
+    }
 
 
-def test_should_fit_random_search_with_selected_features_and_capture_logs(
-    mocker: pytest_mock.MockerFixture,
-    settings: config.Settings,
+@pytest.mark.parametrize(
+    ("n_samples", "splits_cross_validation", "expected_max"),
+    [
+        pytest.param(2_000, 2, 333, id="small-dataset"),
+        pytest.param(12_000, 2, 2_000, id="medium-dataset"),
+        pytest.param(100_000, 2, 2_900, id="large-dataset-capped"),
+    ],
+)
+def test_should_adapt_min_child_samples_to_fold_size(
+    n_samples: int,
+    splits_cross_validation: int,
+    expected_max: int,
 ) -> None:
-    """Verifica la selección de variables y la captura de salidas del ajuste.
+    """Verifica que el rango de hojas mínimas sea factible para los pliegues.
 
     ## Args:
-        mocker: Utilidad para sustituir la búsqueda aleatoria.
-        settings: Configuración con los nombres de columnas del dataset.
+        n_samples: Cantidad de filas del conjunto de entrenamiento.
+        splits_cross_validation: Cantidad de particiones de la validación cruzada.
+        expected_max: Valor máximo esperado para `min_child_samples`.
     """
-    searcher, search_class = _patch_random_search(mocker, np.array([3.0, 1.0, 2.0]))
-
-    def fake_fit(X: pl.DataFrame, y: pl.Series) -> None:
-        print("Fitting 3 folds")
-        print("stderr line", file=sys.stderr)
-
-    searcher.fit.side_effect = fake_fit
-    train = pl.DataFrame(
-        {
-            "Feature_A": [1.0, 2.0],
-            "Feature_B": [3.0, 4.0],
-            "Feature_C": [5.0, 6.0],
-            "Target": [0, 1],
-        }
+    distributions = training._build_param_distributions(
+        n_samples, splits_cross_validation
     )
+    min_child_samples = np.asarray(distributions["min_child_samples"])
 
-    result_searcher, importances, search_logs = training._fit_lgbm_random_search(
-        train,
-        ["Feature_A", "Feature_B", "Feature_C"],
-        n_iter=2,
-        splits_cross_validation=3,
-        settings=settings,
-    )
-
-    assert result_searcher is searcher
-    assert search_class.call_args.kwargs["n_iter"] == 2
-    fitted_X, fitted_y = searcher.fit.call_args.args
-    assert fitted_X.columns == ["Feature_A", "Feature_B", "Feature_C"]
-    assert fitted_y.to_list() == [0, 1]
-    assert "Fitting 3 folds" in search_logs
-    assert "stderr line" in search_logs
-    expected_importances = pl.DataFrame(
-        {
-            "Feature": ["Feature_A", "Feature_C", "Feature_B"],
-            "Importance": [3.0, 2.0, 1.0],
-        }
-    )
-    polars.testing.assert_frame_equal(importances, expected_importances)
+    fold_size = n_samples * (splits_cross_validation - 1) // splits_cross_validation
+    assert min_child_samples.size > 0
+    assert int(min_child_samples.max()) == expected_max
+    assert int(min_child_samples.max()) * 2 <= fold_size
 
 
 @pytest.mark.parametrize(
     "splits_cross_validation",
     [pytest.param(2, id="two-folds"), pytest.param(5, id="five-folds")],
 )
-def test_should_use_stratified_cross_validation_with_requested_splits(
-    mocker: pytest_mock.MockerFixture,
+def test_should_build_cross_validation_with_requested_splits_and_seed(
     settings: config.Settings,
     splits_cross_validation: int,
 ) -> None:
     """Verifica la configuración de la validación cruzada estratificada.
 
     ## Args:
-        mocker: Utilidad para sustituir la búsqueda aleatoria.
         settings: Configuración con la semilla del proyecto.
         splits_cross_validation: Cantidad de particiones solicitada.
     """
-    _, search_class = _patch_random_search(mocker, np.array([1.0]))
-    train = pl.DataFrame({"Feature_A": [1.0, 2.0], "Target": [0, 1]})
-
-    training._fit_lgbm_random_search(
-        train,
-        ["Feature_A"],
-        n_iter=1,
-        splits_cross_validation=splits_cross_validation,
-        settings=settings,
+    cross_validation = training._build_cross_validation(
+        splits_cross_validation, settings
     )
 
-    cross_validation = search_class.call_args.kwargs["cv"]
-    assert cross_validation.n_splits == splits_cross_validation
-    assert cross_validation.random_state == settings.random_state
-
-
-def test_should_name_importance_columns_from_settings(
-    mocker: pytest_mock.MockerFixture,
-) -> None:
-    """Verifica que las columnas de importancias usen los nombres configurados.
-
-    ## Args:
-        mocker: Utilidad para sustituir la búsqueda aleatoria.
-    """
-    custom_settings = config.Settings(
-        analysis=config.AnalysisColumns(feature="Variable", importance="Weight")
+    expected_cv = sklearn.model_selection.StratifiedKFold(
+        n_splits=splits_cross_validation,
+        shuffle=True,
+        random_state=settings.random_state,
     )
-    _patch_random_search(mocker, np.array([2.0, 1.0]))
-    train = pl.DataFrame({"Feature_A": [1.0], "Feature_B": [2.0], "Target": [0]})
+    features = np.zeros((2 * splits_cross_validation, 1))
+    target = np.repeat([0, 1], splits_cross_validation)
 
-    _, importances, _logs = training._fit_lgbm_random_search(
-        train,
-        ["Feature_A", "Feature_B"],
-        n_iter=1,
-        splits_cross_validation=2,
+    assert [
+        (train.tolist(), test.tolist())
+        for train, test in cross_validation.split(features, target)
+    ] == [
+        (train.tolist(), test.tolist())
+        for train, test in expected_cv.split(features, target)
+    ]
+    assert cross_validation.get_n_splits() == splits_cross_validation
+
+
+def test_should_build_searcher_with_configured_parallelism() -> None:
+    """Verifica la configuración del buscador y su paralelismo."""
+    custom_settings = config.Settings(n_jobs=1)
+
+    searcher = training._build_searcher(
+        n_iter=2,
+        splits_cross_validation=3,
+        n_samples=2_000,
         settings=custom_settings,
     )
 
-    assert importances.columns == ["Variable", "Weight"]
-    assert importances.get_column("Variable").to_list() == ["Feature_A", "Feature_B"]
+    assert isinstance(searcher, sklearn.model_selection.RandomizedSearchCV)
+    params = searcher.get_params()
+    assert params["n_iter"] == 2
+    assert params["n_jobs"] == 1
+    assert params["random_state"] == custom_settings.random_state
+    estimator = params["estimator"]
+    assert isinstance(estimator, lgb.LGBMClassifier)
+    assert estimator.get_params()["n_jobs"] == 1
 
 
-@pytest.mark.parametrize(
-    ("n_iter", "splits_cross_validation"),
-    [
-        pytest.param(1, 2, id="minimum-valid"),
-        pytest.param(4, 5, id="typical"),
-    ],
-)
-def test_should_build_trainer_when_search_configuration_is_valid(
-    mocker: pytest_mock.MockerFixture,
+def test_should_expose_search_metrics(
     settings: config.Settings,
     importances: pl.DataFrame,
-    n_iter: int,
-    splits_cross_validation: int,
 ) -> None:
-    """Verifica la construcción del entrenador con una búsqueda exitosa.
+    """Verifica las propiedades públicas de resultados de la búsqueda.
 
     ## Args:
-        mocker: Utilidad para sustituir la búsqueda aleatoria.
         settings: Configuración global del proyecto.
         importances: Tabla de importancias ordenada de mayor a menor.
-        n_iter: Cantidad de combinaciones a evaluar.
-        splits_cross_validation: Cantidad de particiones de la validación cruzada.
     """
-    best_estimator = object()
-    searcher = _StubSearcher(best_estimator=best_estimator)
-    search_mock = mocker.patch.object(
-        training,
-        "_fit_lgbm_random_search",
-        return_value=(searcher, importances, "captured logs"),
-    )
-    train = pl.DataFrame({"Feature_A": [1.0, 2.0], "Target": [0, 1]})
-    columns = ["Feature_A"]
-
-    trainer = training.LGBMTrainer.fit_and_build(
-        train,
-        columns,
+    trainer = _build_trainer(
         settings,
-        n_iter=n_iter,
-        splits_cross_validation=splits_cross_validation,
+        importances,
+        _StubSearcher(best_score=0.82, n_splits=4),
     )
 
-    assert isinstance(trainer, training.LGBMTrainer)
-    assert trainer.importances is importances
-    assert trainer.search_logs == "captured logs"
-    assert trainer.n_iter == n_iter
-    assert trainer.splits_cross_validation == splits_cross_validation
-    assert trainer.settings is settings
-    assert trainer.best_model is best_estimator
-    search_mock.assert_called_once_with(
-        train,
-        columns,
-        n_iter=n_iter,
-        splits_cross_validation=splits_cross_validation,
-        settings=settings,
-    )
+    assert trainer.best_score == 0.82
+    assert trainer.splits_cross_validation == 4
+    assert trainer.random_state == settings.random_state
 
 
 @pytest.mark.parametrize(
