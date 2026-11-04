@@ -134,8 +134,12 @@ class FeaturesSelection:
         best_model = self.trainer.best_model
         X_train = self.train.select(self.snake_case_names)
         X_test = self.test.select(self.snake_case_names)
-        probabilities_train = cast(np.ndarray, best_model.predict_proba(X_train))[:, 1]
-        probabilities_test = cast(np.ndarray, best_model.predict_proba(X_test))[:, 1]
+
+        probabilities_train_matrix = cast(np.ndarray, best_model.predict_proba(X_train))
+        probabilities_train = probabilities_train_matrix[:, 1]
+
+        probabilities_test_matrix = cast(np.ndarray, best_model.predict_proba(X_test))
+        probabilities_test = probabilities_test_matrix[:, 1]
 
         evaluation_metrics = evaluation.evaluate(
             train=self.train,
