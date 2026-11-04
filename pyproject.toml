@@ -95,6 +95,7 @@ convention = "google"
 [tool.pytest.ini_options]
 markers = [
     "integration_lgbm: integration tests that run actual LightGBM",
+    "integration_svg: integration tests that require Bun and SVGO to write SVG files",
 ]
 
 [tool.marimo.runtime]
