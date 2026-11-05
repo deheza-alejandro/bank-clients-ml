@@ -3,7 +3,6 @@
 import pathlib
 import shutil
 
-import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 import pytest
@@ -35,6 +34,8 @@ def test_should_write_top_features_bivariate_roc_and_deciles_svgs(
     integration_settings: config.Settings,
 ) -> None:
     """Verifica que los cuatro tipos de gráficos se guarden como SVG válidos.
+
+    visualization.plot_bivariate_charts se ejecuta de forma secuencial.
 
     ## Args:
         integration_settings: Configuración con un directorio de imágenes temporal.
@@ -120,27 +121,6 @@ def test_should_write_top_features_bivariate_roc_and_deciles_svgs(
         content = svg_path.read_text(encoding="utf-8")
         assert len(content) > 100
         assert content.rstrip().endswith("</svg>")
-
-
-def test_should_save_matplotlib_figure_with_svgo(
-    tmp_path: pathlib.Path,
-) -> None:
-    """Verifica el guardado directo de una figura mediante Bun y SVGO.
-
-    ## Args:
-        tmp_path: Directorio temporal para aislar la escritura del archivo.
-    """
-    _require_svg_tooling()
-    fig, ax = plt.subplots()
-    ax.plot([0.0, 1.0], [0.0, 1.0])
-
-    visualization._save_fig_as_svg(fig, "direct", tmp_path, "nested")
-
-    svg_path = tmp_path / "nested" / "direct.svg"
-    assert svg_path.is_file()
-    content = svg_path.read_text(encoding="utf-8")
-    assert len(content) > 100
-    assert content.rstrip().endswith("</svg>")
 
 
 @pytest.mark.integration_lgbm

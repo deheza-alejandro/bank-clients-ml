@@ -12,16 +12,6 @@ DECILE_DTYPE = pl.Enum(DECILE_LABELS)
 
 
 @pytest.fixture
-def decile_bins() -> list[float]:
-    """Devuelve los cortes que separan las diez categorías de decil.
-
-    ## Returns:
-        Lista de nueve cortes equiespaciados entre 0.1 y 0.9.
-    """
-    return [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-
-
-@pytest.fixture
 def balanced_target_train() -> pl.DataFrame:
     """Devuelve un entrenamiento con cinco ceros y cinco unos.
 
@@ -85,20 +75,22 @@ def _min_prob_for_decile(deciles: pl.DataFrame, decile: str) -> float:
 
 def test_should_compute_all_decile_metrics_ordered_by_descending_probability(
     settings: config.Settings,
-    decile_bins: list[float],
     ordered_probabilities: np.ndarray,
 ) -> None:
-    """Verifica todas las métricas por decil con cortes explícitos.
+    """Verifica todas las métricas por decil calculadas desde la API pública.
 
     ## Args:
         settings: Configuración con el nombre de la columna target.
-        decile_bins: Cortes que separan las diez categorías de decil.
         ordered_probabilities: Probabilidades crecientes y separables.
     """
     train = pl.DataFrame({"Target": [0, 0, 0, 0, 1, 1, 1, 1, 1, 1]})
 
-    result = evaluation._compute_prediction_deciles(
-        train, ordered_probabilities, settings, decile_bins
+    metrics = evaluation.evaluate(
+        train=train,
+        test=train,
+        probabilities_train=ordered_probabilities,
+        probabilities_test=ordered_probabilities,
+        settings=settings,
     )
 
     expected = pl.DataFrame(
@@ -121,31 +113,43 @@ def test_should_compute_all_decile_metrics_ordered_by_descending_probability(
         }
     )
 
-    polars.testing.assert_frame_equal(result, expected)
+    polars.testing.assert_frame_equal(metrics.train_deciles, expected)
 
 
 def test_should_assign_probability_equal_to_break_to_lower_decile(
     settings: config.Settings,
-    decile_bins: list[float],
 ) -> None:
-    """Verifica que los cortes sean cerrados por la derecha.
+    """Verifica que los cortes de prueba sean cerrados por la derecha.
+
+    Los cuantiles del entrenamiento producen los mismos cortes que la tabla
+    explícita del caso original.
 
     ## Args:
         settings: Configuración con el nombre de la columna target.
-        decile_bins: Cortes que separan las diez categorías de decil.
     """
-    probabilities = np.array([0.1, 0.2, 0.3, 0.9])
-    train = pl.DataFrame({"Target": [0, 0, 0, 1]})
+    probabilities_train = np.linspace(0.0, 1.0, 11)
+    train = pl.DataFrame({"Target": [value % 2 for value in range(11)]})
+    probabilities_test = np.array([0.1, 0.2, 0.3, 0.9])
+    test = pl.DataFrame({"Target": [0, 0, 1, 1]})
 
-    result = evaluation._compute_prediction_deciles(
-        train, probabilities, settings, decile_bins
+    metrics = evaluation.evaluate(
+        train=train,
+        test=test,
+        probabilities_train=probabilities_train,
+        probabilities_test=probabilities_test,
+        settings=settings,
     )
 
-    assert result.get_column("decile").to_list() == ["2", "8", "9", "10"]
-    assert _min_prob_for_decile(result, "2") == pytest.approx(90.0)
-    assert _min_prob_for_decile(result, "8") == pytest.approx(30.0)
-    assert _min_prob_for_decile(result, "9") == pytest.approx(20.0)
-    assert _min_prob_for_decile(result, "10") == pytest.approx(10.0)
+    assert metrics.test_deciles.get_column("decile").to_list() == [
+        "2",
+        "8",
+        "9",
+        "10",
+    ]
+    assert _min_prob_for_decile(metrics.test_deciles, "2") == pytest.approx(90.0)
+    assert _min_prob_for_decile(metrics.test_deciles, "8") == pytest.approx(30.0)
+    assert _min_prob_for_decile(metrics.test_deciles, "9") == pytest.approx(20.0)
+    assert _min_prob_for_decile(metrics.test_deciles, "10") == pytest.approx(10.0)
 
 
 def test_should_build_ten_equal_deciles_when_bins_are_not_provided(
@@ -159,20 +163,26 @@ def test_should_build_ten_equal_deciles_when_bins_are_not_provided(
     probabilities = np.array([0.005 + 0.01 * index for index in range(100)])
     train = pl.DataFrame({"Target": [index % 2 for index in range(100)]})
 
-    result = evaluation._compute_prediction_deciles(train, probabilities, settings)
+    metrics = evaluation.evaluate(
+        train=train,
+        test=train,
+        probabilities_train=probabilities,
+        probabilities_test=probabilities,
+        settings=settings,
+    )
 
-    assert result.height == 10
-    assert result.get_column("decile").to_list() == [
+    assert metrics.train_deciles.height == 10
+    assert metrics.train_deciles.get_column("decile").to_list() == [
         str(index) for index in range(1, 11)
     ]
-    assert result.get_column("count").to_list() == [10] * 10
-    assert result.get_column("target_1_count").to_list() == [5] * 10
+    assert metrics.train_deciles.get_column("count").to_list() == [10] * 10
+    assert metrics.train_deciles.get_column("target_1_count").to_list() == [5] * 10
 
 
-def test_should_allow_duplicate_probabilities_when_bins_are_not_provided(
+def test_should_raise_value_error_when_quantile_breaks_are_not_unique(
     settings: config.Settings,
 ) -> None:
-    """Verifica que las probabilidades repetidas no impidan calcular deciles.
+    """Verifica que no se calculen deciles si los cortes se repiten.
 
     ## Args:
         settings: Configuración con el nombre de la columna target.
@@ -180,11 +190,17 @@ def test_should_allow_duplicate_probabilities_when_bins_are_not_provided(
     probabilities = np.array([0.1] * 10 + [0.9] * 10)
     train = pl.DataFrame({"Target": [0, 1] * 10})
 
-    result = evaluation._compute_prediction_deciles(train, probabilities, settings)
-
-    assert result.height == 2
-    assert result.get_column("count").to_list() == [10, 10]
-    assert result.get_column("target_1_count").to_list() == [5, 5]
+    with pytest.raises(
+        ValueError,
+        match="got 3 unique values from 9 breaks",
+    ):
+        evaluation.evaluate(
+            train=train,
+            test=train,
+            probabilities_train=probabilities,
+            probabilities_test=probabilities,
+            settings=settings,
+        )
 
 
 def test_should_compute_roc_auc_and_accuracy_from_test_probabilities(

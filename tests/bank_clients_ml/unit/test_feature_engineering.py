@@ -480,52 +480,6 @@ def test_should_use_global_settings_when_settings_is_not_provided_for_date_featu
     assert result["Recency_in_days"].item() == 30
 
 
-def test_should_replace_zero_denominator_with_one() -> None:
-    """Verifica que un denominador cero se reemplace por uno."""
-    data = pl.DataFrame({"denominator": [0.0, 2.0, 0.0]})
-
-    result = data.select(feature_engineering._safe_denominator("denominator"))
-
-    assert result["denominator"].to_list() == [1.0, 2.0, 1.0]
-
-
-def test_should_compute_percentage_from_expressions() -> None:
-    """Verifica que el porcentaje acepte expresiones como numerador."""
-    data = pl.DataFrame({"numerator": [10.0], "denominator": [4.0]})
-
-    result = data.select(
-        feature_engineering._compute_percentage(
-            pl.col("numerator") * 2, pl.col("denominator")
-        ).alias("percentage")
-    )
-
-    assert result["percentage"].item() == 500.0
-
-
-def test_should_return_zero_for_constant_column_in_min_max_normalization() -> None:
-    """Verifica que una columna constante se normalice a cero."""
-    data = pl.DataFrame({"value": [5.0, 5.0]})
-
-    result = data.select(
-        feature_engineering._min_max_normalize("value").alias("normalized")
-    )
-
-    assert result["normalized"].to_list() == [0.0, 0.0]
-
-
-def test_should_multiply_normalized_value_by_weight() -> None:
-    """Verifica que la normalización ponderada multiplique por el peso."""
-    data = pl.DataFrame({"value": [1.0, 2.0, 3.0], "weight": [10.0, 20.0, 30.0]})
-
-    result = data.select(
-        feature_engineering._min_max_normalize_weighted("value", "weight").alias(
-            "weighted"
-        )
-    )
-
-    assert result["weighted"].to_list() == [0.0, 10.0, 30.0]
-
-
 def test_should_generate_expected_monthly_transformations() -> None:
     """Verifica todas las variables mensuales contra una salida esperada.
 

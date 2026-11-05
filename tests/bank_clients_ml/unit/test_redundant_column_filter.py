@@ -2,6 +2,7 @@
 
 import types
 
+import numpy as np
 import polars as pl
 import polars.testing
 import pytest
@@ -63,23 +64,6 @@ def test_data() -> pl.DataFrame:
 
 
 @pytest.fixture
-def correlation_matrix() -> pl.DataFrame:
-    """Devuelve una matriz de correlación con pares de distinta intensidad.
-
-    Returns:
-        Matriz cuadrada con columnas `a`, `b`, `c` y `d`.
-    """
-    return pl.DataFrame(
-        {
-            "a": [1.0, 0.9, -0.5, 0.2],
-            "b": [0.9, 1.0, -0.95, 0.1],
-            "c": [-0.5, -0.95, 1.0, 0.0],
-            "d": [0.2, 0.1, 0.0, 1.0],
-        }
-    )
-
-
-@pytest.fixture
 def binary_frame() -> pl.DataFrame:
     """Devuelve un DataFrame con target y feature binarios.
 
@@ -114,246 +98,57 @@ def redundant_filter(
     )
 
 
-def _build_filter(
-    settings: config.Settings,
-    corr_df: pl.DataFrame,
-    uncorrelated_train: pl.DataFrame | None = None,
-) -> redundant_column_filter.RedundantColumnFilter:
-    """Construye un filtro con una matriz de correlación controlada.
-
-    Args:
-        settings: Configuración global del proyecto.
-        corr_df: Matriz de correlación que se desea analizar.
-        uncorrelated_train: Datos de entrenamiento sin correlaciones. Si no se
-            indica, se utiliza un DataFrame vacío.
-
-    Returns:
-        Instancia lista para consultar sus correlaciones.
-    """
-    empty = pl.DataFrame()
-    return redundant_column_filter.RedundantColumnFilter(
-        reduced_train=empty,
-        correlated_train=empty,
-        correlated_test=empty,
-        uncorrelated_train=(
-            uncorrelated_train if uncorrelated_train is not None else empty
-        ),
-        constant_cols=(),
-        imbalanced_binary_columns=(),
-        correlated_columns=(),
-        imbalanced_binary_threshold=0.1,
-        correlation_threshold=0.8,
-        settings=settings,
-        _corr_df=corr_df,
+def _orthonormal_features() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Devuelve tres vectores centrados, ortogonales y de norma unitaria."""
+    first = np.array([-3.0, -1.0, 1.0, 3.0])
+    second = np.array([1.0, -3.0, 3.0, -1.0])
+    third = np.array([1.0, -1.0, -1.0, 1.0])
+    return (
+        first / np.linalg.norm(first),
+        second / np.linalg.norm(second),
+        third / np.linalg.norm(third),
     )
 
 
-def test_should_return_only_true_column_names() -> None:
-    """Verifica que solo se devuelvan las columnas con valor verdadero."""
-    condition_flags = pl.DataFrame({"alpha": [True], "beta": [False], "gamma": [True]})
-
-    result = redundant_column_filter._get_true_column_names(condition_flags)
-
-    assert result == ("alpha", "gamma")
-
-
-def test_should_identify_constant_columns_of_numeric_and_text_types() -> None:
-    """Verifica la detección de columnas con un único valor en cualquier tipo."""
-    df = pl.DataFrame(
+def _frame_with_features(**features: np.ndarray) -> pl.DataFrame:
+    """Construye un DataFrame con identificador, target y las features indicadas."""
+    return pl.DataFrame(
         {
-            "constant_int": [4, 4, 4],
-            "varying_int": [1, 2, 3],
-            "constant_text": ["x", "x", "x"],
-            "varying_text": ["x", "y", "y"],
+            "client_id": [f"client_{index}" for index in range(4)],
+            "Target": [0, 0, 1, 1],
+            **{name: values.tolist() for name, values in features.items()},
         }
     )
 
-    result = redundant_column_filter._get_constant_columns(df)
 
-    assert result == ("constant_int", "constant_text")
-
-
-@pytest.mark.parametrize(
-    ("zeros", "ones", "expected"),
-    [
-        pytest.param(1, 19, True, id="below-minority-threshold"),
-        pytest.param(19, 1, True, id="above-majority-threshold"),
-        pytest.param(2, 18, False, id="exactly-at-minority-threshold"),
-        pytest.param(18, 2, False, id="exactly-at-majority-threshold"),
-        pytest.param(10, 10, False, id="balanced"),
-    ],
-)
-def test_should_detect_imbalanced_binary_columns_at_threshold_boundaries(
-    settings: config.Settings,
-    zeros: int,
-    ones: int,
-    expected: bool,
-) -> None:
-    """Verifica la proporción mínima exigida para una columna binaria.
-
-    Args:
-        settings: Configuración con el nombre de la columna target.
-        zeros: Cantidad de ceros en la columna evaluada.
-        ones: Cantidad de unos en la columna evaluada.
-        expected: Indica si la columna debe considerarse desbalanceada.
-    """
-    df = pl.DataFrame(
-        {
-            "Target": [0] * 10 + [1] * 10,
-            "feature": [0] * zeros + [1] * ones,
-        }
+def _correlated_frame() -> pl.DataFrame:
+    """Devuelve features con correlaciones conocidas entre sí."""
+    first, second, third = _orthonormal_features()
+    feature_a = first
+    feature_b = 0.9 * first + np.sqrt(1.0 - 0.9**2) * second
+    feature_c = -0.95 * first + np.sqrt(1.0 - 0.95**2) * third
+    return _frame_with_features(
+        feature_a=feature_a,
+        feature_b=feature_b,
+        feature_c=feature_c,
     )
 
-    result = redundant_column_filter._get_imbalanced_binary_columns(df, 0.1, settings)
 
-    expected_columns = ("feature",) if expected else ()
-    assert result == expected_columns
-
-
-def test_should_not_classify_columns_with_more_than_two_values_as_binary(
-    settings: config.Settings,
-) -> None:
-    """Verifica que las columnas con más de dos valores no se descarten."""
-    df = pl.DataFrame(
-        {
-            "Target": [0, 1] * 5,
-            "binary": [0] * 9 + [1],
-            "balanced": [0, 1] * 5,
-            "multi_value": list(range(10)),
-        }
+def _negative_correlated_frame() -> pl.DataFrame:
+    """Devuelve dos features con correlación negativa conocida."""
+    first, second, _ = _orthonormal_features()
+    return _frame_with_features(
+        feature_a=first,
+        feature_b=-0.95 * first + np.sqrt(1.0 - 0.95**2) * second,
     )
 
-    result = redundant_column_filter._get_imbalanced_binary_columns(df, 0.2, settings)
 
-    assert result == ("binary",)
-
-
-def test_should_exclude_target_from_imbalanced_binary_detection(
-    settings: config.Settings,
-) -> None:
-    """Verifica que una target desbalanceada no se marque como columna redundante."""
-    df = pl.DataFrame(
-        {
-            "Target": [0] * 19 + [1],
-            "feature": [0, 1] * 10,
-        }
-    )
-
-    result = redundant_column_filter._get_imbalanced_binary_columns(df, 0.1, settings)
-
-    assert result == ()
-
-
-@pytest.mark.parametrize(
-    "threshold",
-    [
-        pytest.param(0.0, id="zero"),
-        pytest.param(0.5, id="one-half"),
-        pytest.param(-0.1, id="negative"),
-        pytest.param(1.0, id="one"),
-    ],
-)
-def test_should_raise_value_error_for_invalid_imbalanced_threshold(
-    settings: config.Settings,
-    binary_frame: pl.DataFrame,
-    threshold: float,
-) -> None:
-    """Verifica que se rechacen umbrales fuera del intervalo permitido.
-
-    Args:
-        settings: Configuración con el nombre de la columna target.
-        binary_frame: DataFrame con target y feature binarios.
-        threshold: Umbral inválido para columnas binarias.
-    """
-    with pytest.raises(ValueError, match="Invalid threshold"):
-        redundant_column_filter._get_imbalanced_binary_columns(
-            binary_frame, threshold, settings
-        )
-
-
-@pytest.mark.parametrize(
-    ("threshold", "expected"),
-    [
-        pytest.param(0.8, ("b", "c"), id="two-above-threshold"),
-        pytest.param(0.9, ("c",), id="strict-boundary-excludes-b"),
-        pytest.param(0.95, (), id="strict-boundary-excludes-c"),
-    ],
-)
-def test_should_return_columns_whose_previous_correlation_exceeds_threshold(
-    correlation_matrix: pl.DataFrame,
-    threshold: float,
-    expected: tuple[str, ...],
-) -> None:
-    """Verifica la detección de columnas redundantes según su correlación previa.
-
-    Args:
-        correlation_matrix: Matriz con correlaciones de distinta intensidad.
-        threshold: Umbral de correlación absoluta.
-        expected: Columnas que deben descartarse.
-    """
-    result = redundant_column_filter._get_redundant_correlated_columns(
-        correlation_matrix, threshold
-    )
-
-    assert result == expected
-
-
-def test_should_use_absolute_correlation_values_to_detect_redundancy() -> None:
-    """Verifica que las correlaciones negativas también indiquen redundancia."""
-    corr_df = pl.DataFrame({"a": [1.0, -0.95], "b": [-0.95, 1.0]})
-
-    result = redundant_column_filter._get_redundant_correlated_columns(corr_df, 0.9)
-
-    assert result == ("b",)
-
-
-def test_should_keep_one_feature_when_all_are_correlated() -> None:
-    """Verifica que de un grupo correlacionado se conserven N-1 columnas."""
-    corr_df = pl.DataFrame(
-        {
-            "a": [1.0, 0.9, 0.9],
-            "b": [0.9, 1.0, 0.85],
-            "c": [0.9, 0.85, 1.0],
-        }
-    )
-
-    result = redundant_column_filter._get_redundant_correlated_columns(corr_df, 0.8)
-
-    assert result == ("b", "c")
-
-
-def test_should_ignore_correlations_from_lower_triangle() -> None:
-    """Verifica que solo se evalúe cada columna contra las columnas previas."""
-    corr_df = pl.DataFrame({"a": [1.0, 0.95], "b": [0.1, 1.0]})
-
-    result = redundant_column_filter._get_redundant_correlated_columns(corr_df, 0.8)
-
-    assert result == ()
-
-
-@pytest.mark.parametrize(
-    "threshold",
-    [
-        pytest.param(0.0, id="zero"),
-        pytest.param(1.0, id="one"),
-        pytest.param(-0.1, id="negative"),
-        pytest.param(1.5, id="greater-than-one"),
-    ],
-)
-def test_should_raise_value_error_for_invalid_correlation_threshold(
-    correlation_matrix: pl.DataFrame,
-    threshold: float,
-) -> None:
-    """Verifica que se rechacen umbrales de correlación inválidos.
-
-    Args:
-        correlation_matrix: Matriz de correlación válida.
-        threshold: Umbral de correlación inválido.
-    """
-    with pytest.raises(ValueError, match="Invalid threshold"):
-        redundant_column_filter._get_redundant_correlated_columns(
-            correlation_matrix, threshold
-        )
+def _correlation_matrix(
+    frame: pl.DataFrame,
+    columns: tuple[str, ...],
+) -> pl.DataFrame:
+    """Calcula la matriz de correlación de las columnas indicadas."""
+    return frame.select(*columns).corr()
 
 
 def test_should_remove_constant_columns_from_train_and_test(
@@ -368,7 +163,8 @@ def test_should_remove_constant_columns_from_train_and_test(
         {
             "client_id": ["a", "b", "c", "d"],
             "Target": [0, 1, 0, 1],
-            "constant": [7, 7, 7, 7],
+            "constant_int": [7, 7, 7, 7],
+            "constant_text": ["x", "x", "x", "x"],
             "feature_a": [1.0, 2.0, 3.0, 4.0],
             "feature_b": [4.0, 3.0, 2.0, 1.0],
         }
@@ -377,7 +173,8 @@ def test_should_remove_constant_columns_from_train_and_test(
         {
             "client_id": ["e", "f"],
             "Target": [0, 1],
-            "constant": [7, 7],
+            "constant_int": [7, 7],
+            "constant_text": ["x", "x"],
             "feature_a": [5.0, 6.0],
             "feature_b": [3.0, 2.0],
         }
@@ -389,9 +186,16 @@ def test_should_remove_constant_columns_from_train_and_test(
         settings=settings,
     )
 
-    assert result.constant_cols == ("constant",)
-    polars.testing.assert_frame_equal(result.reduced_train, train.drop("constant"))
-    polars.testing.assert_frame_equal(result.correlated_test, test.drop("constant"))
+    expected_constants = ("constant_int", "constant_text")
+    assert result.constant_cols == expected_constants
+    polars.testing.assert_frame_equal(
+        result.reduced_train,
+        train.drop(expected_constants),
+    )
+    polars.testing.assert_frame_equal(
+        result.correlated_test,
+        test.drop(expected_constants),
+    )
 
 
 def test_should_remove_imbalanced_binary_columns_from_train_and_test(
@@ -432,7 +236,9 @@ def test_should_remove_correlated_columns_only_from_uncorrelated_train(
         redundant_filter.uncorrelated_train,
         train_data.drop(["constant", "imbalanced", "feature_b"]),
     )
-    assert redundant_filter._corr_df.columns == ["balanced", "feature_a", "feature_b"]
+    assert redundant_filter.correlated_train.select(
+        pl.exclude("client_id", "Target")
+    ).columns == ["balanced", "feature_a", "feature_b"]
 
 
 def test_should_use_global_settings_and_default_thresholds_when_not_provided(
@@ -485,9 +291,179 @@ def test_should_exclude_custom_id_and_target_from_correlation_analysis() -> None
         settings=custom_settings,
     )
 
-    assert result._corr_df.columns == ["feat_a", "feat_b"]
     assert result.correlated_columns == ("feat_b",)
     assert result.uncorrelated_train.columns == ["customer", "outcome", "feat_a"]
+
+
+@pytest.mark.parametrize(
+    ("zeros", "ones", "expected"),
+    [
+        pytest.param(1, 19, True, id="below-minority-threshold"),
+        pytest.param(19, 1, True, id="above-majority-threshold"),
+        pytest.param(2, 18, False, id="exactly-at-minority-threshold"),
+        pytest.param(18, 2, False, id="exactly-at-majority-threshold"),
+        pytest.param(10, 10, False, id="balanced"),
+    ],
+)
+def test_should_detect_imbalanced_binary_columns_at_threshold_boundaries(
+    settings: config.Settings,
+    zeros: int,
+    ones: int,
+    expected: bool,
+) -> None:
+    """Verifica la proporción mínima exigida para una columna binaria.
+
+    Args:
+        settings: Configuración con el nombre de la columna target.
+        zeros: Cantidad de ceros en la columna evaluada.
+        ones: Cantidad de unos en la columna evaluada.
+        expected: Indica si la columna debe considerarse desbalanceada.
+    """
+    data = pl.DataFrame(
+        {
+            "client_id": list(range(20)),
+            "Target": [0] * 10 + [1] * 10,
+            "feature": [0] * zeros + [1] * ones,
+            "numeric": [float(index) for index in range(20)],
+        }
+    )
+
+    result = redundant_column_filter.RedundantColumnFilter.generate(
+        train=data,
+        test=data,
+        imbalanced_binary_threshold=0.1,
+        settings=settings,
+    )
+
+    expected_columns = ("feature",) if expected else ()
+    assert result.imbalanced_binary_columns == expected_columns
+
+
+def test_should_not_classify_columns_with_more_than_two_values_as_binary(
+    settings: config.Settings,
+) -> None:
+    """Verifica que las columnas con más de dos valores no se descarten."""
+    data = pl.DataFrame(
+        {
+            "client_id": list(range(10)),
+            "Target": [0, 1] * 5,
+            "binary": [0] * 9 + [1],
+            "balanced": [0, 1] * 5,
+            "multi_value": list(range(10)),
+        }
+    )
+
+    result = redundant_column_filter.RedundantColumnFilter.generate(
+        train=data,
+        test=data,
+        imbalanced_binary_threshold=0.2,
+        settings=settings,
+    )
+
+    assert result.imbalanced_binary_columns == ("binary",)
+
+
+def test_should_exclude_target_from_imbalanced_binary_detection(
+    settings: config.Settings,
+) -> None:
+    """Verifica que una target desbalanceada no se marque como columna redundante."""
+    data = pl.DataFrame(
+        {
+            "client_id": list(range(20)),
+            "Target": [0] * 19 + [1],
+            "feature": [0, 1] * 10,
+        }
+    )
+
+    result = redundant_column_filter.RedundantColumnFilter.generate(
+        train=data,
+        test=data,
+        imbalanced_binary_threshold=0.1,
+        settings=settings,
+    )
+
+    assert result.imbalanced_binary_columns == ()
+
+
+def test_should_keep_first_feature_and_drop_later_correlated_columns(
+    settings: config.Settings,
+) -> None:
+    """Verifica que se conserve la primera variable de un grupo correlacionado."""
+    data = _correlated_frame()
+
+    result = redundant_column_filter.RedundantColumnFilter.generate(
+        train=data,
+        test=data,
+        correlation_threshold=0.8,
+        settings=settings,
+    )
+
+    assert result.correlated_columns == ("feature_b", "feature_c")
+    assert "feature_a" in result.uncorrelated_train.columns
+    assert "feature_b" not in result.uncorrelated_train.columns
+    assert "feature_c" not in result.uncorrelated_train.columns
+
+
+def test_should_use_absolute_correlation_values_to_detect_redundancy(
+    settings: config.Settings,
+) -> None:
+    """Verifica que las correlaciones negativas también indiquen redundancia."""
+    data = _negative_correlated_frame()
+
+    result = redundant_column_filter.RedundantColumnFilter.generate(
+        train=data,
+        test=data,
+        correlation_threshold=0.8,
+        settings=settings,
+    )
+
+    assert result.correlated_columns == ("feature_b",)
+
+
+def test_should_keep_one_feature_when_all_are_correlated(
+    settings: config.Settings,
+) -> None:
+    """Verifica que de un grupo correlacionado se conserven N-1 columnas."""
+    data = _correlated_frame()
+
+    result = redundant_column_filter.RedundantColumnFilter.generate(
+        train=data,
+        test=data,
+        correlation_threshold=0.8,
+        settings=settings,
+    )
+
+    assert result.correlated_columns == ("feature_b", "feature_c")
+    assert result.uncorrelated_train.columns == ["client_id", "Target", "feature_a"]
+
+
+def test_should_apply_correlation_threshold_strictly(
+    settings: config.Settings,
+) -> None:
+    """Verifica que el umbral se aplique con comparación estricta."""
+    data = _correlated_frame()
+    correlations = _correlation_matrix(
+        data,
+        ("feature_a", "feature_b", "feature_c"),
+    )
+    correlation_ab = abs(correlations.get_column("feature_b").item(0))
+    correlation_ac = abs(correlations.get_column("feature_c").item(0))
+
+    at_ab = redundant_column_filter.RedundantColumnFilter.generate(
+        train=data,
+        test=data,
+        correlation_threshold=correlation_ab,
+        settings=settings,
+    )
+    at_ac = redundant_column_filter.RedundantColumnFilter.generate(
+        train=data,
+        test=data,
+        correlation_threshold=correlation_ac,
+        settings=settings,
+    )
+
+    assert at_ab.correlated_columns == ("feature_c",)
+    assert at_ac.correlated_columns == ()
 
 
 @pytest.mark.parametrize(
@@ -496,6 +472,7 @@ def test_should_exclude_custom_id_and_target_from_correlation_analysis() -> None
         pytest.param(0.0, id="zero"),
         pytest.param(0.5, id="one-half"),
         pytest.param(-0.1, id="negative"),
+        pytest.param(1.0, id="one"),
     ],
 )
 def test_should_raise_value_error_during_generate_for_invalid_imbalanced_threshold(
@@ -576,57 +553,67 @@ def test_should_count_values_of_imbalanced_binary_columns(
     polars.testing.assert_frame_equal(result, expected)
 
 
-@pytest.mark.parametrize(
-    ("threshold", "expected_names"),
-    [
-        pytest.param(0.4, ["b", "c"], id="two-above-threshold"),
-        pytest.param(0.5, ["b"], id="strict-boundary-excludes-c"),
-        pytest.param(0.9, [], id="strict-boundary-excludes-b"),
-        pytest.param(0.0, ["b", "c", "d"], id="all-other-features"),
-    ],
-)
-def test_should_filter_and_order_correlations_by_absolute_value(
+def test_should_filter_and_group_correlations_for_each_requested_column(
     settings: config.Settings,
-    correlation_matrix: pl.DataFrame,
-    threshold: float,
-    expected_names: list[str],
 ) -> None:
-    """Verifica el filtrado y orden de las correlaciones de una columna.
+    """Verifica el filtrado, orden y agrupación de las correlaciones públicas.
 
     Args:
         settings: Configuración global del proyecto.
-        correlation_matrix: Matriz de correlación controlada.
-        threshold: Umbral mínimo de correlación absoluta.
-        expected_names: Variables esperadas en orden de correlación absoluta.
     """
-    redundant_filter = _build_filter(settings, correlation_matrix)
+    data = _correlated_frame()
+    column_filter = redundant_column_filter.RedundantColumnFilter.generate(
+        train=data,
+        test=data,
+        correlation_threshold=0.999,
+        settings=settings,
+    )
 
-    result = redundant_filter._get_correlations_for("a", threshold)
+    result = column_filter.correlations_for_each(["feature_a", "feature_b"], 0.8)
 
-    assert result.columns == ["feature_name", "correlation"]
-    assert result.get_column("feature_name").to_list() == expected_names
-    absolute_values = result.get_column("correlation").abs().to_list()
-    assert absolute_values == sorted(absolute_values, reverse=True)
-    assert "a" not in result.get_column("feature_name").to_list()
-
-
-def test_should_group_correlations_for_each_requested_column(
-    settings: config.Settings,
-    correlation_matrix: pl.DataFrame,
-) -> None:
-    """Verifica que se devuelva un resultado independiente por columna solicitada.
-
-    Args:
-        settings: Configuración global del proyecto.
-        correlation_matrix: Matriz de correlación controlada.
-    """
-    redundant_filter = _build_filter(settings, correlation_matrix)
-
-    result = redundant_filter.correlations_for_each(["a", "b"], 0.4)
-
-    expected_a = pl.DataFrame({"feature_name": ["b", "c"], "correlation": [0.9, -0.5]})
-    expected_b = pl.DataFrame({"feature_name": ["c", "a"], "correlation": [-0.95, 0.9]})
     assert isinstance(result, types.MappingProxyType)
-    assert tuple(result) == ("a", "b")
-    polars.testing.assert_frame_equal(result["a"], expected_a)
-    polars.testing.assert_frame_equal(result["b"], expected_b)
+    assert tuple(result) == ("feature_a", "feature_b")
+    assert result["feature_a"].columns == ["feature_name", "correlation"]
+    assert result["feature_a"].get_column("feature_name").to_list() == [
+        "feature_c",
+        "feature_b",
+    ]
+    assert result["feature_b"].get_column("feature_name").to_list() == [
+        "feature_a",
+        "feature_c",
+    ]
+    assert "feature_a" not in result["feature_a"].get_column("feature_name").to_list()
+    assert "feature_b" not in result["feature_b"].get_column("feature_name").to_list()
+    for frame in result.values():
+        absolute_values = frame.get_column("correlation").abs().to_list()
+        assert absolute_values == sorted(absolute_values, reverse=True)
+        assert (frame.get_column("correlation").abs() > 0.8).all()
+
+
+def test_should_apply_correlation_threshold_strictly_in_correlations_for_each(
+    settings: config.Settings,
+) -> None:
+    """Verifica la comparación estricta al filtrar correlaciones públicas.
+
+    Args:
+        settings: Configuración global del proyecto.
+    """
+    data = _correlated_frame()
+    column_filter = redundant_column_filter.RedundantColumnFilter.generate(
+        train=data,
+        test=data,
+        correlation_threshold=0.999,
+        settings=settings,
+    )
+    correlations = _correlation_matrix(
+        data,
+        ("feature_a", "feature_b", "feature_c"),
+    )
+    correlation_ab = abs(correlations.get_column("feature_b").item(0))
+    correlation_ac = abs(correlations.get_column("feature_c").item(0))
+
+    at_ab = column_filter.correlations_for_each(["feature_a"], correlation_ab)
+    at_ac = column_filter.correlations_for_each(["feature_a"], correlation_ac)
+
+    assert at_ab["feature_a"].get_column("feature_name").to_list() == ["feature_c"]
+    assert at_ac["feature_a"].is_empty()

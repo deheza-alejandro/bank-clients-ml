@@ -381,23 +381,14 @@ def test_should_run_heavy_operations_and_return_correlations(
         integration_settings: Configuración del proyecto.
     """
     train, test = grouped_train_test
-    correlation_threshold = 0.8
-    column_filter = redundant_column_filter.RedundantColumnFilter(
-        reduced_train=train,
-        correlated_train=train,
-        correlated_test=test,
-        uncorrelated_train=train,
-        constant_cols=(),
-        imbalanced_binary_columns=(),
-        correlated_columns=(),
-        imbalanced_binary_threshold=0.1,
-        correlation_threshold=correlation_threshold,
+    column_filter = redundant_column_filter.RedundantColumnFilter.generate(
+        train=train,
+        test=test,
+        imbalanced_binary_threshold=0.01,
+        correlation_threshold=0.999,
         settings=integration_settings,
-        _corr_df=train.drop(
-            integration_settings.dataset.id,
-            integration_settings.dataset.target,
-        ).corr(),
     )
+    correlation_threshold = column_filter.correlation_threshold
     plot_mock = mocker.patch.object(training.visualization, "plot_top_features")
 
     group_trainer, trainer, correlations = (

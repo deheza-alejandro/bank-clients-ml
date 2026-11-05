@@ -117,19 +117,6 @@ def imbalanced_train() -> pl.DataFrame:
 
 
 @pytest.fixture
-def twelve_months_data() -> pl.DataFrame:
-    """Devuelve un DataFrame con los doce meses de 2024.
-
-    ## Returns:
-        DataFrame con una fila por mes.
-    """
-    return pl.DataFrame(
-        {"Month": [date(2024, month, 1) for month in range(1, 13)]},
-        schema={"Month": pl.Date},
-    )
-
-
-@pytest.fixture
 def time_window_split(
     clean_data: pl.DataFrame,
     settings: config.Settings,
@@ -151,30 +138,26 @@ def time_window_split(
     [
         pytest.param(
             1,
-            tuple(date(2024, month, 1) for month in range(1, 11)),
-            (date(2024, 12, 1),),
+            tuple(date(2024, month, 1) for month in range(1, 9)),
+            (date(2024, 10, 1),),
             id="one-month",
         ),
         pytest.param(
             2,
-            tuple(date(2024, month, 1) for month in range(1, 10)),
-            (date(2024, 11, 1), date(2024, 12, 1)),
+            tuple(date(2024, month, 1) for month in range(1, 8)),
+            (date(2024, 9, 1), date(2024, 10, 1)),
             id="two-months",
         ),
         pytest.param(
             3,
-            tuple(date(2024, month, 1) for month in range(1, 9)),
-            (
-                date(2024, 10, 1),
-                date(2024, 11, 1),
-                date(2024, 12, 1),
-            ),
+            tuple(date(2024, month, 1) for month in range(1, 7)),
+            (date(2024, 8, 1), date(2024, 9, 1), date(2024, 10, 1)),
             id="three-months",
         ),
     ],
 )
 def test_should_build_training_and_prediction_windows_with_one_lead_month(
-    twelve_months_data: pl.DataFrame,
+    clean_data: pl.DataFrame,
     settings: config.Settings,
     prediction_window_size: int,
     expected_training: tuple[date, ...],
@@ -183,20 +166,20 @@ def test_should_build_training_and_prediction_windows_with_one_lead_month(
     """Verifica que las ventanas respeten el tamaño y dejen un mes de separación.
 
     ## Args:
-        twelve_months_data: Datos con los doce meses del año.
+        clean_data: Datos limpios con diez meses de historia.
         settings: Configuración con el nombre de la columna de meses.
         prediction_window_size: Cantidad de meses reservados para predicción.
         expected_training: Meses esperados en la ventana de entrenamiento.
         expected_prediction: Meses esperados en la ventana de predicción.
     """
-    training_months, prediction_months = sampling._build_date_windows(
-        twelve_months_data, prediction_window_size, settings
+    split = sampling.TimeWindowSplit.generate(
+        clean_data, prediction_window_size, settings=settings
     )
 
-    lead_month = date(2024, 12 - prediction_window_size, 1)
-    assert training_months == expected_training
-    assert prediction_months == expected_prediction
-    assert training_months[-1] < lead_month < prediction_months[0]
+    lead_month = date(2024, 10 - prediction_window_size, 1)
+    assert split.training_months == expected_training
+    assert split.prediction_months == expected_prediction
+    assert split.training_months[-1] < lead_month < split.prediction_months[0]
 
 
 def test_should_build_expected_windows_and_expose_boundary_months(

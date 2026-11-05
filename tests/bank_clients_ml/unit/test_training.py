@@ -1,15 +1,26 @@
 """Tests unitarios para el módulo de entrenamiento de modelos LightGBM."""
 
-from typing import cast
+from typing import Any
 
 import numpy as np
 import polars as pl
 import polars.testing
 import pytest
 import pytest_mock
-import sklearn.model_selection
 
 from bank_clients_ml import binning, config, training
+
+
+class _StubClassifier:
+    """Clasificador simulado con importancias configurables."""
+
+    def __init__(self, feature_importances: list[float]) -> None:
+        """Inicializa el clasificador con las importancias indicadas.
+
+        ## Args:
+            feature_importances: Importancias asociadas a las columnas entrenadas.
+        """
+        self.feature_importances_ = feature_importances
 
 
 class _StubSearcher:
@@ -32,6 +43,94 @@ class _StubSearcher:
         self.best_score_ = best_score
         self.n_splits_ = n_splits
         self.cv_results_ = cv_results if cv_results is not None else {}
+        self.best_estimator_ = _StubClassifier([])
+
+    def fit(self, _x: object, _y: object) -> "_StubSearcher":
+        """Simula el ajuste del buscador sin ejecutar un entrenamiento real."""
+        return self
+
+
+def _train_frame(
+    columns: list[str],
+    target: str,
+    height: int = 4,
+) -> pl.DataFrame:
+    """Construye un DataFrame mínimo con las columnas y el target indicados."""
+    return pl.DataFrame(
+        {
+            **{column: [float(index) for index in range(height)] for column in columns},
+            target: [index % 2 for index in range(height)],
+        }
+    )
+
+
+def _patch_searcher(
+    mocker: pytest_mock.MockerFixture,
+    searcher: _StubSearcher,
+) -> Any:
+    """Reemplaza el buscador de scikit-learn por un doble controlado."""
+    return mocker.patch.object(
+        training.sklearn.model_selection,
+        "RandomizedSearchCV",
+        return_value=searcher,
+    )
+
+
+def _build_trainer(
+    mocker: pytest_mock.MockerFixture,
+    settings: config.Settings,
+    importances: pl.DataFrame,
+    searcher: _StubSearcher | None = None,
+) -> training.LGBMTrainer:
+    """Construye un entrenador mediante la API pública y un buscador simulado.
+
+    ## Args:
+        mocker: Utilidad para sustituir el buscador de scikit-learn.
+        settings: Configuración global del proyecto.
+        importances: Tabla de importancias ordenada de mayor a menor.
+        searcher: Buscador simulado; si no se indica, se usa uno por defecto.
+
+    ## Returns:
+        Entrenador listo para consultar sus propiedades.
+    """
+    searcher = searcher if searcher is not None else _StubSearcher()
+    searcher.best_estimator_ = _StubClassifier(
+        importances.get_column(settings.analysis.importance).to_list()
+    )
+    columns = importances.get_column(settings.analysis.feature).to_list()
+    _patch_searcher(mocker, searcher)
+
+    return training.LGBMTrainer.fit_and_build(
+        _train_frame(columns, settings.dataset.target),
+        columns,
+        settings,
+        n_iter=2,
+        splits_cross_validation=3,
+    )
+
+
+def _search_param_distributions(
+    mocker: pytest_mock.MockerFixture,
+    settings: config.Settings,
+    n_samples: int,
+    splits_cross_validation: int,
+) -> dict[str, Any]:
+    """Obtiene las distribuciones pasadas al buscador mediante la API pública."""
+    searcher = _StubSearcher()
+    searcher.best_estimator_ = _StubClassifier([1.0])
+    search_factory = _patch_searcher(mocker, searcher)
+
+    training.LGBMTrainer.fit_and_build(
+        _train_frame(["Feature"], settings.dataset.target, height=n_samples),
+        ["Feature"],
+        settings,
+        n_iter=1,
+        splits_cross_validation=splits_cross_validation,
+    )
+
+    search_call = search_factory.call_args
+    assert search_call is not None
+    return search_call.kwargs["param_distributions"]
 
 
 @pytest.fixture
@@ -59,36 +158,17 @@ def minimal_train() -> pl.DataFrame:
     return pl.DataFrame({"Target": [0, 1]})
 
 
-def _build_trainer(
+def test_should_build_expected_hyperparameter_distributions(
+    mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
-    importances: pl.DataFrame,
-    searcher: _StubSearcher | None = None,
-) -> training.LGBMTrainer:
-    """Construye un entrenador con un buscador simulado.
+) -> None:
+    """Verifica que el espacio de búsqueda incluya todos los hiperparámetros.
 
     ## Args:
+        mocker: Utilidad para inspeccionar el buscador construido.
         settings: Configuración global del proyecto.
-        importances: Tabla de importancias ordenada de mayor a menor.
-        searcher: Buscador simulado; si no se indica, se usa uno por defecto.
-
-    ## Returns:
-        Entrenador listo para consultar sus propiedades.
     """
-    return training.LGBMTrainer(
-        importances=importances,
-        search_logs="captured logs",
-        n_iter=2,
-        settings=settings,
-        _searcher=cast(
-            sklearn.model_selection.RandomizedSearchCV,
-            searcher if searcher is not None else _StubSearcher(),
-        ),
-    )
-
-
-def test_should_build_expected_hyperparameter_distributions() -> None:
-    """Verifica que el espacio de búsqueda incluya todos los hiperparámetros."""
-    distributions = training._build_param_distributions(12_000, 2)
+    distributions = _search_param_distributions(mocker, settings, 12_000, 2)
 
     assert set(distributions) == {
         "n_estimators",
@@ -109,6 +189,8 @@ def test_should_build_expected_hyperparameter_distributions() -> None:
     ],
 )
 def test_should_adapt_min_child_samples_to_fold_size(
+    mocker: pytest_mock.MockerFixture,
+    settings: config.Settings,
     n_samples: int,
     splits_cross_validation: int,
     expected_max: int,
@@ -116,12 +198,14 @@ def test_should_adapt_min_child_samples_to_fold_size(
     """Verifica que el rango de hojas mínimas sea factible para los pliegues.
 
     ## Args:
+        mocker: Utilidad para inspeccionar el buscador construido.
+        settings: Configuración global del proyecto.
         n_samples: Cantidad de filas del conjunto de entrenamiento.
         splits_cross_validation: Cantidad de particiones de la validación cruzada.
         expected_max: Valor máximo esperado para `min_child_samples`.
     """
-    distributions = training._build_param_distributions(
-        n_samples, splits_cross_validation
+    distributions = _search_param_distributions(
+        mocker, settings, n_samples, splits_cross_validation
     )
     min_child_samples = np.asarray(distributions["min_child_samples"])
 
@@ -177,12 +261,14 @@ def test_should_raise_value_error_when_splits_cross_validation_is_less_than_two(
 
 
 def test_should_return_cv_results_sorted_by_rank_without_params(
+    mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
     importances: pl.DataFrame,
 ) -> None:
     """Verifica el orden y las columnas de los resultados de validación cruzada.
 
     ## Args:
+        mocker: Utilidad para sustituir el buscador de scikit-learn.
         settings: Configuración global del proyecto.
         importances: Tabla de importancias ordenada de mayor a menor.
     """
@@ -193,6 +279,7 @@ def test_should_return_cv_results_sorted_by_rank_without_params(
         "params": [{"max_depth": 4}, {"max_depth": 5}],
     }
     trainer = _build_trainer(
+        mocker,
         settings,
         importances,
         _StubSearcher(cv_results=cv_results),
@@ -225,6 +312,7 @@ def test_should_return_cv_results_sorted_by_rank_without_params(
     ],
 )
 def test_should_return_top_ranked_features_in_importance_order(
+    mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
     importances: pl.DataFrame,
     top_n: int,
@@ -233,12 +321,13 @@ def test_should_return_top_ranked_features_in_importance_order(
     """Verifica la selección de las variables mejor posicionadas.
 
     ## Args:
+        mocker: Utilidad para sustituir el buscador de scikit-learn.
         settings: Configuración global del proyecto.
         importances: Tabla de importancias ordenada de mayor a menor.
         top_n: Cantidad de variables solicitada.
         expected: Variables esperadas en orden de importancia.
     """
-    trainer = _build_trainer(settings, importances)
+    trainer = _build_trainer(mocker, settings, importances)
 
     result = trainer.get_top_ranked_features(top_n)
 
@@ -250,6 +339,7 @@ def test_should_return_top_ranked_features_in_importance_order(
     [pytest.param(-1, id="negative"), pytest.param(4, id="greater-than-features")],
 )
 def test_should_raise_value_error_when_top_n_is_out_of_range(
+    mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
     importances: pl.DataFrame,
     top_n: int,
@@ -257,11 +347,12 @@ def test_should_raise_value_error_when_top_n_is_out_of_range(
     """Verifica que se rechace una cantidad inválida de variables a seleccionar.
 
     ## Args:
+        mocker: Utilidad para sustituir el buscador de scikit-learn.
         settings: Configuración global del proyecto.
         importances: Tabla de importancias ordenada de mayor a menor.
         top_n: Cantidad de variables fuera del rango permitido.
     """
-    trainer = _build_trainer(settings, importances)
+    trainer = _build_trainer(mocker, settings, importances)
 
     with pytest.raises(ValueError, match=f"Invalid top_n {top_n}"):
         trainer.get_top_ranked_features(top_n)
@@ -281,6 +372,7 @@ def test_should_plot_importances_without_name_mapping(
     """
     plot_mock = mocker.patch.object(training.visualization, "plot_top_features")
     trainer = _build_trainer(
+        mocker,
         settings,
         importances,
         _StubSearcher(best_score=0.81),
@@ -309,6 +401,7 @@ def test_should_plot_importances_with_descriptive_feature_names(
     """
     plot_mock = mocker.patch.object(training.visualization, "plot_top_features")
     trainer = _build_trainer(
+        mocker,
         settings,
         importances,
         _StubSearcher(best_score=0.83),

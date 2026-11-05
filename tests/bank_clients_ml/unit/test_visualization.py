@@ -1,6 +1,5 @@
 """Tests unitarios para la generación y guardado de gráficos."""
 
-import concurrent.futures
 import pathlib
 from collections.abc import Generator
 from typing import cast
@@ -10,9 +9,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing
 import polars as pl
-import polars.testing
 import pytest
 import pytest_mock
+from matplotlib.figure import Figure
 
 from bank_clients_ml import bivariate_table, config, evaluation, visualization
 
@@ -22,6 +21,36 @@ def close_figures_after_each_test() -> Generator[None]:
     """Cierra todas las figuras abiertas al finalizar cada test."""
     yield
     plt.close("all")
+
+
+@pytest.fixture
+def plot_settings(tmp_path: pathlib.Path) -> config.Settings:
+    """Devuelve una configuración con las imágenes en un directorio temporal.
+
+    ## Args:
+        tmp_path: Directorio temporal proporcionado por pytest.
+
+    ## Returns:
+        Configuración aislada para las pruebas de escritura de gráficos.
+    """
+    return config.Settings(paths=config.DirectoryPaths(project=tmp_path))
+
+
+@pytest.fixture
+def capture_saver() -> tuple[
+    list[tuple[Figure, pathlib.Path]], visualization.FigureSaver
+]:
+    """Devuelve una estrategia de guardado que captura figuras y rutas.
+
+    ## Returns:
+        Lista de capturas y la estrategia que las acumula.
+    """
+    saved: list[tuple[Figure, pathlib.Path]] = []
+
+    def saver(fig: Figure, path: pathlib.Path) -> None:
+        saved.append((fig, path))
+
+    return saved, saver
 
 
 @pytest.fixture
@@ -102,64 +131,42 @@ def evaluation_metrics() -> evaluation.EvaluationMetrics:
     )
 
 
-def test_should_close_figure_when_context_exits() -> None:
-    """Verifica que la figura se cierre al salir correctamente del contexto."""
-    fig, _ = plt.subplots()
-    fig_number = fig.number
-
-    with visualization._closing_figure(fig):
-        assert plt.fignum_exists(fig_number)
-
-    assert not plt.fignum_exists(fig_number)
-
-
-def test_should_close_figure_when_context_body_raises() -> None:
-    """Verifica que la figura se cierre aunque ocurra un error en el contexto."""
-    fig, _ = plt.subplots()
-    fig_number = fig.number
-
-    with pytest.raises(RuntimeError, match="boom"), visualization._closing_figure(fig):
-        msg = "boom"
-        raise RuntimeError(msg)
-
-    assert not plt.fignum_exists(fig_number)
-
-
-def test_should_round_float_columns_to_two_decimals_without_modifying_input() -> None:
-    """Verifica el redondeo de columnas float y la inmutabilidad de los datos."""
-    df = pl.DataFrame(
-        {
-            "decimal": [1.234, 5.678],
-            "integer": [1, 2],
-            "text": ["a", "b"],
-        }
-    )
-
-    result = visualization._format_floats(df)
-
-    expected = pl.DataFrame(
-        {
-            "decimal": [1.23, 5.68],
-            "integer": [1, 2],
-            "text": ["a", "b"],
-        }
-    )
-    polars.testing.assert_frame_equal(result, expected)
-    assert df.get_column("decimal").to_list() == [1.234, 5.678]
-
-
-def test_should_raise_runtime_error_when_bun_executable_is_missing(
+def test_should_close_figure_after_plotting_top_features(
     mocker: pytest_mock.MockerFixture,
-    tmp_path: pathlib.Path,
+    top_features_table: pl.DataFrame,
+    plot_settings: config.Settings,
+) -> None:
+    """Verifica que la API pública cierre la figura después de guardarla.
+
+    ## Args:
+        mocker: Utilidad para evitar la ejecución de SVGO.
+        top_features_table: Tabla de importancias ordenada.
+        plot_settings: Configuración con un directorio de imágenes temporal.
+    """
+    mocker.patch.object(visualization.subprocess, "run")
+
+    visualization.plot_top_features(
+        top_features_table,
+        "chart",
+        roc_auc=0.9,
+        settings=plot_settings,
+    )
+
+    assert plt.get_fignums() == []
+
+
+def test_should_raise_runtime_error_and_close_figure_when_bun_is_missing(
+    mocker: pytest_mock.MockerFixture,
+    top_features_table: pl.DataFrame,
+    plot_settings: config.Settings,
 ) -> None:
     """Verifica el error informativo cuando Bun no está disponible.
 
     ## Args:
         mocker: Utilidad para simular la ausencia del ejecutable.
-        tmp_path: Directorio temporal para aislar la escritura en disco.
+        top_features_table: Tabla de importancias ordenada.
+        plot_settings: Configuración con un directorio de imágenes temporal.
     """
-    fig, _ = plt.subplots()
-    fig_number = fig.number
     mocker.patch.object(
         visualization.subprocess,
         "run",
@@ -167,9 +174,14 @@ def test_should_raise_runtime_error_when_bun_executable_is_missing(
     )
 
     with pytest.raises(RuntimeError, match="Bun executable not found"):
-        visualization._save_fig_as_svg(fig, "chart", tmp_path)
+        visualization.plot_top_features(
+            top_features_table,
+            "chart",
+            roc_auc=0.9,
+            settings=plot_settings,
+        )
 
-    assert not plt.fignum_exists(fig_number)
+    assert plt.get_fignums() == []
 
 
 @pytest.mark.parametrize(
@@ -185,25 +197,37 @@ def test_should_raise_runtime_error_when_bun_executable_is_missing(
 )
 def test_should_build_top_features_figure_with_requested_limit_and_expected_title(
     top_features_table: pl.DataFrame,
-    settings: config.Settings,
+    plot_settings: config.Settings,
     top_n: int,
     expected_features: list[str],
+    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
 ) -> None:
     """Verifica el límite de variables y el contenido del gráfico de importancia.
 
     ## Args:
         top_features_table: Tabla de importancias ordenada.
-        settings: Configuración con los nombres de columnas.
+        plot_settings: Configuración con nombres de columnas y directorio temporal.
         top_n: Cantidad solicitada de variables.
         expected_features: Variables que deben aparecer en el gráfico.
+        capture_saver: Captura de figuras y rutas guardadas.
     """
-    fig = visualization._build_top_features_figure(
+    saved, saver = capture_saver
+
+    visualization.plot_top_features(
         top_features_table,
         "model_a",
         roc_auc=0.987654321,
         top_n=top_n,
-        settings=settings,
+        settings=plot_settings,
+        figure_saver=saver,
     )
+
+    assert len(saved) == 1
+    fig, svg_path = saved[0]
+    assert svg_path == (
+        plot_settings.paths.images / "plot_top_features" / "model_a.svg"
+    )
+    assert plt.get_fignums() == []
 
     ax = fig.axes[0]
     assert [label.get_text() for label in ax.get_yticklabels()] == expected_features
@@ -215,25 +239,42 @@ def test_should_build_top_features_figure_with_requested_limit_and_expected_titl
         .head(len(expected_features))
         .to_list()
     )
-    assert ax.get_xlabel() == settings.analysis.importance
-    assert ax.get_ylabel() == settings.analysis.feature
+    assert ax.get_xlabel() == plot_settings.analysis.importance
+    assert ax.get_ylabel() == plot_settings.analysis.feature
     assert ax.get_title() == (
         f"model_a: top {len(expected_features)} Features\nROC AUC: 0.987654"
     )
 
 
-def test_should_use_configured_column_names_in_top_features_figure() -> None:
-    """Verifica que los ejes usen los nombres de columna configurados."""
+def test_should_use_configured_column_names_in_top_features_figure(
+    tmp_path: pathlib.Path,
+    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
+) -> None:
+    """Verifica que los ejes usen los nombres de columna configurados.
+
+    ## Args:
+        tmp_path: Directorio temporal proporcionado por pytest.
+        capture_saver: Captura de figuras y rutas guardadas.
+    """
     custom_settings = config.Settings(
-        analysis=config.AnalysisColumns(feature="Variable", importance="Weight")
+        paths=config.DirectoryPaths(project=tmp_path),
+        analysis=config.AnalysisColumns(feature="Variable", importance="Weight"),
     )
     variables = pl.DataFrame({"Variable": ["A", "B"], "Weight": [7.0, 3.0]})
+    saved, saver = capture_saver
 
-    fig = visualization._build_top_features_figure(
+    visualization.plot_top_features(
         variables,
         "custom",
         roc_auc=0.5,
         settings=custom_settings,
+        figure_saver=saver,
+    )
+
+    assert len(saved) == 1
+    fig, svg_path = saved[0]
+    assert svg_path == (
+        custom_settings.paths.images / "plot_top_features" / "custom.svg"
     )
 
     ax = fig.axes[0]
@@ -244,15 +285,31 @@ def test_should_use_configured_column_names_in_top_features_figure() -> None:
 
 def test_should_build_bivariate_figure_with_table_bars_and_target_percentage_line(
     bivariate_age: bivariate_table.BivariateTable,
-    settings: config.Settings,
+    plot_settings: config.Settings,
+    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
 ) -> None:
     """Verifica el contenido de la tabla, las barras y la línea del target.
 
     ## Args:
         bivariate_age: Tabla bivariada de ejemplo.
-        settings: Configuración con los nombres de columnas.
+        plot_settings: Configuración con nombres de columnas y directorio temporal.
+        capture_saver: Captura de figuras y rutas guardadas.
     """
-    fig = visualization._build_bivariate_chart_figure(bivariate_age, settings)
+    saved, saver = capture_saver
+
+    visualization.plot_bivariate_charts(
+        [bivariate_age],
+        "test_analysis",
+        plot_settings,
+        max_workers=1,
+        figure_saver=saver,
+    )
+
+    assert len(saved) == 1
+    fig, svg_path = saved[0]
+    assert svg_path == (
+        plot_settings.paths.images / "bivariate_analysis" / "test_analysis" / "age.svg"
+    )
 
     ax_table, ax_graph, ax_target_pct = fig.axes
     table = ax_table.tables[0]
@@ -271,7 +328,7 @@ def test_should_build_bivariate_figure_with_table_bars_and_target_percentage_lin
         "2",
         "3",
     ]
-    assert ax_graph.get_ylabel() == settings.analysis.clients
+    assert ax_graph.get_ylabel() == plot_settings.analysis.clients
     target_pct_values = cast(
         numpy.typing.NDArray[np.float64],
         ax_target_pct.lines[0].get_ydata(),
@@ -280,12 +337,21 @@ def test_should_build_bivariate_figure_with_table_bars_and_target_percentage_lin
         target_pct_values,
         [10.0, 20.0, 30.0],
     )
-    assert ax_target_pct.get_ylabel() == f"{settings.dataset.target} pct (%)"
+    assert ax_target_pct.get_ylabel() == f"{plot_settings.dataset.target} pct (%)"
 
 
-def test_should_use_configured_columns_in_bivariate_figure() -> None:
-    """Verifica que la tabla y los ejes respeten la configuración personalizada."""
+def test_should_use_configured_columns_in_bivariate_figure(
+    tmp_path: pathlib.Path,
+    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
+) -> None:
+    """Verifica que la tabla y los ejes respeten la configuración personalizada.
+
+    ## Args:
+        tmp_path: Directorio temporal proporcionado por pytest.
+        capture_saver: Captura de figuras y rutas guardadas.
+    """
     custom_settings = config.Settings(
+        paths=config.DirectoryPaths(project=tmp_path),
         dataset=config.DatasetColumns(target="label"),
         analysis=config.AnalysisColumns(
             bin="bucket",
@@ -304,8 +370,24 @@ def test_should_use_configured_columns_in_bivariate_figure() -> None:
         }
     )
     bivariate = bivariate_table.BivariateTable("income", "Income", table)
+    saved, saver = capture_saver
 
-    fig = visualization._build_bivariate_chart_figure(bivariate, custom_settings)
+    visualization.plot_bivariate_charts(
+        [bivariate],
+        "custom_analysis",
+        custom_settings,
+        max_workers=1,
+        figure_saver=saver,
+    )
+
+    assert len(saved) == 1
+    fig, svg_path = saved[0]
+    assert svg_path == (
+        custom_settings.paths.images
+        / "bivariate_analysis"
+        / "custom_analysis"
+        / "income.svg"
+    )
 
     ax_table, ax_graph, ax_target_pct = fig.axes
     table_artist = ax_table.tables[0]
@@ -315,46 +397,6 @@ def test_should_use_configured_columns_in_bivariate_figure() -> None:
     assert table_artist[2, 5].get_text().get_text() == "33"
     assert ax_graph.get_ylabel() == "customers"
     assert ax_target_pct.get_ylabel() == "label pct (%)"
-
-
-def test_should_process_all_tables_with_process_pool_when_many_tables_are_requested(
-    mocker: pytest_mock.MockerFixture,
-    settings: config.Settings,
-) -> None:
-    """Verifica que todas las tablas se procesen mediante el pool de procesos.
-
-    ## Args:
-        mocker: Utilidad para sustituir el pool y el dibujo individual.
-        settings: Configuración del proyecto.
-    """
-    tables = [
-        bivariate_table.BivariateTable(
-            f"var_{index}",
-            f"Var {index}",
-            pl.DataFrame(),
-        )
-        for index in range(20)
-    ]
-    plot_mock = mocker.patch.object(visualization, "_plot_single_bivariate_chart")
-    executor_factory = mocker.patch.object(
-        visualization.concurrent.futures,
-        "ProcessPoolExecutor",
-        side_effect=concurrent.futures.ThreadPoolExecutor,
-    )
-
-    visualization.plot_bivariate_charts(
-        tables,
-        "analysis",
-        settings,
-        max_workers=4,
-    )
-
-    executor_factory.assert_called_once_with(4)
-    assert plot_mock.call_count == len(tables)
-    plot_mock.assert_has_calls(
-        [mocker.call(table, "analysis", settings) for table in tables],
-        any_order=True,
-    )
 
 
 def _line_data(
@@ -369,13 +411,30 @@ def _line_data(
 
 def test_should_build_roc_curve_figure_with_metrics_annotation(
     evaluation_metrics: evaluation.EvaluationMetrics,
+    plot_settings: config.Settings,
+    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
 ) -> None:
     """Verifica la curva ROC, la diagonal y la anotación de métricas.
 
     ## Args:
         evaluation_metrics: Métricas de evaluación de ejemplo.
+        plot_settings: Configuración con un directorio de imágenes temporal.
+        capture_saver: Captura de figuras y rutas guardadas.
     """
-    fig = visualization._build_roc_curve_figure(evaluation_metrics, "test_model")
+    saved, saver = capture_saver
+
+    visualization.plot_roc_curve(
+        evaluation_metrics,
+        "test_model",
+        plot_settings,
+        figure_saver=saver,
+    )
+
+    assert len(saved) == 1
+    fig, svg_path = saved[0]
+    assert svg_path == (
+        plot_settings.paths.images / "plot_evaluation_metrics" / "test_model.svg"
+    )
 
     ax = fig.axes[0]
     xdata_0, ydata_0 = _line_data(ax.lines[0])
@@ -392,58 +451,66 @@ def test_should_build_roc_curve_figure_with_metrics_annotation(
     assert ax.get_ylim() == (0.0, 1.0)
 
 
-def test_should_render_rounded_deciles_table_with_title() -> None:
-    """Verifica el formato de los valores y el título de la tabla de deciles."""
-    deciles = pl.DataFrame(
-        {
-            "decile": ["1", "2"],
-            "count": [10, 20],
-            "target_1_rate": [12.346, 67.891],
-        }
-    )
-    _, ax = plt.subplots()
-
-    visualization._plot_single_deciles_table(ax, deciles, "Train Deciles")
-
-    table = ax.tables[0]
-    headers = [table[0, column].get_text().get_text() for column in range(3)]
-    assert headers == ["decile", "count", "target_1_rate"]
-    assert table[1, 0].get_text().get_text() == "1"
-    assert table[1, 2].get_text().get_text() == "12.35"
-    assert table[2, 2].get_text().get_text() == "67.89"
-    assert ax.get_title(loc="left") == "Train Deciles"
-    assert not ax.axison
-
-
 def test_should_build_train_and_test_deciles_in_single_figure(
     evaluation_metrics: evaluation.EvaluationMetrics,
+    plot_settings: config.Settings,
+    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
 ) -> None:
-    """Verifica las dos tablas del gráfico de deciles.
+    """Verifica títulos, ejes, cabeceras y redondeo de las tablas de deciles.
 
     ## Args:
         evaluation_metrics: Métricas con las tablas de deciles.
+        plot_settings: Configuración con un directorio de imágenes temporal.
+        capture_saver: Captura de figuras y rutas guardadas.
     """
-    fig = visualization._build_deciles_figure(evaluation_metrics)
+    saved, saver = capture_saver
+
+    visualization.plot_deciles(
+        evaluation_metrics,
+        "deciles",
+        plot_settings,
+        figure_saver=saver,
+    )
+
+    assert len(saved) == 1
+    fig, svg_path = saved[0]
+    assert svg_path == (
+        plot_settings.paths.images / "plot_evaluation_metrics" / "deciles.svg"
+    )
 
     assert len(fig.axes) == 2
 
     train_ax, test_ax = fig.axes
     assert train_ax.get_title(loc="left") == "Train Deciles"
     assert test_ax.get_title(loc="left") == "Test Deciles"
+    assert not train_ax.axison
+    assert not test_ax.axison
 
     train_table = train_ax.tables[0]
     test_table = test_ax.tables[0]
+    train_columns = evaluation_metrics.train_deciles_without_probs.columns
+    test_columns = evaluation_metrics.test_deciles_without_probs.columns
     train_headers = [
         train_table[0, column].get_text().get_text()
-        for column in range(len(evaluation_metrics.train_deciles_without_probs.columns))
+        for column in range(len(train_columns))
     ]
     test_headers = [
         test_table[0, column].get_text().get_text()
-        for column in range(len(evaluation_metrics.test_deciles_without_probs.columns))
+        for column in range(len(test_columns))
     ]
-    assert train_headers == evaluation_metrics.train_deciles_without_probs.columns
-    assert test_headers == evaluation_metrics.test_deciles_without_probs.columns
+    assert train_headers == train_columns
+    assert test_headers == test_columns
     assert "min_prob" not in train_headers
     assert "max_prob" not in test_headers
     assert train_table[1, 0].get_text().get_text() == "1"
     assert test_table[1, 0].get_text().get_text() == "1"
+    assert train_table[1, train_columns.index("lift")].get_text().get_text() == "1.23"
+    assert train_table[2, train_columns.index("lift")].get_text().get_text() == "1.46"
+    assert (
+        test_table[1, test_columns.index("target_1_rate")].get_text().get_text()
+        == "16.67"
+    )
+    assert (
+        test_table[2, test_columns.index("target_1_rate")].get_text().get_text()
+        == "44.44"
+    )
