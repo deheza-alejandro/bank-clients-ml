@@ -62,6 +62,7 @@
         "equiespaciados",
         "facecolor",
         "fignum",
+        "fignums",
         "figsize",
         "fonttype",
         "fontweight",
