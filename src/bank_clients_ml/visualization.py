@@ -1,7 +1,13 @@
 """Generación y guardado de gráficos para análisis y evaluación del modelo.
 
 Este módulo centraliza las visualizaciones utilizadas en el notebook.
-Todas las figuras se guardan como archivos SVG optimizados con SVGO a través de Bun.
+Por defecto, todas las figuras se guardan como archivos SVG optimizados con SVGO
+a través de Bun. La estrategia de guardado puede sustituirse con `figure_saver`.
+
+## Tipos exportados:
+    FigureSaver: Alias de `Callable[[Figure, pathlib.Path], None]` para las
+        estrategias de guardado. El figure_saver escribe la figura en la ruta indicada;
+        el cierre de la figura lo gestiona este módulo.
 
 ## Funciones exportadas:
     plot_top_features: Genera y guarda un gráfico con las variables más importantes.
@@ -14,7 +20,7 @@ import concurrent.futures
 import io
 import pathlib
 import subprocess
-from collections.abc import Generator, Sequence
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 
 import matplotlib
@@ -31,6 +37,8 @@ matplotlib.use("Agg")
 matplotlib.style.use("default")
 matplotlib.rcParams["svg.hashsalt"] = "fixed_seed_for_this_project"
 matplotlib.rcParams["svg.fonttype"] = "path"
+
+FigureSaver = Callable[[Figure, pathlib.Path], None]
 
 
 @contextmanager
@@ -52,16 +60,50 @@ def _closing_figure(fig: Figure) -> Generator[Figure]:
         plt.close(fig)
 
 
+def _save_fig_with_svgo(fig: Figure, svg_path: pathlib.Path) -> None:
+    """Guarda una figura como SVG optimizado con SVGO a través de Bun.
+
+    ## Args:
+        fig: Figura de Matplotlib a guardar.
+        svg_path: Ruta de destino del archivo SVG. Su directorio debe existir.
+
+    ## Raises:
+        RuntimeError: Si el ejecutable de Bun no se encuentra en el PATH y no
+            es posible optimizar el SVG con SVGO.
+    """
+    with io.BytesIO() as buffer:
+        fig.savefig(buffer, format="svg", bbox_inches="tight")
+        svg_data = buffer.getvalue()
+
+    cmd = ["bun", "run", "svgo", "--multipass", "-i", "-", "-o", "-"]
+
+    with svg_path.open("wb") as out_file:
+        try:
+            subprocess.run(  # noqa: S603
+                cmd, input=svg_data, stdout=out_file, check=True
+            )
+        except FileNotFoundError as err:
+            msg = (
+                f"Bun executable not found in PATH. "
+                "Ensure Bun is installed and available in PATH to optimize SVG "
+                f"with SVGO: \n{svg_path}"
+            )
+            raise RuntimeError(msg) from err
+
+
 def _save_fig_as_svg(
     fig: Figure,
     plot_name: str,
     images_dir: pathlib.Path,
     images_sub_dir: str = "",
+    *,
+    figure_saver: FigureSaver,
 ) -> None:
-    """Guarda una figura de Matplotlib como archivo SVG optimizado con SVGO.
+    """Guarda una figura en la ruta SVG correspondiente y la cierra.
 
-    Canaliza el contenido SVG a través de SVGO mediante Bun para optimizarlo
-    antes de escribirlo en disco. Crea la carpeta de destino si no existe.
+    Crea la carpeta de destino si no existe y delega la escritura en la
+    estrategia de guardado indicada. La figura se cierra siempre al finalizar,
+    incluso si el guardado falla.
 
     El resultado se exporta a:
     {images_dir}/{images_sub_dir}/{plot_name}.svg
@@ -71,32 +113,13 @@ def _save_fig_as_svg(
         plot_name: Nombre base del archivo, sin extensión.
         images_dir: Directorio base donde se guardan las imágenes.
         images_sub_dir: Subdirectorio opcional dentro del directorio base.
-
-    ## Raises:
-        RuntimeError: Si el ejecutable de Bun no se encuentra en el PATH y no
-            es posible optimizar el SVG con SVGO.
+        figure_saver: Estrategia que escribe la figura en la ruta indicada.
     """
-    output_folder = images_dir / images_sub_dir
-    output_folder.mkdir(parents=True, exist_ok=True)
-    svg_path = output_folder / f"{plot_name}.svg"
-
-    with io.BytesIO() as buffer, _closing_figure(fig):
-        fig.savefig(buffer, format="svg", bbox_inches="tight")
-        svg_data = buffer.getvalue()
-
-    cmd = ["bun", "run", "svgo", "--multipass", "-i", "-", "-o", "-"]
-
-    try:
-        with svg_path.open("wb") as out_file:
-            subprocess.run(  # noqa: S603
-                cmd, input=svg_data, stdout=out_file, check=True
-            )
-    except FileNotFoundError as err:
-        msg = (
-            f"Bun executable not found in PATH. "
-            f"Ensure Bun is installed and available in PATH to optimize SVG with SVGO: \n{svg_path}"
-        )
-        raise RuntimeError(msg) from err
+    with _closing_figure(fig):
+        output_folder = images_dir / images_sub_dir
+        output_folder.mkdir(parents=True, exist_ok=True)
+        svg_path = output_folder / f"{plot_name}.svg"
+        figure_saver(fig, svg_path)
 
 
 def _build_top_features_figure(
@@ -166,6 +189,7 @@ def plot_top_features(
     roc_auc: float,
     top_n: int = 20,
     settings: config.Settings,
+    figure_saver: FigureSaver | None = None,
 ) -> None:
     """Genera y guarda un gráfico con las variables más importantes.
 
@@ -180,7 +204,11 @@ def plot_top_features(
         top_n: Cantidad máxima de variables a incluir en el gráfico.
         settings: Configuración con los nombres de columnas de variable e importancia,
             y el directorio base donde se guarda la imagen.
+        figure_saver: Estrategia de guardado. Si no se indica, se usa el guardado SVG
+            optimizado con SVGO.
     """
+    figure_saver = figure_saver or _save_fig_with_svgo
+
     fig = _build_top_features_figure(
         variables_to_plot,
         plot_name,
@@ -188,7 +216,13 @@ def plot_top_features(
         top_n=top_n,
         settings=settings,
     )
-    _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_top_features")
+    _save_fig_as_svg(
+        fig,
+        plot_name,
+        settings.paths.images,
+        "plot_top_features",
+        figure_saver=figure_saver,
+    )
 
 
 def _format_floats(df: pl.DataFrame) -> pl.DataFrame:
@@ -269,6 +303,8 @@ def _plot_single_bivariate_chart(
     bivariate_table: bivariate_table.BivariateTable,
     analysis_name: str,
     settings: config.Settings,
+    *,
+    figure_saver: FigureSaver,
 ) -> None:
     """Genera y guarda el gráfico bivariado individual para una variable.
 
@@ -283,6 +319,7 @@ def _plot_single_bivariate_chart(
         analysis_name: Nombre del análisis. Define el subdirectorio de salida.
         settings: Configuración con el nombre de la columna target y el directorio
             base donde se guarda la imagen.
+        figure_saver: Estrategia que escribe la figura en la ruta indicada.
     """
     fig = _build_bivariate_chart_figure(bivariate_table, settings)
     _save_fig_as_svg(
@@ -290,6 +327,7 @@ def _plot_single_bivariate_chart(
         bivariate_table.snake_case_name,
         settings.paths.images,
         f"bivariate_analysis/{analysis_name}",
+        figure_saver=figure_saver,
     )
 
 
@@ -298,6 +336,8 @@ def plot_bivariate_charts(
     analysis_name: str,
     settings: config.Settings,
     max_workers: int | None = None,
+    *,
+    figure_saver: FigureSaver | None = None,
 ) -> None:
     """Genera gráficos bivariados para un conjunto de variables.
 
@@ -317,13 +357,18 @@ def plot_bivariate_charts(
         max_workers: Cantidad máxima de procesos en paralelo. Si no se indica,
             se usan todos los núcleos disponibles. Si se indica el valor 1 o si
             hay menos de 20 tablas, se utiliza ejecución secuencial.
+        figure_saver: Estrategia de guardado. Si no se indica, se usa el guardado SVG
+            optimizado con SVGO. En ejecución paralela debe ser serializable.
     """
+    figure_saver = figure_saver or _save_fig_with_svgo
+
     if max_workers == 1 or len(bivariate_tables) < 20:
         for bivariate_table in bivariate_tables:
             _plot_single_bivariate_chart(
                 bivariate_table,
                 analysis_name,
                 settings,
+                figure_saver=figure_saver,
             )
     else:
         with concurrent.futures.ProcessPoolExecutor(max_workers) as executor:
@@ -333,6 +378,7 @@ def plot_bivariate_charts(
                     bivariate_table,
                     analysis_name,
                     settings,
+                    figure_saver=figure_saver,
                 )
                 for bivariate_table in bivariate_tables
             ]
@@ -384,6 +430,8 @@ def plot_roc_curve(
     evaluation_metrics: evaluation.EvaluationMetrics,
     plot_name: str,
     settings: config.Settings,
+    *,
+    figure_saver: FigureSaver | None = None,
 ) -> None:
     """Genera y guarda una curva ROC con las métricas resumidas de evaluación.
 
@@ -394,9 +442,19 @@ def plot_roc_curve(
         evaluation_metrics: Métricas del modelo.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
         settings: Configuración con el directorio base donde se guarda la imagen.
+        figure_saver: Estrategia de guardado. Si no se indica, se usa el guardado SVG
+            optimizado con SVGO.
     """
+    figure_saver = figure_saver or _save_fig_with_svgo
+
     fig = _build_roc_curve_figure(evaluation_metrics, plot_name)
-    _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_evaluation_metrics")
+    _save_fig_as_svg(
+        fig,
+        plot_name,
+        settings.paths.images,
+        "plot_evaluation_metrics",
+        figure_saver=figure_saver,
+    )
 
 
 def _plot_single_deciles_table(
@@ -482,6 +540,8 @@ def plot_deciles(
     evaluation_metrics: evaluation.EvaluationMetrics,
     plot_name: str,
     settings: config.Settings,
+    *,
+    figure_saver: FigureSaver | None = None,
 ) -> None:
     """Genera y guarda un gráfico con tablas de deciles de entrenamiento y prueba.
 
@@ -492,6 +552,16 @@ def plot_deciles(
         evaluation_metrics: Métricas del modelo.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
         settings: Configuración con el directorio base donde se guarda la imagen.
+        figure_saver: Estrategia de guardado. Si no se indica, se usa el guardado SVG
+            optimizado con SVGO.
     """
+    figure_saver = figure_saver or _save_fig_with_svgo
+
     fig = _build_deciles_figure(evaluation_metrics)
-    _save_fig_as_svg(fig, plot_name, settings.paths.images, "plot_evaluation_metrics")
+    _save_fig_as_svg(
+        fig,
+        plot_name,
+        settings.paths.images,
+        "plot_evaluation_metrics",
+        figure_saver=figure_saver,
+    )
