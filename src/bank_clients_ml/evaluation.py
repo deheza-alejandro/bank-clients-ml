@@ -19,6 +19,45 @@ import sklearn.model_selection
 from bank_clients_ml import config
 
 
+def _validate_decile_breaks(breaks: Sequence[float]) -> list[float]:
+    """Valida que los cortes permitan construir diez deciles.
+
+    ## Args:
+        breaks: Cortes candidatos para segmentar las probabilidades.
+
+    ## Returns:
+        Cortes únicos ordenados de forma ascendente.
+
+    ## Raises:
+        ValueError: Si no hay nueve cortes únicos.
+    """
+    unique_breaks = np.unique(breaks)
+    if len(breaks) != 9 or unique_breaks.size != 9:
+        msg = (
+            "Cannot compute 10 deciles: expected 9 unique quantile breaks, "
+            f"got {unique_breaks.size} unique values from {len(breaks)} breaks"
+        )
+        raise ValueError(msg)
+    return unique_breaks.tolist()
+
+
+def _compute_decile_breaks(probabilities: np.ndarray) -> list[float]:
+    """Calcula los cortes de deciles a partir de las probabilidades.
+
+    ## Args:
+        probabilities: Probabilidades predichas para la clase positiva.
+
+    ## Returns:
+        Cortes únicos ordenados de forma ascendente.
+
+    ## Raises:
+        ValueError: Si los cuantiles producen cortes repetidos.
+    """
+    decile_quantiles = np.linspace(0.1, 0.9, 9)
+    breaks = np.quantile(probabilities, decile_quantiles)
+    return _validate_decile_breaks(breaks)
+
+
 def _compute_prediction_deciles(
     df: pl.DataFrame,
     probabilities: np.ndarray,
@@ -35,24 +74,26 @@ def _compute_prediction_deciles(
         df: Datos que incluyen la variable target.
         probabilities: Probabilidades predichas por el modelo para la clase positiva.
         settings: Configuración con el nombre de la columna target.
-        bins: bins para segmentar las probabilidades. Si no se indica, se
-            calculan los deciles a partir de `probabilities`.
+        bins: Nueve cortes únicos para segmentar las probabilidades. Si no se
+            indica, se calculan los deciles a partir de `probabilities`.
 
     ## Returns:
         Tabla por decil con conteos, probabilidades mínima y máxima, tasa de
             la clase positiva, ganancia acumulada, lift y KS, ordenada de
             forma descendente por decil.
+
+    ## Raises:
+        ValueError: Si los cortes no permiten construir diez deciles.
     """
     decile_labels = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]
     decile_dtype = pl.Enum(decile_labels)
-
-    decile_expr = (
-        pl.col("probabilities").cut(breaks=bins, labels=decile_labels)
-        if bins
-        else pl.col("probabilities").qcut(
-            10, labels=decile_labels, allow_duplicates=True
-        )
+    breaks = (
+        _compute_decile_breaks(probabilities)
+        if bins is None
+        else _validate_decile_breaks(bins)
     )
+
+    decile_expr = pl.col("probabilities").cut(breaks=breaks, labels=decile_labels)
 
     deciles_df = (
         df.select(
@@ -158,6 +199,10 @@ def evaluate(
     ## Returns:
         Métricas globales, puntos de la curva ROC y tablas de deciles de
             entrenamiento y prueba.
+
+    ## Raises:
+        ValueError: Si las probabilidades de entrenamiento no producen nueve
+            cortes únicos y no permiten construir diez deciles.
     """
     y_true_arr = test.get_column(settings.dataset.target).to_numpy()
     y_pred = (probabilities_test >= 0.5).astype(int)
@@ -166,10 +211,11 @@ def evaluate(
     accuracy = float(sklearn.metrics.accuracy_score(y_true_arr, y_pred))
     fpr, tpr, _ = sklearn.metrics.roc_curve(y_true_arr, probabilities_test)
 
-    quantiles = np.linspace(0.1, 0.9, 9)
-    train_based_bins = np.quantile(probabilities_train, quantiles).tolist()
+    train_based_bins = _compute_decile_breaks(probabilities_train)
 
-    train_deciles = _compute_prediction_deciles(train, probabilities_train, settings)
+    train_deciles = _compute_prediction_deciles(
+        train, probabilities_train, settings, train_based_bins
+    )
     test_deciles = _compute_prediction_deciles(
         test, probabilities_test, settings, train_based_bins
     )
