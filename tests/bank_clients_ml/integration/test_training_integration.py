@@ -4,7 +4,6 @@ import lightgbm as lgb
 import numpy as np
 import polars as pl
 import pytest
-import sklearn.datasets
 
 from bank_clients_ml import config, training
 
@@ -20,86 +19,6 @@ FEATURE_COLUMNS: tuple[str, ...] = (
 N_SAMPLES = 2_000
 N_ITER = 1
 SPLITS_CROSS_VALIDATION = 2
-
-
-def _build_synthetic_train(random_state: int) -> pl.DataFrame:
-    """Genera un conjunto sintético compatible con el esquema del proyecto.
-
-    El espacio de búsqueda adapta `min_child_samples` al tamaño de los pliegues,
-    por lo que este conjunto alcanza para que el modelo realice al menos una
-    partición sin necesidad de agrandar los datos artificialmente.
-
-    ## Args:
-        random_state: Semilla para reproducir la generación de los datos.
-
-    ## Returns:
-        DataFrame con cinco variables, una columna extra que no debe usarse y
-            un target binario desbalanceado.
-    """
-    features, target = sklearn.datasets.make_classification(
-        n_samples=N_SAMPLES,
-        n_features=len(FEATURE_COLUMNS),
-        n_informative=3,
-        n_redundant=0,
-        n_classes=2,
-        weights=[0.85, 0.15],
-        class_sep=1.5,
-        flip_y=0.01,
-        random_state=random_state,
-    )
-    return pl.DataFrame(features, schema=list(FEATURE_COLUMNS)).with_columns(
-        pl.Series("Target", target, dtype=pl.Int64),
-        pl.lit(0.0).alias("Ignored"),
-    )
-
-
-@pytest.fixture(scope="module")
-def custom_settings() -> config.Settings:
-    """Devuelve la configuración personalizada usada por los tests.
-
-    ## Returns:
-        Configuración con nombres propios para las columnas de análisis.
-    """
-    return config.Settings(
-        analysis=config.AnalysisColumns(feature="Variable", importance="Weight"),
-        n_jobs=1,
-    )
-
-
-@pytest.fixture(scope="module")
-def synthetic_train(custom_settings: config.Settings) -> pl.DataFrame:
-    """Genera el conjunto sintético con la semilla configurada.
-
-    ## Args:
-        custom_settings: Configuración que define la semilla de los datos.
-
-    ## Returns:
-        DataFrame sintético compatible con el esquema del proyecto.
-    """
-    return _build_synthetic_train(custom_settings.random_state)
-
-
-@pytest.fixture(scope="module")
-def trained_model(
-    custom_settings: config.Settings,
-    synthetic_train: pl.DataFrame,
-) -> training.LGBMTrainer:
-    """Entrena una única vez el modelo real usado por los tests.
-
-    ## Args:
-        custom_settings: Configuración del entrenamiento.
-        synthetic_train: Datos sintéticos de entrenamiento.
-
-    ## Returns:
-        Entrenador ajustado con la búsqueda de hiperparámetros.
-    """
-    return training.LGBMTrainer.fit_and_build(
-        synthetic_train,
-        FEATURE_COLUMNS,
-        custom_settings,
-        n_iter=N_ITER,
-        splits_cross_validation=SPLITS_CROSS_VALIDATION,
-    )
 
 
 def test_should_train_real_lightgbm_and_expose_search_metadata(
@@ -121,6 +40,8 @@ def test_should_train_real_lightgbm_and_expose_search_metadata(
     assert 0.0 <= trained_model.best_score <= 1.0
     assert trained_model.search_logs.strip()
     assert "Fitting" in trained_model.search_logs
+
+    assert trained_model.best_model.get_params()["n_jobs"] == custom_settings.n_jobs
 
     cross_validation_results = trained_model.cv_results
     assert cross_validation_results.height == 1
