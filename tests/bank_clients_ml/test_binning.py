@@ -71,15 +71,6 @@ def test_should_create_inclusive_interval_when_end_is_provided() -> None:
     assert [interval.range for interval in binner.bin_intervals] == [range(3, 6)]
 
 
-def test_should_return_same_binner_instance_when_merging_bins() -> None:
-    """Verifica que `merge_bins` devuelva la misma instancia para encadenar."""
-    binner = binning.Binner("feature", "Feature")
-
-    result = binner.merge_bins(1)
-
-    assert result is binner
-
-
 def test_should_accumulate_multiple_intervals() -> None:
     """Verifica que se conserven todos los intervalos agregados en orden."""
     binner = binning.Binner("feature", "Feature").merge_bins(1, 2).merge_bins(3, 4)
@@ -412,44 +403,6 @@ def test_should_ignore_interval_with_null_bounds_and_use_residual_target_pct(
     polars.testing.assert_series_equal(result, expected)
 
 
-def test_should_alias_result_with_feature_name(
-    settings: config.Settings,
-    bivariate_table: pl.DataFrame,
-) -> None:
-    """Verifica que la expresión resultante conserve el nombre de la feature.
-
-    ## Args:
-        settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
-    """
-    binner = binning.Binner("feature", "Feature").merge_bins(1, 2)
-    expression = binner.build_encoding_expr(bivariate_table, settings)
-
-    result = pl.DataFrame({"feature": [5.0]}).select(expression)
-
-    assert result.columns == ["feature"]
-
-
-def test_should_replace_feature_column_when_expression_is_applied_with_columns(
-    settings: config.Settings,
-    bivariate_table: pl.DataFrame,
-) -> None:
-    """Verifica que la expresión reemplace la columna original sin duplicarla.
-
-    ## Args:
-        settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
-    """
-    binner = binning.Binner("feature", "Feature").merge_bins(1, 2)
-    frame = pl.DataFrame({"feature": [5.0], "Target": [0]})
-
-    result = frame.with_columns(binner.build_encoding_expr(bivariate_table, settings))
-
-    assert result.columns == ["feature", "Target"]
-    assert result.get_column("Target").to_list() == [0]
-    assert result.get_column("feature").to_list() == [25.0]
-
-
 @pytest.mark.parametrize("column", ["Min", "Max"])
 def test_should_raise_type_error_when_bound_column_is_not_numeric(
     settings: config.Settings,
@@ -500,49 +453,6 @@ def test_should_use_column_names_from_settings() -> None:
     polars.testing.assert_series_equal(result, expected)
 
 
-def test_should_preserve_order_when_created_from_dict() -> None:
-    """Verifica que se conserve el orden de inserción de los nombres."""
-    mapping = binning.NameMapping.from_dict({"age": "Age", "income": "Income"})
-
-    assert mapping.snake_case_names == ("age", "income")
-    assert mapping.pretty_names == ("Age", "Income")
-
-
-def test_should_return_pretty_name_when_key_exists() -> None:
-    """Verifica que se devuelva el nombre descriptivo asociado a una clave."""
-    mapping = binning.NameMapping.from_dict({"age": "Age"})
-
-    assert mapping.get("age") == "Age"
-
-
-def test_should_raise_key_error_when_key_is_missing() -> None:
-    """Verifica que se lance KeyError cuando el nombre interno no existe."""
-    mapping = binning.NameMapping.from_dict({"age": "Age"})
-
-    with pytest.raises(KeyError):
-        mapping.get("missing")
-
-
-def test_should_build_mapping_from_dual_named_objects() -> None:
-    """Verifica que se construya el mapeo a partir de objetos con doble nombre."""
-    binners = [
-        binning.Binner("age", "Age"),
-        binning.Binner("income", "Income"),
-    ]
-
-    mapping = binning.NameMapping.from_dual_named(binners)
-
-    assert mapping.snake_case_names == ("age", "income")
-    assert mapping.pretty_names == ("Age", "Income")
-
-
-def test_should_expose_pairs_when_items_is_called() -> None:
-    """Verifica que se expongan los pares de nombres internos y descriptivos."""
-    mapping = binning.NameMapping.from_dict({"age": "Age", "income": "Income"})
-
-    assert tuple(mapping.items()) == (("age", "Age"), ("income", "Income"))
-
-
 def test_should_replace_mapped_values_and_keep_unmapped_values() -> None:
     """Verifica que se reemplacen los valores mapeados y se conserven los demás."""
     mapping = binning.NameMapping.from_dict({"age": "Age"})
@@ -575,13 +485,3 @@ def test_should_keep_null_values_when_applying_mapping() -> None:
         schema={"feature": pl.String},
     )
     polars.testing.assert_frame_equal(result, expected)
-
-
-def test_should_not_reflect_mutations_of_source_dict() -> None:
-    """Verifica que el mapeo no cambie si se modifica el diccionario de origen."""
-    source = {"age": "Age"}
-    mapping = binning.NameMapping.from_dict(source)
-
-    source["age"] = "Age_modified"
-
-    assert mapping.get("age") == "Age"

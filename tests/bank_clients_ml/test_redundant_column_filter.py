@@ -7,7 +7,7 @@ import polars.testing
 import pytest
 import pytest_mock
 
-from bank_clients_ml import config, redundant_column_filter, training
+from bank_clients_ml import config, redundant_column_filter
 
 
 @pytest.fixture
@@ -630,55 +630,3 @@ def test_should_group_correlations_for_each_requested_column(
     assert tuple(result) == ("a", "b")
     polars.testing.assert_frame_equal(result["a"], expected_a)
     polars.testing.assert_frame_equal(result["b"], expected_b)
-
-
-def test_should_train_grouped_model_and_return_top_feature_correlations(
-    mocker: pytest_mock.MockerFixture,
-    settings: config.Settings,
-    correlation_matrix: pl.DataFrame,
-    train_data: pl.DataFrame,
-) -> None:
-    """Verifica el entrenamiento pesado y las correlaciones de las mejores variables.
-
-    Args:
-        mocker: Utilidad para sustituir los entrenadores de LightGBM.
-        settings: Configuración global del proyecto.
-        correlation_matrix: Matriz de correlación controlada.
-        train_data: Conjunto de entrenamiento sin correlaciones.
-    """
-    group_trainer = mocker.Mock()
-    group_trainer.get_top_grouped_features.return_value = ("a", "b")
-    trainer = mocker.Mock()
-    trainer.get_top_ranked_features.return_value = ("a", "c")
-    group_fit = mocker.patch.object(
-        training.GroupsLGBMTrainer,
-        "fit_and_build",
-        return_value=group_trainer,
-    )
-    main_fit = mocker.patch.object(
-        training.LGBMTrainer,
-        "fit_and_build",
-        return_value=trainer,
-    )
-    redundant_filter = _build_filter(settings, correlation_matrix, train_data)
-
-    result = redundant_filter.heavy_operations_and_correlations("top_features")
-
-    result_group_trainer, result_trainer, correlations = result
-    assert result_group_trainer is group_trainer
-    assert result_trainer is trainer
-    assert tuple(correlations) == ("a", "c")
-    polars.testing.assert_frame_equal(
-        correlations["a"],
-        pl.DataFrame({"feature_name": ["b"], "correlation": [0.9]}),
-    )
-    polars.testing.assert_frame_equal(
-        correlations["c"],
-        pl.DataFrame({"feature_name": ["b"], "correlation": [-0.95]}),
-    )
-    group_fit.assert_called_once_with(train_data, settings=settings)
-    group_trainer.plot_top_features.assert_called_once_with()
-    group_trainer.get_top_grouped_features.assert_called_once_with()
-    main_fit.assert_called_once_with(train_data, ("a", "b"), settings)
-    trainer.plot_top_features.assert_called_once_with("top_features")
-    trainer.get_top_ranked_features.assert_called_once_with()

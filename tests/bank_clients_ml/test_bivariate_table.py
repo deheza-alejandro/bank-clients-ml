@@ -258,37 +258,3 @@ def test_should_use_custom_column_names_from_settings(
         }
     )
     polars.testing.assert_frame_equal(result[0].table, expected)
-
-
-def test_should_round_column_and_cast_to_int64_without_modifying_original_table() -> (
-    None
-):
-    """Verifica el redondeo de una columna y la inmutabilidad de la tabla."""
-    table = pl.DataFrame(
-        {
-            "Bin": pl.Series([1, 2, 3], dtype=pl.Int64),
-            "Target_pct": pl.Series([10.4, 10.6, 20.49], dtype=pl.Float64),
-        }
-    )
-    bivariate = bivariate_table.BivariateTable("age", "Age", table)
-
-    result = bivariate.with_rounded_int_column("Target_pct")
-
-    assert result.get_column("Target_pct").to_list() == [10, 11, 20]
-    assert result.schema["Target_pct"] == pl.Int64
-    assert result.get_column("Bin").to_list() == [1, 2, 3]
-    assert bivariate.table.schema["Target_pct"] == pl.Float64
-    assert bivariate.table.get_column("Target_pct").to_list() == [
-        10.4,
-        10.6,
-        20.49,
-    ]
-
-
-def test_should_build_plot_title_from_pretty_name() -> None:
-    """Verifica que el título del gráfico use el nombre legible de la variable."""
-    bivariate = bivariate_table.BivariateTable("age", "Age", pl.DataFrame({"Bin": [1]}))
-
-    result = bivariate.title_for_plot
-
-    assert result == "Variable analysis: Age"

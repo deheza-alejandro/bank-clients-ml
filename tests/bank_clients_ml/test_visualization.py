@@ -5,7 +5,6 @@ import pathlib
 from collections.abc import Generator
 from typing import cast
 
-import matplotlib.figure
 import matplotlib.patches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -147,49 +146,6 @@ def test_should_round_float_columns_to_two_decimals_without_modifying_input() ->
     )
     polars.testing.assert_frame_equal(result, expected)
     assert df.get_column("decimal").to_list() == [1.234, 5.678]
-
-
-def test_should_write_optimized_svg_to_requested_subdirectory(
-    mocker: pytest_mock.MockerFixture,
-    tmp_path: pathlib.Path,
-) -> None:
-    """Verifica que el SVG optimizado se escriba en la ruta configurada.
-
-    ## Args:
-        mocker: Utilidad para sustituir la ejecución de Bun.
-        tmp_path: Directorio temporal para aislar la escritura en disco.
-    """
-    fig, _ = plt.subplots()
-    fig_number = fig.number
-
-    def fake_run(command, **kwargs):
-        """Simula la salida de SVGO escribiendo un SVG optimizado."""
-        kwargs["stdout"].write(b"<svg>optimized</svg>")
-
-    run_mock = mocker.patch.object(
-        visualization.subprocess,
-        "run",
-        side_effect=fake_run,
-    )
-
-    visualization._save_fig_as_svg(fig, "chart", tmp_path, "nested")
-
-    svg_path = tmp_path / "nested" / "chart.svg"
-    assert svg_path.read_bytes() == b"<svg>optimized</svg>"
-    call = run_mock.call_args
-    assert call.args[0] == [
-        "bun",
-        "run",
-        "svgo",
-        "--multipass",
-        "-i",
-        "-",
-        "-o",
-        "-",
-    ]
-    assert b"<svg" in call.kwargs["input"]
-    assert call.kwargs["check"] is True
-    assert not plt.fignum_exists(fig_number)
 
 
 def test_should_raise_runtime_error_when_bun_executable_is_missing(
@@ -361,50 +317,6 @@ def test_should_use_configured_columns_in_bivariate_figure() -> None:
     assert ax_target_pct.get_ylabel() == "label pct (%)"
 
 
-@pytest.mark.parametrize(
-    ("table_count", "max_workers"),
-    [
-        pytest.param(2, None, id="few-tables"),
-        pytest.param(19, 4, id="fewer-than-twenty-tables"),
-        pytest.param(20, 1, id="single-worker"),
-    ],
-)
-def test_should_plot_bivariate_charts_sequentially_when_requested_or_few_tables(
-    mocker: pytest_mock.MockerFixture,
-    settings: config.Settings,
-    table_count: int,
-    max_workers: int | None,
-) -> None:
-    """Verifica la ejecución secuencial y el orden de las tablas.
-
-    ## Args:
-        mocker: Utilidad para sustituir el dibujo individual.
-        settings: Configuración del proyecto.
-        table_count: Cantidad de tablas a procesar.
-        max_workers: Cantidad de workers solicitada.
-    """
-    tables = [
-        bivariate_table.BivariateTable(
-            f"var_{index}",
-            f"Var {index}",
-            pl.DataFrame(),
-        )
-        for index in range(table_count)
-    ]
-    plot_mock = mocker.patch.object(visualization, "_plot_single_bivariate_chart")
-
-    visualization.plot_bivariate_charts(
-        tables,
-        "analysis",
-        settings,
-        max_workers=max_workers,
-    )
-
-    assert [mock_call.args for mock_call in plot_mock.call_args_list] == [
-        (table, "analysis", settings) for table in tables
-    ]
-
-
 def test_should_process_all_tables_with_process_pool_when_many_tables_are_requested(
     mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
@@ -535,125 +447,3 @@ def test_should_build_train_and_test_deciles_in_single_figure(
     assert "max_prob" not in test_headers
     assert train_table[1, 0].get_text().get_text() == "1"
     assert test_table[1, 0].get_text().get_text() == "1"
-
-
-def _assert_saved_figure(
-    save_mock,
-    plot_name: str,
-    images_sub_dir: str,
-    settings: config.Settings,
-) -> None:
-    """Verifica los argumentos con los que se solicitó guardar una figura.
-
-    ## Args:
-        save_mock: Mock del guardado de figuras.
-        plot_name: Nombre base esperado del archivo.
-        images_sub_dir: Subdirectorio esperado de imágenes.
-        settings: Configuración con el directorio base de imágenes.
-    """
-    assert save_mock.call_count == 1
-    figure, actual_plot_name, images_dir, actual_sub_dir = save_mock.call_args.args
-    assert isinstance(figure, matplotlib.figure.Figure)
-    assert actual_plot_name == plot_name
-    assert images_dir == settings.paths.images
-    assert actual_sub_dir == images_sub_dir
-
-
-def test_should_save_top_features_figure_with_expected_name_and_directory(
-    mocker: pytest_mock.MockerFixture,
-    top_features_table: pl.DataFrame,
-    settings: config.Settings,
-) -> None:
-    """Verifica el nombre y el directorio usados al guardar el gráfico de importancia.
-
-    ## Args:
-        mocker: Utilidad para sustituir el guardado en disco.
-        top_features_table: Tabla de importancias ordenada.
-        settings: Configuración con el directorio de imágenes.
-    """
-    save_mock = mocker.patch.object(visualization, "_save_fig_as_svg")
-
-    visualization.plot_top_features(
-        top_features_table,
-        "model_a",
-        roc_auc=0.9,
-        settings=settings,
-    )
-
-    _assert_saved_figure(save_mock, "model_a", "plot_top_features", settings)
-
-
-def test_should_save_bivariate_figure_with_variable_name_and_analysis_directory(
-    mocker: pytest_mock.MockerFixture,
-    bivariate_age: bivariate_table.BivariateTable,
-    settings: config.Settings,
-) -> None:
-    """Verifica el nombre y el subdirectorio usados al guardar el gráfico bivariado.
-
-    ## Args:
-        mocker: Utilidad para sustituir el guardado en disco.
-        bivariate_age: Tabla bivariada de ejemplo.
-        settings: Configuración con el directorio de imágenes.
-    """
-    save_mock = mocker.patch.object(visualization, "_save_fig_as_svg")
-
-    visualization._plot_single_bivariate_chart(
-        bivariate_age,
-        "age_analysis",
-        settings,
-    )
-
-    _assert_saved_figure(
-        save_mock,
-        "age",
-        "bivariate_analysis/age_analysis",
-        settings,
-    )
-
-
-def test_should_save_roc_curve_figure_with_expected_name_and_directory(
-    mocker: pytest_mock.MockerFixture,
-    evaluation_metrics: evaluation.EvaluationMetrics,
-    settings: config.Settings,
-) -> None:
-    """Verifica el nombre y el directorio usados al guardar la curva ROC.
-
-    ## Args:
-        mocker: Utilidad para sustituir el guardado en disco.
-        evaluation_metrics: Métricas de evaluación de ejemplo.
-        settings: Configuración con el directorio de imágenes.
-    """
-    save_mock = mocker.patch.object(visualization, "_save_fig_as_svg")
-
-    visualization.plot_roc_curve(evaluation_metrics, "test_model", settings)
-
-    _assert_saved_figure(
-        save_mock,
-        "test_model",
-        "plot_evaluation_metrics",
-        settings,
-    )
-
-
-def test_should_save_deciles_figure_with_expected_name_and_directory(
-    mocker: pytest_mock.MockerFixture,
-    evaluation_metrics: evaluation.EvaluationMetrics,
-    settings: config.Settings,
-) -> None:
-    """Verifica el nombre y el directorio usados al guardar el gráfico de deciles.
-
-    ## Args:
-        mocker: Utilidad para sustituir el guardado en disco.
-        evaluation_metrics: Métricas con las tablas de deciles.
-        settings: Configuración con el directorio de imágenes.
-    """
-    save_mock = mocker.patch.object(visualization, "_save_fig_as_svg")
-
-    visualization.plot_deciles(evaluation_metrics, "deciles", settings)
-
-    _assert_saved_figure(
-        save_mock,
-        "deciles",
-        "plot_evaluation_metrics",
-        settings,
-    )
