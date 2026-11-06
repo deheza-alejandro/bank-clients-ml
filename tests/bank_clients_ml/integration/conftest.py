@@ -118,7 +118,7 @@ SYNTHETIC_SPLITS_CROSS_VALIDATION = 2
 
 
 @dataclasses.dataclass(frozen=True)
-class PreparedData:
+class IntegrationPreparedData:
     """Resultado del flujo de preparación de datos hasta la partición final.
 
     ## Attributes:
@@ -315,7 +315,7 @@ def _prepare_data(
     clean_data: pl.DataFrame,
     settings: config.Settings,
     prediction_window_size: int = 2,
-) -> PreparedData:
+) -> IntegrationPreparedData:
     """Ejecuta la preparación de datos desde la limpieza hasta el split."""
     time_window_split = sampling.TimeWindowSplit.generate(
         clean_data,
@@ -362,7 +362,7 @@ def _prepare_data(
     )
     train, test = sampling.stratified_train_test_split(abt, settings=settings)
 
-    return PreparedData(
+    return IntegrationPreparedData(
         clean_data=clean_data,
         time_window_split=time_window_split,
         identity_features=dated_identity,
@@ -465,7 +465,9 @@ def time_window_split(
 
 
 @pytest.fixture
-def prepare_data() -> Callable[[pl.DataFrame, config.Settings], PreparedData]:
+def prepare_data() -> Callable[
+    [pl.DataFrame, config.Settings], IntegrationPreparedData
+]:
     """Devuelve el helper que ejecuta el flujo completo de preparación."""
     return _prepare_data
 
@@ -474,19 +476,21 @@ def prepare_data() -> Callable[[pl.DataFrame, config.Settings], PreparedData]:
 def prepared_data(
     clean_data: pl.DataFrame,
     integration_settings: config.Settings,
-) -> PreparedData:
+) -> IntegrationPreparedData:
     """Devuelve todos los artefactos intermedios del flujo de preparación."""
     return _prepare_data(clean_data, integration_settings)
 
 
 @pytest.fixture
-def abt(prepared_data: PreparedData) -> pl.DataFrame:
+def abt(prepared_data: IntegrationPreparedData) -> pl.DataFrame:
     """Devuelve la Analytical Base Table a nivel de cliente."""
     return prepared_data.abt
 
 
 @pytest.fixture
-def train_test_abt(prepared_data: PreparedData) -> tuple[pl.DataFrame, pl.DataFrame]:
+def train_test_abt(
+    prepared_data: IntegrationPreparedData,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Devuelve los conjuntos de entrenamiento y prueba de la ABT."""
     return prepared_data.train, prepared_data.test
 
