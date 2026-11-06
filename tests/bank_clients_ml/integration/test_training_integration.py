@@ -3,11 +3,8 @@
 import lightgbm as lgb
 import numpy as np
 import polars as pl
-import pytest
 
 from bank_clients_ml import config, training
-
-pytestmark = pytest.mark.integration_lgbm
 
 FEATURE_COLUMNS: tuple[str, ...] = (
     "Feature_1",

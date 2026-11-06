@@ -20,6 +20,7 @@ def real_raw_data() -> pl.DataFrame:
     return pl.read_parquet(REAL_DATA_PATH)
 
 
+@pytest.mark.slow
 def test_should_run_real_data_until_time_windows(
     real_raw_data: pl.DataFrame,
 ) -> None:

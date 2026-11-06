@@ -16,7 +16,10 @@ from bank_clients_ml import (
     visualization,
 )
 
-pytestmark = pytest.mark.integration_svg
+pytestmark = [
+    pytest.mark.requires_svg,
+    pytest.mark.slow,
+]
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]
 SVGO_DIRECTORY = PROJECT_ROOT / "node_modules" / "svgo"
@@ -123,8 +126,6 @@ def test_should_write_top_features_bivariate_roc_and_deciles_svgs(
         assert content.rstrip().endswith("</svg>")
 
 
-@pytest.mark.integration_lgbm
-@pytest.mark.integration_svg
 def test_should_write_bivariate_top_features_and_evaluation_svgs(
     synthetic_train: pl.DataFrame,
     integration_settings: config.Settings,

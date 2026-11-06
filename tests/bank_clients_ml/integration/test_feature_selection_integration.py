@@ -106,6 +106,7 @@ def grouped_train_test(
     )
 
 
+@pytest.mark.slow
 def test_should_reduce_redundant_columns_and_cover_all_groups(
     enhanced_column_filter: redundant_column_filter.RedundantColumnFilter,
     integration_settings: config.Settings,
@@ -161,7 +162,7 @@ def test_should_reduce_redundant_columns_and_cover_all_groups(
     assert np.nanmax(np.abs(correlation_matrix)) <= column_filter.correlation_threshold
 
 
-@pytest.mark.integration_lgbm
+@pytest.mark.slow
 def test_should_train_grouped_models_and_select_top_features(
     grouped_train_test: tuple[pl.DataFrame, pl.DataFrame],
     integration_settings: config.Settings,
@@ -276,7 +277,7 @@ def _build_binners(
     return tuple(binners)
 
 
-@pytest.mark.integration_lgbm
+@pytest.mark.slow
 def test_should_bin_selected_features_and_keep_final_columns(
     grouped_train_test: tuple[pl.DataFrame, pl.DataFrame],
     integration_settings: config.Settings,
@@ -324,7 +325,7 @@ def test_should_bin_selected_features_and_keep_final_columns(
     assert result.n_iter == 20
 
 
-@pytest.mark.integration_lgbm
+@pytest.mark.slow
 def test_should_train_features_selection_with_mapped_features_and_explicit_iterations(
     synthetic_train: pl.DataFrame,
     integration_settings: config.Settings,
@@ -367,7 +368,7 @@ def test_should_train_features_selection_with_mapped_features_and_explicit_itera
     assert result.settings is integration_settings
 
 
-@pytest.mark.integration_lgbm
+@pytest.mark.slow
 def test_should_run_heavy_operations_and_return_correlations(
     mocker,
     grouped_train_test: tuple[pl.DataFrame, pl.DataFrame],

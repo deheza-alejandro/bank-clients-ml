@@ -94,9 +94,12 @@ max-line-length = 100
 convention = "google"
 
 [tool.pytest.ini_options]
+addopts = [
+    "--strict-markers",
+]
 markers = [
-    "integration_lgbm: integration tests that run actual LightGBM",
-    "integration_svg: integration tests that require Bun and SVGO to write SVG files",
+    "slow: tests that exceed the agreed duration threshold (setup + call + teardown > 0.40 seg)",
+    "requires_svg: integration tests that require Bun and SVGO to write SVG files",
 ]
 
 [tool.marimo.runtime]

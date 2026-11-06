@@ -10,8 +10,6 @@ import sklearn.model_selection
 
 from bank_clients_ml import config, evaluation, training
 
-pytestmark = pytest.mark.integration_lgbm
-
 FEATURE_COLUMNS: tuple[str, ...] = tuple(f"Feature_{index}" for index in range(1, 9))
 N_SAMPLES = 1_200
 TEST_SIZE = 0.25

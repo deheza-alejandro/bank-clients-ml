@@ -170,6 +170,7 @@ def test_should_build_identity_features_and_monthly_transformations(
     )
 
 
+@pytest.mark.slow
 def test_should_build_abt_and_split_preserving_target_rate(
     abt: pl.DataFrame,
     train_test_abt: tuple[pl.DataFrame, pl.DataFrame],
