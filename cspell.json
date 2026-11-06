@@ -35,6 +35,7 @@
     ],
     // words - list of words to be always considered correct
     "words": [
+        "addopts",
         "allclose",
         "autouse",
         "axison",
