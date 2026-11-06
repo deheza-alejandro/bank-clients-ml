@@ -94,6 +94,14 @@ max-line-length = 100
 convention = "google"
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    ".git",
+    ".venv",
+    "build",
+    "dist",
+    "__pycache__"
+]
 addopts = [
     "--strict-markers",
 ]
