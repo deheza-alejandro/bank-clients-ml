@@ -30,12 +30,16 @@ class DirectoryPaths(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(frozen=True)
 
     project: pathlib.Path = pathlib.Path(__file__).parent.parent.parent
+    raw_data_file_name: str = "example_data.parquet"
 
     @pydantic.computed_field
     @property
-    def data(self) -> pathlib.Path:
-        """Directorio de datos calculado dinámicamente a partir de project."""
-        return self.project / "data"
+    def raw_data(self) -> pathlib.Path:
+        """Ruta completa del parquet de entrada del proyecto.
+
+        Calculado dinámicamente a partir de project.
+        """
+        return self.project / "data" / self.raw_data_file_name
 
     @pydantic.computed_field
     @property

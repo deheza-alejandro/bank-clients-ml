@@ -18,10 +18,10 @@ def test_should_derive_data_and_images_paths_from_project(
     """Verifica que las rutas de datos e imágenes se deriven correctamente a partir del proyecto."""
     paths = config.DirectoryPaths(project=project)
 
-    data_path = paths.data
+    data_path = paths.raw_data
     images_path = paths.images
 
-    assert data_path == project / "data"
+    assert data_path == project / "data" / "example_data.parquet"
     assert images_path == project / "notebooks" / "images"
 
 
@@ -37,6 +37,6 @@ def test_should_resolve_paths_from_project_and_not_from_working_directory(
     monkeypatch.chdir(tmp_path)
     paths = config.DirectoryPaths(project=project)
 
-    data_path = paths.data
+    data_path = paths.raw_data
 
-    assert data_path == project / "data"
+    assert data_path == project / "data" / "example_data.parquet"

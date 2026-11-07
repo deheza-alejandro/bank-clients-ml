@@ -38,7 +38,7 @@ def _():
 
 @app.cell
 def _():
-    raw_data = pl.read_parquet(settings.paths.data / "data.parquet")
+    raw_data = pl.read_parquet(settings.paths.raw_data)
 
     _less_than_zero_columns = [
         "SavingAccount_Balance_Average",
