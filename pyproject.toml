@@ -14,8 +14,8 @@ dependencies = [
     "scipy>=1.18.0",
 ]
 
-[project.scripts]
-bank-clients-ml = "bank_clients_ml:main"
+# [project.scripts]
+# bank-clients-ml = "bank_clients_ml:main"
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
