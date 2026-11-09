@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Machine learning project"
 readme = "README.md"
 requires-python = ">=3.13"
+license = "MIT"
 dependencies = [
     "lightgbm>=4.7.0",
     "matplotlib>=3.11.1",
