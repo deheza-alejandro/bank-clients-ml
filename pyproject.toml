@@ -170,6 +170,9 @@ respect-gitignore = true
 # tables = false  # Exclude tables from line length check
 # headings = true  # Include headings in line length check
 
+[tool.rumdl.MD033]
+allowed-elements = ["details", "summary", "b", "br"]
+
 # [tool.rumdl.MD044]
 # names = ["rumdl", "Markdown", "GitHub"]  # Proper names that should be capitalized correctly
 # code-blocks = false  # Check code blocks for proper names (default: false, skips code blocks)
