@@ -68,6 +68,12 @@ extend-select = [
     "D",       # pydocstyle
 ]
 
+# EXE002 depends on the Unix execution bit. On Windows/WSL, Ruff does not apply it,
+# and Docker Desktop on Windows exposes the entire bind mount as executable.
+# The repository contains no .py scripts intended to be executed directly,
+# so this rule serves no purpose and causes linting results to differ across systems.
+extend-ignore = ["EXE002"]
+
 [tool.ruff.lint.mccabe]
 max-complexity = 10
 
