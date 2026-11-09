@@ -1,0 +1,48 @@
+# Keep README.md: uv_build reads it during installation.
+# Keep .gitignore: cspell uses it through useGitignore.
+
+# Version control metadata
+.git
+
+# Editor and operating system files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Python environments and caches
+.venv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.rumdl_cache/
+.mypy_cache/
+.pyrefly_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# JavaScript dependencies and caches
+node_modules/
+.bun/
+
+# Marimo session state and generated artifacts
+notebooks/__marimo__/
+notebooks/images/
+
+# Local secrets and environment overrides
+.env
+.env.*
+*.env
+
+# Generated documents
+*.pdf
+
+# Docker files are not needed inside the image
+Dockerfile
+.dockerignore
+compose.yaml

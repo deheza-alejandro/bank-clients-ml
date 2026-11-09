@@ -1,0 +1,28 @@
+name: bank-clients-ml
+
+services:
+  dev:
+    build:
+      context: .
+      target: dev
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    image: bank-clients-ml:dev
+    init: true
+    working_dir: /app
+    ports:
+      - "127.0.0.1:${MARIMO_PORT:-2718}:2718"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      # Hide the host .venv. The container uses /opt/venv from the image.
+      - /app/.venv
+    environment:
+      UV_PROJECT_ENVIRONMENT: /opt/venv
+      PYTHONUNBUFFERED: "1"
+    stdin_open: true
+    tty: true
+
+volumes:
+  node_modules:
