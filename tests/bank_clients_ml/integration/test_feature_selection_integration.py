@@ -6,7 +6,10 @@ import lightgbm as lgb
 import numpy as np
 import polars as pl
 import pytest
+import pytest_mock
 
+import tests.builders.integration.data
+import tests.builders.integration.feature_selection
 from bank_clients_ml import (
     binning,
     bivariate_analysis,
@@ -18,106 +21,29 @@ from bank_clients_ml import (
 )
 
 
-@pytest.fixture
-def column_filter(
-    train_test_abt: tuple[pl.DataFrame, pl.DataFrame],
-    integration_settings: config.Settings,
-) -> redundant_column_filter.RedundantColumnFilter:
-    """Devuelve el filtro de columnas generado sobre la ABT de integración."""
-    train, test = train_test_abt
-    return redundant_column_filter.RedundantColumnFilter.generate(
-        train=train,
-        test=test,
-        imbalanced_binary_threshold=0.10,
-        correlation_threshold=0.80,
-        settings=integration_settings,
-    )
-
-
-@pytest.fixture
-def enhanced_train_test(
-    train_test_abt: tuple[pl.DataFrame, pl.DataFrame],
-) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Agrega columnas constantes, desbalanceadas y perfectamente correlacionadas."""
-    train, test = train_test_abt
-
-    def _augment(frame: pl.DataFrame, offset: int) -> pl.DataFrame:
-        return frame.with_columns(
-            pl.lit(1.0).alias("integration_constant_feature"),
-            pl.when(pl.int_range(0, frame.height) == 0)
-            .then(1)
-            .otherwise(0)
-            .cast(pl.Int8)
-            .alias("integration_rare_flag"),
-            (pl.int_range(0, frame.height) + offset)
-            .cast(pl.Float64)
-            .alias("integration_correlated_a"),
-        ).with_columns(
-            (pl.col("integration_correlated_a") * 2.0 + 1.0).alias(
-                "integration_correlated_b"
-            )
-        )
-
-    return _augment(train, 0), _augment(test, 100)
-
-
-@pytest.fixture
-def enhanced_column_filter(
-    enhanced_train_test: tuple[pl.DataFrame, pl.DataFrame],
-    integration_settings: config.Settings,
-) -> redundant_column_filter.RedundantColumnFilter:
-    """Devuelve el filtro generado sobre la ABT con columnas redundantes extra."""
-    train, test = enhanced_train_test
-    return redundant_column_filter.RedundantColumnFilter.generate(
-        train=train,
-        test=test,
-        imbalanced_binary_threshold=0.10,
-        correlation_threshold=0.80,
-        settings=integration_settings,
-    )
-
-
-@pytest.fixture
-def grouped_train_test(
-    column_filter: redundant_column_filter.RedundantColumnFilter,
-    integration_settings: config.Settings,
-) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Reduce los conjuntos conservando hasta cuatro features por grupo."""
-    grouped = dict(
-        column_groups.group_columns_by_source(
-            column_filter.correlated_train,
-            integration_settings,
-        ).items()
-    )
-    selected_columns = [
-        column
-        for group, columns in grouped.items()
-        if group is not column_groups.ValidColumnGroup.ALL
-        for column in columns[:4]
-    ]
-    required_columns = [
-        integration_settings.dataset.id,
-        integration_settings.dataset.target,
-        *selected_columns,
-    ]
-    return (
-        column_filter.correlated_train.select(required_columns),
-        column_filter.correlated_test.select(required_columns),
-    )
-
-
 @pytest.mark.slow
 def test_should_reduce_redundant_columns_and_cover_all_groups(
-    enhanced_column_filter: redundant_column_filter.RedundantColumnFilter,
     integration_settings: config.Settings,
 ) -> None:
     """Verifica la reducción secuencial y la cobertura de grupos.
 
     ## Args:
-        enhanced_column_filter: Filtro generado sobre una ABT con columnas extra.
         integration_settings: Configuración con identificador y target.
     """
-    column_filter = enhanced_column_filter
+    train_test_abt = tests.builders.integration.data.build_train_test_abt(
+        integration_settings
+    )
+    enhanced_train_test = (
+        tests.builders.integration.feature_selection.build_enhanced_train_test(
+            train_test_abt
+        )
+    )
+    column_filter = (
+        tests.builders.integration.feature_selection.build_enhanced_column_filter(
+            enhanced_train_test,
+            integration_settings,
+        )
+    )
 
     assert "integration_constant_feature" in column_filter.constant_cols
     assert "integration_rare_flag" in column_filter.imbalanced_binary_columns
@@ -164,15 +90,24 @@ def test_should_reduce_redundant_columns_and_cover_all_groups(
 
 @pytest.mark.slow
 def test_should_train_grouped_models_and_select_top_features(
-    grouped_train_test: tuple[pl.DataFrame, pl.DataFrame],
     integration_settings: config.Settings,
 ) -> None:
     """Verifica el entrenamiento por grupos y la selección de sus mejores features.
 
     ## Args:
-        grouped_train_test: Conjuntos reducidos con columnas de todos los grupos.
         integration_settings: Configuración del entrenamiento.
     """
+    train_test_abt = tests.builders.integration.data.build_train_test_abt(
+        integration_settings
+    )
+    column_filter = tests.builders.integration.feature_selection.build_column_filter(
+        train_test_abt, integration_settings
+    )
+    grouped_train_test = (
+        tests.builders.integration.feature_selection.build_grouped_train_test(
+            column_filter, integration_settings
+        )
+    )
     train, _ = grouped_train_test
     grouped = dict(
         column_groups.group_columns_by_source(train, integration_settings).items()
@@ -279,15 +214,24 @@ def _build_binners(
 
 @pytest.mark.slow
 def test_should_bin_selected_features_and_keep_final_columns(
-    grouped_train_test: tuple[pl.DataFrame, pl.DataFrame],
     integration_settings: config.Settings,
 ) -> None:
     """Verifica la codificación por bines y las columnas finales del modelo.
 
     ## Args:
-        grouped_train_test: Conjuntos reducidos con features reales.
         integration_settings: Configuración del proyecto.
     """
+    train_test_abt = tests.builders.integration.data.build_train_test_abt(
+        integration_settings
+    )
+    column_filter = tests.builders.integration.feature_selection.build_column_filter(
+        train_test_abt, integration_settings
+    )
+    grouped_train_test = (
+        tests.builders.integration.feature_selection.build_grouped_train_test(
+            column_filter, integration_settings
+        )
+    )
     train, test = grouped_train_test
     binners = _build_binners(train, integration_settings)
     analyzer = bivariate_analysis.BivariateAnalyzer(
@@ -370,17 +314,30 @@ def test_should_train_features_selection_with_mapped_features_and_explicit_itera
 
 @pytest.mark.slow
 def test_should_run_heavy_operations_and_return_correlations(
-    mocker,
-    grouped_train_test: tuple[pl.DataFrame, pl.DataFrame],
+    mocker: pytest_mock.MockerFixture,
     integration_settings: config.Settings,
 ) -> None:
     """Verifica el entrenamiento jerárquico y las correlaciones de las mejores features.
 
     ## Args:
         mocker: Utilidad para sustituir la generación de gráficos.
-        grouped_train_test: Conjuntos reducidos con features reales.
         integration_settings: Configuración del proyecto.
     """
+    train_test_abt = tests.builders.integration.data.build_train_test_abt(
+        integration_settings
+    )
+    column_filter_grouped = (
+        tests.builders.integration.feature_selection.build_column_filter(
+            train_test_abt,
+            integration_settings,
+        )
+    )
+    grouped_train_test = (
+        tests.builders.integration.feature_selection.build_grouped_train_test(
+            column_filter_grouped,
+            integration_settings,
+        )
+    )
     train, test = grouped_train_test
     column_filter = redundant_column_filter.RedundantColumnFilter.generate(
         train=train,

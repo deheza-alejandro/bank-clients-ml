@@ -1,55 +1,57 @@
 """Tests de integración del flujo de preparación de datos."""
 
-import datetime
+from typing import cast
 
 import numpy as np
 import polars as pl
 import polars.testing
 import pytest
 
-from bank_clients_ml import cleaning, column_groups, config, sampling
-
-TRAINING_MONTHS: tuple[datetime.date, ...] = tuple(
-    datetime.date(2024, month, 1) for month in range(1, 8)
-)
-PREDICTION_MONTHS: tuple[datetime.date, ...] = (
-    datetime.date(2024, 9, 1),
-    datetime.date(2024, 10, 1),
-)
-LAST_TRAINING_MONTH = datetime.date(2024, 7, 1)
-LEAD_MONTH = datetime.date(2024, 8, 1)
-NULL_TARGET_COUNT = 3
+import tests.builders.integration.data
+import tests.support.scenario
+from bank_clients_ml import column_groups, config
 
 
 def test_should_clean_raw_data_and_build_time_windows(
-    raw_bank_data: pl.DataFrame,
-    clean_data: pl.DataFrame,
-    time_window_split: sampling.TimeWindowSplit,
-    expected_eligible_ids: tuple[int, ...],
+    integration_settings: config.Settings,
 ) -> None:
     """Verifica la limpieza y la construcción del universo temporal.
 
     ## Args:
-        raw_bank_data: Datos crudos con clientes válidos, inválidos y nulos.
-        clean_data: Datos resultantes de la limpieza.
-        time_window_split: Partición temporal construida sobre los datos limpios.
-        expected_eligible_ids: Clientes que deben formar el universo.
+        integration_settings: Configuración con los nombres de las columnas.
     """
-    assert raw_bank_data.get_column("Target").null_count() == NULL_TARGET_COUNT
+    raw_bank_data = tests.builders.integration.data.build_raw_bank_data()
+    clean_data = tests.builders.integration.data.build_clean_data(
+        raw_bank_data, integration_settings
+    )
+    time_window_split = tests.builders.integration.data.build_time_window_split(
+        clean_data, integration_settings
+    )
+    expected_eligible_ids = tests.builders.integration.data.ELIGIBLE_CLIENT_IDS
+    null_target_count = raw_bank_data.get_column("Target").null_count()
+    assert null_target_count == tests.support.scenario.NULL_TARGET_COUNT
     assert clean_data.get_column("Target").null_count() == 0
-    assert clean_data.height == raw_bank_data.height - NULL_TARGET_COUNT
+    assert clean_data.height == raw_bank_data.height - null_target_count
     assert clean_data.schema["Month"] == pl.Date
     assert clean_data.schema["First_product_dt"] == pl.Date
     assert clean_data.schema["Last_product_dt"] == pl.Date
     assert clean_data.schema["client_id"] == pl.Int64
 
-    assert time_window_split.training_months == TRAINING_MONTHS
-    assert time_window_split.prediction_months == PREDICTION_MONTHS
-    assert time_window_split.last_training_month == LAST_TRAINING_MONTH
-    assert time_window_split.first_prediction_month == PREDICTION_MONTHS[0]
-    assert LEAD_MONTH not in time_window_split.training_months
-    assert LEAD_MONTH not in time_window_split.prediction_months
-    assert LEAD_MONTH in set(
+    assert time_window_split.training_months == tests.support.scenario.TRAINING_MONTHS
+    assert (
+        time_window_split.prediction_months == tests.support.scenario.PREDICTION_MONTHS
+    )
+    assert (
+        time_window_split.last_training_month
+        == tests.support.scenario.LAST_TRAINING_MONTH
+    )
+    assert (
+        time_window_split.first_prediction_month
+        == tests.support.scenario.FIRST_PREDICTION_MONTH
+    )
+    assert tests.support.scenario.LEAD_MONTH not in time_window_split.training_months
+    assert tests.support.scenario.LEAD_MONTH not in time_window_split.prediction_months
+    assert tests.support.scenario.LEAD_MONTH in set(
         time_window_split.universe_and_target_data.get_column("Month")
     )
 
@@ -82,26 +84,20 @@ def test_should_clean_raw_data_and_build_time_windows(
     )
 
     assert set(time_window_split.training_data.get_column("Month")) == set(
-        TRAINING_MONTHS
+        tests.support.scenario.TRAINING_MONTHS
     )
     assert set(time_window_split.prediction_data.get_column("Month")) == set(
-        PREDICTION_MONTHS
+        tests.support.scenario.PREDICTION_MONTHS
     )
 
 
-def test_should_build_identity_features_and_monthly_transformations(
-    prepared_data,
-    expected_eligible_ids: tuple[int, ...],
-) -> None:
-    """Verifica las identity features y las transformaciones mensuales.
+def _assert_identity_features(identity_features: pl.DataFrame) -> None:
+    """Valida las identity features codificadas y las fechas derivadas.
 
     ## Args:
-        prepared_data: Artefactos intermedios del flujo de preparación.
-        expected_eligible_ids: Clientes que forman el universo.
+        identity_features: Identity features ya codificadas y con fechas derivadas.
     """
-    identity_features = prepared_data.identity_features
-    transformed = prepared_data.transformed_training_data
-    time_window_split = prepared_data.time_window_split
+    expected_eligible_ids = tests.builders.integration.data.ELIGIBLE_CLIENT_IDS
 
     assert identity_features.height == len(expected_eligible_ids)
     assert (
@@ -113,17 +109,33 @@ def test_should_build_identity_features_and_monthly_transformations(
 
     for column in column_groups.CATEGORICAL_COLS:
         assert identity_features.schema[column].is_numeric()
-        assert identity_features.get_column(column).min() >= 0.0
-        assert identity_features.get_column(column).max() <= 100.0
+        assert cast(float, identity_features.get_column(column).min()) >= 0.0
+        assert cast(float, identity_features.get_column(column).max()) <= 100.0
 
     assert "First_product_dt" not in identity_features.columns
     assert "Last_product_dt" not in identity_features.columns
     assert "Days_between_first_and_last_product" in identity_features.columns
     assert "Recency_in_days" in identity_features.columns
-    assert identity_features.get_column("Days_between_first_and_last_product").min() > 0
-    assert identity_features.get_column("Recency_in_days").min() >= 0
+    days_between = cast(
+        int,
+        identity_features.get_column("Days_between_first_and_last_product").min(),
+    )
+    recency = cast(int, identity_features.get_column("Recency_in_days").min())
+    assert days_between > 0
+    assert recency >= 0
 
-    assert transformed.height == time_window_split.training_data.height
+
+def _assert_monthly_transformations(
+    transformed: pl.DataFrame,
+    training_data: pl.DataFrame,
+) -> None:
+    """Valida la codificación mensual y los totales derivados.
+
+    ## Args:
+        transformed: Historia mensual con transformaciones.
+        training_data: Historia mensual de entrenamiento sin transformaciones.
+    """
+    assert transformed.height == training_data.height
     for column in column_groups.CATEGORICAL_COLS:
         assert column not in transformed.columns
 
@@ -170,20 +182,39 @@ def test_should_build_identity_features_and_monthly_transformations(
     )
 
 
+def test_should_build_identity_features_and_monthly_transformations(
+    integration_settings: config.Settings,
+) -> None:
+    """Verifica las identity features y las transformaciones mensuales.
+
+    ## Args:
+        integration_settings: Configuración con los nombres de las columnas.
+    """
+    prepared_data = tests.builders.integration.data.build_prepared_data(
+        integration_settings
+    )
+    _assert_identity_features(prepared_data.identity_features)
+    _assert_monthly_transformations(
+        prepared_data.transformed_training_data,
+        prepared_data.time_window_split.training_data,
+    )
+
+
 @pytest.mark.slow
 def test_should_build_abt_and_split_preserving_target_rate(
-    abt: pl.DataFrame,
-    train_test_abt: tuple[pl.DataFrame, pl.DataFrame],
-    expected_eligible_ids: tuple[int, ...],
+    integration_settings: config.Settings,
 ) -> None:
     """Verifica la ABT final y la partición estratificada.
 
     ## Args:
-        abt: Analytical Base Table a nivel de cliente.
-        train_test_abt: Conjuntos de entrenamiento y prueba.
-        expected_eligible_ids: Clientes que forman el universo.
+        integration_settings: Configuración con los nombres de las columnas.
     """
-    train, test = train_test_abt
+    prepared_data = tests.builders.integration.data.build_prepared_data(
+        integration_settings
+    )
+    abt = prepared_data.abt
+    train, test = prepared_data.train, prepared_data.test
+    expected_eligible_ids = tests.builders.integration.data.ELIGIBLE_CLIENT_IDS
 
     assert abt.height == len(expected_eligible_ids)
     assert abt.get_column("client_id").n_unique() == abt.height
@@ -214,49 +245,44 @@ def test_should_build_abt_and_split_preserving_target_rate(
 
 
 def test_should_run_data_preparation_with_custom_column_names(
-    raw_bank_data: pl.DataFrame,
     custom_columns_settings: config.Settings,
-    rename_raw_data,
-    prepare_data,
-    expected_eligible_ids: tuple[int, ...],
 ) -> None:
     """Verifica que el flujo respete identificador, target, mes y fechas propios.
 
     ## Args:
-        raw_bank_data: Datos crudos con los nombres por defecto.
         custom_columns_settings: Configuración con columnas personalizadas.
-        rename_raw_data: Helper para renombrar las columnas configuradas.
-        prepare_data: Helper que ejecuta el flujo de preparación.
-        expected_eligible_ids: Clientes que deben sobrevivir al filtrado.
     """
-    renamed_raw_data = rename_raw_data(raw_bank_data, custom_columns_settings)
-    clean_custom = cleaning.clean_up_data(renamed_raw_data, custom_columns_settings)
-    prepared = prepare_data(clean_custom, custom_columns_settings)
+    raw_bank_data = tests.builders.integration.data.build_raw_bank_data()
+    renamed_raw_data = tests.builders.integration.data.rename_raw_data(
+        raw_bank_data, custom_columns_settings
+    )
+    clean_custom = tests.builders.integration.data.build_clean_data(
+        renamed_raw_data, custom_columns_settings
+    )
+    prepared = tests.builders.integration.data.prepare_data(
+        clean_custom, custom_columns_settings
+    )
+    expected_eligible_ids = tests.builders.integration.data.ELIGIBLE_CLIENT_IDS
     identity = prepared.identity_features
     abt = prepared.abt
 
     for frame in (prepared.clean_data, prepared.time_window_split.training_data):
-        assert "customer_id" in frame.columns
-        assert "churn" in frame.columns
-        assert "snapshot_month" in frame.columns
-        assert "client_id" not in frame.columns
-        assert "Target" not in frame.columns
-        assert "Month" not in frame.columns
+        assert {"customer_id", "churn", "snapshot_month"} <= set(frame.columns)
+        assert {"client_id", "Target", "Month"}.isdisjoint(frame.columns)
 
-    assert "customer_id" in identity.columns
-    assert "churn" in identity.columns
-    assert "client_id" not in identity.columns
-    assert "Target" not in identity.columns
-    assert "first_seen" not in identity.columns
-    assert "last_seen" not in identity.columns
+    assert {"customer_id", "churn"} <= set(identity.columns)
+    assert {
+        "client_id",
+        "Target",
+        "first_seen",
+        "last_seen",
+    }.isdisjoint(identity.columns)
     assert "Days_between_first_and_last_product" in identity.columns
     assert "Recency_in_days" in identity.columns
 
     assert abt.height == len(expected_eligible_ids)
     assert abt.get_column("customer_id").n_unique() == abt.height
-    assert "snapshot_month" not in abt.columns
-    assert "Month" not in abt.columns
-    assert "Target" not in abt.columns
+    assert {"snapshot_month", "Month", "Target"}.isdisjoint(abt.columns)
 
     train_ids = set(prepared.train.get_column("customer_id").to_list())
     test_ids = set(prepared.test.get_column("customer_id").to_list())

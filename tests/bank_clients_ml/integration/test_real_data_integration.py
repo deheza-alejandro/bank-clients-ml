@@ -4,13 +4,14 @@ import polars as pl
 import polars.testing
 import pytest
 
+import tests.support.settings
 from bank_clients_ml import cleaning, config, sampling
 
 
 @pytest.fixture(scope="module")
 def real_settings() -> config.Settings:
     """Settings reales del proyecto con n_jobs=1."""
-    return config.Settings(n_jobs=1)
+    return tests.support.settings.build_settings_for_tests(n_jobs=1)
 
 
 @pytest.fixture(scope="module")
@@ -18,7 +19,7 @@ def real_raw_data(real_settings: config.Settings) -> pl.DataFrame:
     """Carga los datos reales del proyecto si están disponibles."""
     real_raw_data_path = real_settings.paths.raw_data
     if not real_raw_data_path.is_file():
-        pytest.skip(f"No se encontró el conjunto de datos real en {real_raw_data_path}")
+        pytest.skip(f"The actual dataset was not found in {real_raw_data_path}")
     return pl.read_parquet(real_raw_data_path)
 
 
