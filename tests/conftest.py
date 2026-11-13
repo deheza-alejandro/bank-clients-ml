@@ -17,8 +17,8 @@ def clean_ml_environment(
     """Aísla `Settings` de las variables `ML_*` y limpia su caché entre tests.
 
     Es autouse, así que se aplica a todos los tests. Antes y después de cada
-    test limpia la caché de `get_settings` para que no se reutilice una
-    instancia construida con otra configuración.
+    test limpia la caché de `Settings.settings_cached()` para que no se
+    reutilice una instancia construida con otra configuración.
 
     Salvo que el test esté marcado con `@pytest.mark.requires_real_env`,
     elimina las variables de entorno `ML_*`; `monkeypatch` las restaura al
@@ -49,9 +49,9 @@ def clean_ml_environment(
             if name.upper().startswith("ML_"):
                 monkeypatch.delenv(name, raising=False)
 
-    # Save the original reference: some tests replace get_settings using
+    # Save the original reference: some tests replace settings_cached using
     # monkeypatch, and the teardown for this fixture occurs before it is restored.
-    clear_settings_cache = config.get_settings.cache_clear
+    clear_settings_cache = config.Settings.settings_clear_cache
     clear_settings_cache()
     yield
     clear_settings_cache()

@@ -12,14 +12,15 @@ from bank_clients_ml import config
 def settings() -> config.Settings:
     """Devuelve una configuración nueva para cada test.
 
-    Se construye con `build_settings_for_tests`, sin pasar por `get_settings`
-    ni compartir la instancia cacheada. No lee el archivo `.env`, pero sí
-    respeta las variables `ML_*` del entorno; la fixture autouse
-    `clean_ml_environment` las elimina en los tests no marcados con
-    `requires_real_env`.
+    Se construye con `build_settings_for_tests`, sin pasar por
+    `Settings.settings_cached` ni compartir la instancia cacheada. No lee el
+    archivo `.env`, pero sí respeta las variables `ML_*` del entorno; la
+    fixture autouse `clean_ml_environment` las elimina en los tests no
+    marcados con `requires_real_env`.
 
     No sustituye la configuración global: si el código bajo prueba llama a
-    `config.get_settings()`, hay que inyectarla con `patch_global_settings`.
+    `config.Settings.settings_cached()`, hay que inyectarla con
+    `patch_global_settings`.
 
     ## Returns:
         Configuración con los valores por defecto del proyecto, salvo las
@@ -66,26 +67,35 @@ def custom_dataset_settings() -> config.Settings:
 def patch_global_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Callable[[config.Settings], None]:
-    """Devuelve un helper que sustituye `config.get_settings` durante el test.
+    """Devuelve un helper que sustituye `config.Settings.settings_cached` durante el test.
 
-    El helper recibe la configuración que debe devolver `get_settings` y la
-    instala con `monkeypatch.setattr`. El parche se revierte automáticamente
-    al terminar el test.
+    El helper recibe la configuración que debe devolver
+    `Settings.settings_cached` y la instala con `monkeypatch.setattr` sobre
+    el método de clase. El parche se revierte automáticamente al terminar el
+    test.
 
-    Solo afecta a las llamadas que resuelven `config.get_settings` en tiempo
-    de ejecución; no modifica referencias importadas previamente ni el
-    entorno o el archivo `.env`. Tampoco limpia la caché, porque de eso se
-    encarga la fixture autouse `clean_ml_environment`.
+    Afecta a las llamadas que resuelven `config.Settings.settings_cached` en
+    tiempo de ejecución, incluidas las que usan la clase `Settings` importada,
+    porque se reemplaza el método de la clase. No modifica el entorno, el
+    archivo `.env` ni la instancia cacheada real. Tampoco limpia la caché,
+    porque de eso se encarga la fixture autouse `clean_ml_environment`.
 
     ## Args:
-        monkeypatch: Utilidad para reemplazar `get_settings`.
+        monkeypatch: Utilidad para reemplazar `Settings.settings_cached`.
 
     ## Returns:
         Función que recibe la configuración que debe devolver
-        `config.get_settings`.
+        `config.Settings.settings_cached`.
     """
 
     def _patch(settings: config.Settings) -> None:
-        monkeypatch.setattr(config, "get_settings", lambda: settings)
+        def settings_cached(_cls: type[config.Settings]) -> config.Settings:
+            return settings
+
+        monkeypatch.setattr(
+            config.Settings,
+            "settings_cached",
+            classmethod(settings_cached),
+        )
 
     return _patch

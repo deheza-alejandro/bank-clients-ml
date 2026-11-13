@@ -26,7 +26,7 @@ def clean_up_data(
         Datos limpios con fechas convertidas, identificador
             normalizado y sin valores nulos en la columna target.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     clean_data = raw_data.filter(
         pl.col(settings.dataset.target).is_not_null()

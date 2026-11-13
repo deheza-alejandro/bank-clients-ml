@@ -20,7 +20,7 @@ with app.setup:
     from bank_clients_ml import marimo_utils as mo_utils
     from bank_clients_ml import redundant_column_filter as col_filter
 
-    settings = config.get_settings()
+    settings = config.Settings.settings_cached()
 
 
 @app.cell(hide_code=True)

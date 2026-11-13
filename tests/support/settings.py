@@ -1,8 +1,8 @@
 """Construcción de instancias de `config.Settings` para los tests.
 
 Expone `build_settings_for_tests`, que crea configuraciones aisladas sin
-pasar por `get_settings`, para no compartir ni modificar la instancia
-cacheada.
+pasar por `Settings.settings_cached`, para no compartir ni modificar la
+instancia cacheada.
 """
 
 import pathlib
@@ -16,7 +16,8 @@ def build_settings_for_tests(
     """Construye una configuración independiente para los tests.
 
     Crea una instancia nueva de `config.Settings` sin pasar por
-    `get_settings`, por lo que no comparte ni altera la instancia cacheada.
+    `Settings.settings_cached`, por lo que no comparte ni altera la instancia
+    cacheada.
 
     Bajo pytest, la fixture autouse `clean_ml_environment` elimina las
     variables `ML_*`. Salvo que se indique `env_file`, los campos no

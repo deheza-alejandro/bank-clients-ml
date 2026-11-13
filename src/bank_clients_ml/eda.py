@@ -168,7 +168,7 @@ def count_row_matches(
         Nuevo DataFrame con el nombre de cada columna y la cantidad de filas que
         cumplen la condición indicada.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     comparison_function = _get_operator(condition)
 
@@ -199,7 +199,7 @@ def filter_columns_by_cardinality(
         Nuevo DataFrame con las columnas que cumplen la condición y su cantidad de
         valores únicos.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     comparison_function = _get_operator(condition)
 
@@ -233,7 +233,7 @@ def low_cardinality_value_counts(
         ordenado por columna y frecuencia descendente. Si ninguna columna
         cumple el criterio, retorna un DataFrame vacío con dicho esquema.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     cols_to_keep = (
         filter_columns_by_cardinality(df, "<=", max_unique_values, settings)
@@ -275,7 +275,7 @@ def get_clients_by_months(
         clientes y cuántos clientes hay en cada grupo, ordenado por frecuencia
         descendente.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     return (
         clean_data.group_by(settings.dataset.id)
@@ -312,7 +312,7 @@ def mins_in_range(
         mínimo correspondiente. Si ninguna columna cumple la condición, retorna
         un DataFrame vacío con dicho esquema.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     return (
         df.select(cs.numeric().min())
@@ -338,7 +338,7 @@ def columns_with_zeros(
         Nuevo DataFrame con las columnas que contienen al menos un cero y la cantidad
         de ceros encontrados en cada una.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     return (
         df.select((cs.numeric() == 0).sum())

@@ -49,7 +49,7 @@ def target_encode_columns(
         ZeroDivisionError: Si alguna categoría no tiene registros con target 0.0 o 1.0
             y el denominador del calculo resulta cero.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
     categorical_cols = categorical_cols or column_groups.CATEGORICAL_COLS
     categorical_cols = tuple(categorical_cols)
 
@@ -109,7 +109,7 @@ def transform_date_features(
         Nuevo DataFrame con las columnas `Days_between_first_and_last_product` y
         `Recency_in_days` en lugar de las columnas originales de fechas.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     return identity_features.with_columns(
         [
@@ -613,7 +613,7 @@ def aggregate_monthly_to_client(
         Nuevo DataFrame agregado a nivel de cliente con una fila por identificador y
         columnas con sufijos de estadísticas.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     columns_with_monetary_values = (
         columns_with_monetary_values or column_groups.COLUMNS_WITH_MONETARY_VALUES
@@ -715,7 +715,7 @@ def standardize(
     ## Returns:
         Nuevo DataFrame con las variables numéricas estandarizadas.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     cols_to_standardize = pl.exclude(settings.dataset.id, settings.dataset.target)
 

@@ -126,7 +126,7 @@ class TimeWindowSplit:
             Partición temporal con los meses de cada ventana, el universo con su
             target y los datos correspondientes de entrenamiento y predicción.
         """
-        settings = settings or config.get_settings()
+        settings = settings or config.Settings.settings_cached()
 
         training_months, prediction_months = _build_date_windows(
             clean_data, prediction_window_size, settings
@@ -207,7 +207,7 @@ def stratified_train_test_split(
         msg = f"Invalid test_ratio {test_ratio}: must satisfy 0 < test_ratio < 1"
         raise ValueError(msg)
 
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     df_flagged = df.sample(
         fraction=1.0, shuffle=True, seed=settings.random_state
@@ -266,7 +266,7 @@ def oversample_with_unique_ids(
         msg = f"Invalid target_proportion {target_proportion}: must satisfy 0 < proportion < 1"
         raise ValueError(msg)
 
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     df_majority = train.filter(pl.col(settings.dataset.target) == 0)
     df_minority = train.filter(pl.col(settings.dataset.target) == 1)

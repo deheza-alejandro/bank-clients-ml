@@ -97,7 +97,7 @@ def get_identity_features_cols(
     ## Returns:
         Nombres de las columnas que componen las identity features.
     """
-    settings = settings or config.get_settings()
+    settings = settings or config.Settings.settings_cached()
 
     return (
         settings.dataset.id,

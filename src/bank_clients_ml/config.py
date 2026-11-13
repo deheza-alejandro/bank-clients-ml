@@ -3,9 +3,10 @@
 Centraliza los parámetros globales compartidos por casi todos los módulos
 del proyecto.
 
-La configuración se expone mediante la clase `Settings` y se accede a
-ella con la función `get_settings`, que devuelve una instancia única
-almacenada en caché (Singleton).
+La configuración se expone mediante la clase `Settings`. Para reutilizar
+una única instancia durante el proceso se usa `Settings.settings_cached()`;
+`Settings()` crea una instancia nueva y `Settings.settings_clear_cache()`
+invalida la instancia cacheada.
 
 Los valores se pueden redefinir mediante variables de entorno con el
 prefijo `ML_` y, opcionalmente, un archivo `.env` en la raíz del proyecto.
@@ -17,7 +18,6 @@ La precedencia es la de Pydantic: argumentos, variables de entorno,
 por ejemplo "ML_PATHS__RAW_DATA_FILE_NAME=example_data.parquet"
 """
 
-import functools
 import pathlib
 from typing import Final
 
@@ -128,6 +128,12 @@ class Settings(pydantic_settings.BaseSettings):
     La precedencia es: argumentos del constructor, variables de entorno del
     sistema, archivo `.env` y valores por defecto.
 
+    `Settings()` construye una instancia nueva con el entorno y el archivo
+    `.env` vigentes. Para compartir una única instancia durante el proceso,
+    usar `Settings.settings_cached()`. La instancia cacheada se calcula una
+    sola vez. Si se modifican las variables de entorno o el archivo `.env`,
+    reiniciar el proceso o llamar a `Settings.settings_clear_cache()`.
+
     ## Attributes:
         debug: Indica si el modo de depuración está activado.
         random_state: Semilla utilizada para garantizar reproducibilidad.
@@ -136,6 +142,13 @@ class Settings(pydantic_settings.BaseSettings):
         paths: Rutas base de directorios del proyecto.
         dataset: Nombres de columnas del conjunto de datos principal.
         analysis: Nombres de columnas genéricas para resultados de análisis.
+
+    ## Example:
+        from bank_clients_ml import config
+
+        settings = config.Settings.settings_cached()
+        print(settings.dataset.id)
+        print(settings.dataset.target)
     """
 
     debug: bool = False
@@ -158,27 +171,3 @@ class Settings(pydantic_settings.BaseSettings):
         env_ignore_empty=True,
         env_file_encoding="utf-8",
     )
-
-
-@functools.cache
-def get_settings() -> Settings:
-    """Obtiene la configuración global del proyecto.
-
-    Devuelve una instancia única de `Settings` almacenada en caché (Singleton).
-
-    ## Note:
-        La instancia se calcula una sola vez. Si se modifican las variables de
-        entorno o el archivo `.env`, reiniciar el proceso o llamar a
-        `get_settings.cache_clear()`.
-
-    ## Returns:
-        Instancia compartida de la configuración global.
-
-    ## Example:
-        from bank_clients_ml import config
-
-        settings = config.get_settings()
-        print(settings.dataset.id)
-        print(settings.dataset.target)
-    """
-    return Settings()

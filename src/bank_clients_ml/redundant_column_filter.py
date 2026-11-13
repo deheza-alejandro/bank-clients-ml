@@ -209,7 +209,7 @@ class RedundantColumnFilter:
         ## Raises:
             ValueError: Si el umbral para columnas binarias no está entre 0.0 y 0.5.
         """
-        settings = settings or config.get_settings()
+        settings = settings or config.Settings.settings_cached()
 
         constant_cols = _get_constant_columns(train)
         reduced_train = train.drop(constant_cols)
