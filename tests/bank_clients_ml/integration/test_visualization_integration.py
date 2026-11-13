@@ -1,6 +1,5 @@
 """Tests de integración de la generación y escritura de gráficos SVG."""
 
-import pathlib
 import shutil
 
 import numpy as np
@@ -21,16 +20,14 @@ pytestmark = [
     pytest.mark.slow,
 ]
 
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]
-SVGO_DIRECTORY = PROJECT_ROOT / "node_modules" / "svgo"
 
-
-def _require_svg_tooling() -> None:
+@pytest.fixture(autouse=True)
+def require_svg_tooling(request: pytest.FixtureRequest) -> None:
     """Omite el test cuando Bun o SVGO no están disponibles."""
     if shutil.which("bun") is None:
-        pytest.skip("Bun no está disponible en PATH")
-    if not SVGO_DIRECTORY.is_dir():
-        pytest.skip("SVGO no está instalado en node_modules")
+        pytest.skip("Bun is not available in PATH")
+    if not (request.config.rootpath / "node_modules" / "svgo").is_dir():
+        pytest.skip("SVGO is not installed in node_modules")
 
 
 def test_should_write_top_features_bivariate_roc_and_deciles_svgs(
@@ -43,8 +40,6 @@ def test_should_write_top_features_bivariate_roc_and_deciles_svgs(
     ## Args:
         integration_settings: Configuración con un directorio de imágenes temporal.
     """
-    _require_svg_tooling()
-
     top_features = pl.DataFrame(
         {
             "Feature": ["Age", "Income", "Balance", "Tenure"],
@@ -136,8 +131,6 @@ def test_should_write_bivariate_top_features_and_evaluation_svgs(
         synthetic_train: Conjunto sintético con variables y target.
         integration_settings: Configuración con un directorio de imágenes temporal.
     """
-    _require_svg_tooling()
-
     feature_columns = [
         column for column in synthetic_train.columns if column.startswith("Feature_")
     ][:3]
