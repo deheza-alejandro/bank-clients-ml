@@ -110,4 +110,4 @@ USER dev
 EXPOSE 2718
 
 ENTRYPOINT ["python", "/usr/local/bin/docker_entrypoint.py"]
-CMD ["uv", "run", "--no-sync", "marimo", "edit", "--headless", "--no-token", "--skip-update-check", "--host", "0.0.0.0", "--port", "2718", "notebooks/notebook.py"]
+CMD ["uv", "run", "--no-sync", "marimo", "edit", "--headless", "--watch", "--no-token", "--skip-update-check", "--host", "0.0.0.0", "--port", "2718", "notebooks/notebook.py"]
