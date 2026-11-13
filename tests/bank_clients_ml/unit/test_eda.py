@@ -8,6 +8,7 @@ import polars as pl
 import polars.testing
 import pytest
 
+import tests.support.settings
 from bank_clients_ml import config, eda
 
 SHAPE_METRIC = "Shape of the DataFrame"
@@ -26,7 +27,9 @@ def custom_analysis_settings() -> config.Settings:
     ## Returns:
         Configuración con la columna de resultados renombrada.
     """
-    return config.Settings(analysis=config.AnalysisColumns(column_name="Variable"))
+    return tests.support.settings.build_settings_for_tests(
+        analysis=config.AnalysisColumns(column_name="Variable")
+    )
 
 
 def _metric_values(result: pl.DataFrame, metric: str) -> list[str]:
