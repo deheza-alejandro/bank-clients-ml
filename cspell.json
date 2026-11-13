@@ -26,12 +26,12 @@
     "files": [
         "src/**",
         "tests/**",
+        "scripts/**",
         "**/*.py",
         "**/*.md",
         "**/*.yml",
         "**/*.yaml",
-        "**/*.toml",
-        ".lefthook/**"
+        "**/*.toml"
     ],
     // words - list of words to be always considered correct
     "words": [
