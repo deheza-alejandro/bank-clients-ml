@@ -6,13 +6,25 @@ del proyecto.
 La configuración se expone mediante la clase `Settings` y se accede a
 ella con la función `get_settings`, que devuelve una instancia única
 almacenada en caché (Singleton).
+
+Los valores se pueden redefinir mediante variables de entorno con el
+prefijo `ML_` y, opcionalmente, un archivo `.env` en la raíz del proyecto.
+Los campos anidados usan el separador `__`.
+
+La precedencia es la de Pydantic: argumentos, variables de entorno,
+`.env` y valores por defecto.
+
+por ejemplo "ML_PATHS__RAW_DATA_FILE_NAME=example_data.parquet"
 """
 
 import functools
 import pathlib
+from typing import Final
 
 import pydantic
 import pydantic_settings
+
+_PROJECT_ROOT: Final = pathlib.Path(__file__).resolve().parents[2]
 
 
 class DirectoryPaths(pydantic.BaseModel):
@@ -23,13 +35,14 @@ class DirectoryPaths(pydantic.BaseModel):
 
     ## Attributes:
         project: Directorio raíz del proyecto.
-        data: Directorio de datos calculado dinámicamente a partir de project.
-        images: Directorio de imágenes calculado dinámicamente a partir de project.
+        raw_data_file_name: Nombre del archivo parquet de entrada.
+        raw_data: Ruta completa del parquet, calculada dinámicamente a partir de project.
+        images: Directorio de imágenes, calculado dinámicamente a partir de project.
     """
 
-    model_config = pydantic.ConfigDict(frozen=True)
+    model_config = pydantic.ConfigDict(frozen=True, extra="forbid")
 
-    project: pathlib.Path = pathlib.Path(__file__).parent.parent.parent
+    project: pathlib.Path = _PROJECT_ROOT
     raw_data_file_name: str = "example_data.parquet"
 
     @pydantic.computed_field
@@ -68,7 +81,7 @@ class DatasetColumns(pydantic.BaseModel):
             tiene "credit card co branding".
     """
 
-    model_config = pydantic.ConfigDict(frozen=True)
+    model_config = pydantic.ConfigDict(frozen=True, extra="forbid")
 
     id: str = "client_id"
     target: str = "Target"
@@ -93,7 +106,7 @@ class AnalysisColumns(pydantic.BaseModel):
         column_name: Nombre de la columna "Column name".
     """
 
-    model_config = pydantic.ConfigDict(frozen=True)
+    model_config = pydantic.ConfigDict(frozen=True, extra="forbid")
 
     feature: str = "Feature"
     importance: str = "Importance"
@@ -111,6 +124,9 @@ class Settings(pydantic_settings.BaseSettings):
     Define los valores por defecto utilizados en el proceso de modelado.
     Agrupa rutas y nombres de columnas para mantener una referencia única y
     consistente en todos los módulos.
+
+    La precedencia es: argumentos del constructor, variables de entorno del
+    sistema, archivo `.env` y valores por defecto.
 
     ## Attributes:
         debug: Indica si el modo de depuración está activado.
@@ -133,11 +149,14 @@ class Settings(pydantic_settings.BaseSettings):
     # api_key: pydantic.SecretStr  # Keeps the secret hidden in logs and print statements.
 
     model_config = pydantic_settings.SettingsConfigDict(
-        frozen=True
-        # env_file=".env",
-        # env_nested_delimiter="__",
-        # env_file_encoding="utf-8",
-        # extra="ignore",
+        frozen=True,
+        extra="forbid",
+        env_file=_PROJECT_ROOT / ".env",
+        env_prefix="ML_",
+        dotenv_filtering="match_prefix",
+        env_nested_delimiter="__",
+        env_ignore_empty=True,
+        env_file_encoding="utf-8",
     )
 
 
@@ -146,6 +165,11 @@ def get_settings() -> Settings:
     """Obtiene la configuración global del proyecto.
 
     Devuelve una instancia única de `Settings` almacenada en caché (Singleton).
+
+    ## Note:
+        La instancia se calcula una sola vez. Si se modifican las variables de
+        entorno o el archivo `.env`, reiniciar el proceso o llamar a
+        `get_settings.cache_clear()`.
 
     ## Returns:
         Instancia compartida de la configuración global.
