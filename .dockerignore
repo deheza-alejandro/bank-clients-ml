@@ -1,5 +1,9 @@
-# Keep README.md: uv_build reads it during installation.
+# Keep README.md: uv_build reads it when the entrypoint installs the project at
+# container startup and when the image is used without the bind mount.
 # Keep .gitignore: cspell uses it through useGitignore.
+
+# Example data: in development, these are provided via bind mount.
+data/
 
 # Version control metadata
 .git
