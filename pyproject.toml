@@ -3,7 +3,7 @@ name = "bank-clients-ml"
 version = "0.1.0"
 description = "Machine learning project"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 license = "MIT"
 dependencies = [
     "lightgbm>=4.7.0",
@@ -27,6 +27,7 @@ dev = [
     "commitizen>=4.18.0",
     "lefthook>=2.1.12",
     "marimo>=0.24.2",
+    "packaging>=26.3",
     "pyrefly>=1.2.0",
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
@@ -37,8 +38,12 @@ dev = [
 
 [tool.pyrefly]
 project-includes = [
-    "**/*.py*"
+    "src", "tests", "notebooks", "scripts"
 ]
+project-excludes = [
+    "**/__pycache__", "**/__marimo__", "**/venv/**", "**/.venv/**"
+]
+search-path = ["src", "."]
 min-severity = "warn"
 
 [tool.ruff]
@@ -102,6 +107,7 @@ convention = "google"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 norecursedirs = [
     ".git",
     ".venv",
@@ -115,6 +121,7 @@ addopts = [
 markers = [
     "slow: tests that exceed the agreed duration threshold (setup + call + teardown > 0.40 seg)",
     "requires_svg: integration tests that require Bun and SVGO to write SVG files",
+    "requires_real_env: tests that need the real .env or ML_* environment",
 ]
 
 [tool.marimo.runtime]
