@@ -7,57 +7,20 @@ import polars as pl
 import polars.testing
 import pytest
 
+import tests.builders.unit.cleaning
+import tests.support.settings
 from bank_clients_ml import cleaning, config
 
 
-@pytest.fixture
-def raw_data() -> pl.DataFrame:
-    """Construye un DataFrame crudo con registros válidos, nulos y un target cero.
-
-    ## Returns:
-        DataFrame con identificadores de texto, fechas de texto y target con
-            valores nulos que deben descartarse.
-    """
-    return pl.DataFrame(
-        {
-            "client_id": ["1", "2", "3", "4"],
-            "Month": ["2024-01-01", "2024-02-01", None, "2024-03-01"],
-            "First_product_dt": [
-                "2020-01-15",
-                "2020-02-15",
-                None,
-                "2020-03-15",
-            ],
-            "Last_product_dt": [
-                "2024-01-01",
-                "2024-02-01",
-                None,
-                "2024-03-01",
-            ],
-            "Target": [1, None, 0, None],
-            "Balance": [100.0, 200.0, 300.0, 400.0],
-        },
-        schema={
-            "client_id": pl.String,
-            "Month": pl.String,
-            "First_product_dt": pl.String,
-            "Last_product_dt": pl.String,
-            "Target": pl.Int64,
-            "Balance": pl.Float64,
-        },
-    )
-
-
 def test_should_drop_rows_with_null_target(
-    raw_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que se descarten los registros cuyo target es nulo.
 
     ## Args:
-        raw_data: Datos crudos de clientes.
         settings: Configuración con los nombres de las columnas.
     """
+    raw_data = tests.builders.unit.cleaning.build_raw_data()
     result = cleaning.clean_up_data(raw_data, settings)
 
     assert result.get_column("client_id").to_list() == [1, 3]
@@ -92,15 +55,14 @@ def test_should_keep_zero_target_value(settings: config.Settings) -> None:
 
 
 def test_should_cast_client_id_to_int64(
-    raw_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que el identificador de texto se convierta a entero de 64 bits.
 
     ## Args:
-        raw_data: Datos crudos de clientes.
         settings: Configuración con los nombres de las columnas.
     """
+    raw_data = tests.builders.unit.cleaning.build_raw_data()
     result = cleaning.clean_up_data(raw_data, settings)
 
     expected = pl.Series("client_id", [1, 3], dtype=pl.Int64)
@@ -124,7 +86,6 @@ def test_should_cast_client_id_to_int64(
     ],
 )
 def test_should_convert_date_column_to_date_type(
-    raw_data: pl.DataFrame,
     settings: config.Settings,
     column: str,
     expected_dates: list[date | None],
@@ -132,11 +93,11 @@ def test_should_convert_date_column_to_date_type(
     """Verifica que las columnas de fecha se conviertan a tipo fecha.
 
     ## Args:
-        raw_data: Datos crudos de clientes.
         settings: Configuración con los nombres de las columnas.
         column: Nombre de la columna de fecha que se valida.
         expected_dates: Fechas esperadas luego de la conversión.
     """
+    raw_data = tests.builders.unit.cleaning.build_raw_data()
     result = cleaning.clean_up_data(raw_data, settings)
 
     expected = pl.Series(column, expected_dates, dtype=pl.Date)
@@ -144,15 +105,14 @@ def test_should_convert_date_column_to_date_type(
 
 
 def test_should_preserve_columns_unrelated_to_cleaning(
-    raw_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que las columnas ajenas a la limpieza se conserven intactas.
 
     ## Args:
-        raw_data: Datos crudos de clientes.
         settings: Configuración con los nombres de las columnas.
     """
+    raw_data = tests.builders.unit.cleaning.build_raw_data()
     result = cleaning.clean_up_data(raw_data, settings)
 
     expected = pl.Series("Balance", [100.0, 300.0], dtype=pl.Float64)
@@ -231,7 +191,9 @@ def test_should_use_global_settings_when_settings_is_not_provided(
     ## Args:
         patch_global_settings: Helper para reemplazar la configuración global.
     """
-    global_settings = config.Settings(dataset=config.DatasetColumns(target="label"))
+    global_settings = tests.support.settings.build_settings_for_tests(
+        dataset=config.DatasetColumns(target="label")
+    )
     patch_global_settings(global_settings)
     raw_data = pl.DataFrame(
         {

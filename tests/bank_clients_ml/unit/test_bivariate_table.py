@@ -4,29 +4,20 @@ import polars as pl
 import polars.testing
 import pytest
 
+import tests.builders.unit.binning
+import tests.support.settings
 from bank_clients_ml import binning, bivariate_table, config
-
-
-@pytest.fixture
-def age_mapping() -> binning.NameMapping:
-    """Mapeo con la variable de edad usada en los tests.
-
-    ## Returns:
-        Mapeo entre el nombre interno y el nombre legible de la edad.
-    """
-    return binning.NameMapping.from_dict({"age": "Age"})
 
 
 def test_should_group_by_original_values_and_compute_target_pct_when_cardinality_is_low(
     settings: config.Settings,
-    age_mapping: binning.NameMapping,
 ) -> None:
     """Verifica el agrupamiento por valores originales y el porcentaje de target.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        age_mapping: Mapeo de la variable de edad.
     """
+    age_mapping = tests.builders.unit.binning.build_age_mapping()
     df = pl.DataFrame(
         {
             "age": [40, 20, 20, 30, 40, 40],
@@ -103,14 +94,13 @@ def test_should_return_tables_in_mapping_order_with_pretty_names(
 
 def test_should_bin_values_when_cardinality_exceeds_maximum_bins(
     settings: config.Settings,
-    age_mapping: binning.NameMapping,
 ) -> None:
     """Verifica que se generen bines cuando la cardinalidad supera el máximo.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        age_mapping: Mapeo de la variable de edad.
     """
+    age_mapping = tests.builders.unit.binning.build_age_mapping()
     df = pl.DataFrame(
         {
             "age": list(range(8)),
@@ -143,14 +133,13 @@ def test_should_bin_values_when_cardinality_exceeds_maximum_bins(
 
 def test_should_preserve_original_values_when_cardinality_equals_maximum_bins(
     settings: config.Settings,
-    age_mapping: binning.NameMapping,
 ) -> None:
     """Verifica que no se generen bines si la cardinalidad iguala el máximo.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        age_mapping: Mapeo de la variable de edad.
     """
+    age_mapping = tests.builders.unit.binning.build_age_mapping()
     df = pl.DataFrame(
         {
             "age": [10] * 8 + [20, 30],
@@ -180,14 +169,13 @@ def test_should_preserve_original_values_when_cardinality_equals_maximum_bins(
 
 def test_should_place_null_group_last_with_bin_number_after_non_null_groups(
     settings: config.Settings,
-    age_mapping: binning.NameMapping,
 ) -> None:
     """Verifica que el grupo de nulos quede al final y conserve sus métricas.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        age_mapping: Mapeo de la variable de edad.
     """
+    age_mapping = tests.builders.unit.binning.build_age_mapping()
     df = pl.DataFrame(
         {
             "age": [20, None, 10, None],
@@ -215,15 +203,10 @@ def test_should_place_null_group_last_with_bin_number_after_non_null_groups(
     polars.testing.assert_frame_equal(result[0].table, expected)
 
 
-def test_should_use_custom_column_names_from_settings(
-    age_mapping: binning.NameMapping,
-) -> None:
-    """Verifica que las columnas de salida respeten la configuración.
-
-    ## Args:
-        age_mapping: Mapeo de la variable de edad.
-    """
-    settings = config.Settings(
+def test_should_use_custom_column_names_from_settings() -> None:
+    """Verifica que las columnas de salida respeten la configuración."""
+    age_mapping = tests.builders.unit.binning.build_age_mapping()
+    settings = tests.support.settings.build_settings_for_tests(
         dataset=config.DatasetColumns(target="target"),
         analysis=config.AnalysisColumns(
             bin="bucket",

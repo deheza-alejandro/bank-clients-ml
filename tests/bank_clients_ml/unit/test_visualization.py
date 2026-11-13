@@ -1,7 +1,6 @@
 """Tests unitarios para la generación y guardado de gráficos."""
 
 import pathlib
-from collections.abc import Generator
 from typing import cast
 
 import matplotlib.patches
@@ -11,16 +10,10 @@ import numpy.typing
 import polars as pl
 import pytest
 import pytest_mock
-from matplotlib.figure import Figure
 
-from bank_clients_ml import bivariate_table, config, evaluation, visualization
-
-
-@pytest.fixture(autouse=True)
-def close_figures_after_each_test() -> Generator[None]:
-    """Cierra todas las figuras abiertas al finalizar cada test."""
-    yield
-    plt.close("all")
+import tests.builders.unit.visualization
+import tests.support.settings
+from bank_clients_ml import bivariate_table, config, visualization
 
 
 @pytest.fixture
@@ -33,116 +26,22 @@ def plot_settings(tmp_path: pathlib.Path) -> config.Settings:
     ## Returns:
         Configuración aislada para las pruebas de escritura de gráficos.
     """
-    return config.Settings(paths=config.DirectoryPaths(project=tmp_path))
-
-
-@pytest.fixture
-def capture_saver() -> tuple[
-    list[tuple[Figure, pathlib.Path]], visualization.FigureSaver
-]:
-    """Devuelve una estrategia de guardado que captura figuras y rutas.
-
-    ## Returns:
-        Lista de capturas y la estrategia que las acumula.
-    """
-    saved: list[tuple[Figure, pathlib.Path]] = []
-
-    def saver(fig: Figure, path: pathlib.Path) -> None:
-        saved.append((fig, path))
-
-    return saved, saver
-
-
-@pytest.fixture
-def top_features_table() -> pl.DataFrame:
-    """Devuelve una tabla de importancias ordenada de mayor a menor.
-
-    ## Returns:
-        Tabla con cinco variables y sus importancias.
-    """
-    return pl.DataFrame(
-        {
-            "Feature": ["Age", "Income", "Balance", "Tenure", "Score"],
-            "Importance": [50.0, 30.0, 15.0, 4.0, 1.0],
-        }
-    )
-
-
-@pytest.fixture
-def bivariate_age() -> bivariate_table.BivariateTable:
-    """Devuelve una tabla bivariada de ejemplo para la edad.
-
-    ## Returns:
-        Tabla con tres bines y valores numéricos para formatear.
-    """
-    table = pl.DataFrame(
-        {
-            "Bin": pl.Series([1, 2, 3], dtype=pl.Int64),
-            "Min": [18.456, 35.5, 60.0],
-            "Max": [34.0, 59.5, 80.0],
-            "Clients": pl.Series([10, 20, 30], dtype=pl.UInt32),
-            "Target": pl.Series([1, 4, 9], dtype=pl.Int64),
-            "Target_pct": [10.4, 19.6, 30.49],
-        }
-    )
-    return bivariate_table.BivariateTable("age", "Age", table)
-
-
-@pytest.fixture
-def evaluation_metrics() -> evaluation.EvaluationMetrics:
-    """Devuelve métricas de evaluación con deciles de entrenamiento y prueba.
-
-    ## Returns:
-        Métricas con curva ROC y tablas de deciles de ejemplo.
-    """
-    train_deciles = pl.DataFrame(
-        {
-            "decile": ["1", "2"],
-            "count": [10, 20],
-            "target_1_count": [3, 7],
-            "min_prob": [10.0, 30.0],
-            "max_prob": [20.0, 40.0],
-            "target_1_rate": [30.0, 35.0],
-            "cum_gain": [30.0, 100.0],
-            "lift": [1.234, 1.456],
-            "ks": [10.0, 20.0],
-        }
-    )
-    test_deciles = pl.DataFrame(
-        {
-            "decile": ["1", "2"],
-            "count": [12, 18],
-            "target_1_count": [2, 8],
-            "min_prob": [15.0, 35.0],
-            "max_prob": [25.0, 45.0],
-            "target_1_rate": [16.666, 44.444],
-            "cum_gain": [20.0, 100.0],
-            "lift": [0.8, 1.2],
-            "ks": [5.0, 25.0],
-        }
-    )
-    return evaluation.EvaluationMetrics(
-        roc_auc=0.876543,
-        accuracy=0.765432,
-        fpr=np.array([0.0, 0.2, 1.0]),
-        tpr=np.array([0.0, 0.8, 1.0]),
-        train_deciles=train_deciles,
-        test_deciles=test_deciles,
+    return tests.support.settings.build_settings_for_tests(
+        paths=config.DirectoryPaths(project=tmp_path)
     )
 
 
 def test_should_close_figure_after_plotting_top_features(
     mocker: pytest_mock.MockerFixture,
-    top_features_table: pl.DataFrame,
     plot_settings: config.Settings,
 ) -> None:
     """Verifica que la API pública cierre la figura después de guardarla.
 
     ## Args:
         mocker: Utilidad para evitar la ejecución de SVGO.
-        top_features_table: Tabla de importancias ordenada.
         plot_settings: Configuración con un directorio de imágenes temporal.
     """
+    top_features_table = tests.builders.unit.visualization.build_top_features_table()
     mocker.patch.object(visualization.subprocess, "run")
 
     visualization.plot_top_features(
@@ -157,16 +56,15 @@ def test_should_close_figure_after_plotting_top_features(
 
 def test_should_raise_runtime_error_and_close_figure_when_bun_is_missing(
     mocker: pytest_mock.MockerFixture,
-    top_features_table: pl.DataFrame,
     plot_settings: config.Settings,
 ) -> None:
     """Verifica el error informativo cuando Bun no está disponible.
 
     ## Args:
         mocker: Utilidad para simular la ausencia del ejecutable.
-        top_features_table: Tabla de importancias ordenada.
         plot_settings: Configuración con un directorio de imágenes temporal.
     """
+    top_features_table = tests.builders.unit.visualization.build_top_features_table()
     mocker.patch.object(
         visualization.subprocess,
         "run",
@@ -196,22 +94,19 @@ def test_should_raise_runtime_error_and_close_figure_when_bun_is_missing(
     ],
 )
 def test_should_build_top_features_figure_with_requested_limit_and_expected_title(
-    top_features_table: pl.DataFrame,
     plot_settings: config.Settings,
     top_n: int,
     expected_features: list[str],
-    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
 ) -> None:
     """Verifica el límite de variables y el contenido del gráfico de importancia.
 
     ## Args:
-        top_features_table: Tabla de importancias ordenada.
         plot_settings: Configuración con nombres de columnas y directorio temporal.
         top_n: Cantidad solicitada de variables.
         expected_features: Variables que deben aparecer en el gráfico.
-        capture_saver: Captura de figuras y rutas guardadas.
     """
-    saved, saver = capture_saver
+    top_features_table = tests.builders.unit.visualization.build_top_features_table()
+    saved, saver = tests.builders.unit.visualization.build_capture_saver()
 
     visualization.plot_top_features(
         top_features_table,
@@ -248,20 +143,18 @@ def test_should_build_top_features_figure_with_requested_limit_and_expected_titl
 
 def test_should_use_configured_column_names_in_top_features_figure(
     tmp_path: pathlib.Path,
-    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
 ) -> None:
     """Verifica que los ejes usen los nombres de columna configurados.
 
     ## Args:
         tmp_path: Directorio temporal proporcionado por pytest.
-        capture_saver: Captura de figuras y rutas guardadas.
     """
-    custom_settings = config.Settings(
+    custom_settings = tests.support.settings.build_settings_for_tests(
         paths=config.DirectoryPaths(project=tmp_path),
         analysis=config.AnalysisColumns(feature="Variable", importance="Weight"),
     )
     variables = pl.DataFrame({"Variable": ["A", "B"], "Weight": [7.0, 3.0]})
-    saved, saver = capture_saver
+    saved, saver = tests.builders.unit.visualization.build_capture_saver()
 
     visualization.plot_top_features(
         variables,
@@ -284,18 +177,15 @@ def test_should_use_configured_column_names_in_top_features_figure(
 
 
 def test_should_build_bivariate_figure_with_table_bars_and_target_percentage_line(
-    bivariate_age: bivariate_table.BivariateTable,
     plot_settings: config.Settings,
-    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
 ) -> None:
     """Verifica el contenido de la tabla, las barras y la línea del target.
 
     ## Args:
-        bivariate_age: Tabla bivariada de ejemplo.
         plot_settings: Configuración con nombres de columnas y directorio temporal.
-        capture_saver: Captura de figuras y rutas guardadas.
     """
-    saved, saver = capture_saver
+    bivariate_age = tests.builders.unit.visualization.build_bivariate_age()
+    saved, saver = tests.builders.unit.visualization.build_capture_saver()
 
     visualization.plot_bivariate_charts(
         [bivariate_age],
@@ -342,15 +232,13 @@ def test_should_build_bivariate_figure_with_table_bars_and_target_percentage_lin
 
 def test_should_use_configured_columns_in_bivariate_figure(
     tmp_path: pathlib.Path,
-    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
 ) -> None:
     """Verifica que la tabla y los ejes respeten la configuración personalizada.
 
     ## Args:
         tmp_path: Directorio temporal proporcionado por pytest.
-        capture_saver: Captura de figuras y rutas guardadas.
     """
-    custom_settings = config.Settings(
+    custom_settings = tests.support.settings.build_settings_for_tests(
         paths=config.DirectoryPaths(project=tmp_path),
         dataset=config.DatasetColumns(target="label"),
         analysis=config.AnalysisColumns(
@@ -370,7 +258,7 @@ def test_should_use_configured_columns_in_bivariate_figure(
         }
     )
     bivariate = bivariate_table.BivariateTable("income", "Income", table)
-    saved, saver = capture_saver
+    saved, saver = tests.builders.unit.visualization.build_capture_saver()
 
     visualization.plot_bivariate_charts(
         [bivariate],
@@ -410,18 +298,15 @@ def _line_data(
 
 
 def test_should_build_roc_curve_figure_with_metrics_annotation(
-    evaluation_metrics: evaluation.EvaluationMetrics,
     plot_settings: config.Settings,
-    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
 ) -> None:
     """Verifica la curva ROC, la diagonal y la anotación de métricas.
 
     ## Args:
-        evaluation_metrics: Métricas de evaluación de ejemplo.
         plot_settings: Configuración con un directorio de imágenes temporal.
-        capture_saver: Captura de figuras y rutas guardadas.
     """
-    saved, saver = capture_saver
+    evaluation_metrics = tests.builders.unit.visualization.build_evaluation_metrics()
+    saved, saver = tests.builders.unit.visualization.build_capture_saver()
 
     visualization.plot_roc_curve(
         evaluation_metrics,
@@ -452,18 +337,15 @@ def test_should_build_roc_curve_figure_with_metrics_annotation(
 
 
 def test_should_build_train_and_test_deciles_in_single_figure(
-    evaluation_metrics: evaluation.EvaluationMetrics,
     plot_settings: config.Settings,
-    capture_saver: tuple[list[tuple[Figure, pathlib.Path]], visualization.FigureSaver],
 ) -> None:
     """Verifica títulos, ejes, cabeceras y redondeo de las tablas de deciles.
 
     ## Args:
-        evaluation_metrics: Métricas con las tablas de deciles.
         plot_settings: Configuración con un directorio de imágenes temporal.
-        capture_saver: Captura de figuras y rutas guardadas.
     """
-    saved, saver = capture_saver
+    evaluation_metrics = tests.builders.unit.visualization.build_evaluation_metrics()
+    saved, saver = tests.builders.unit.visualization.build_capture_saver()
 
     visualization.plot_deciles(
         evaluation_metrics,

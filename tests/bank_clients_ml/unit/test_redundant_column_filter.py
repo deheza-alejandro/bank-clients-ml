@@ -1,101 +1,16 @@
 """Tests unitarios para el filtrado de columnas redundantes."""
 
 import types
+from collections.abc import Callable
 
 import numpy as np
 import polars as pl
 import polars.testing
 import pytest
-import pytest_mock
 
+import tests.builders.unit.redundant_column_filter
+import tests.support.settings
 from bank_clients_ml import config, redundant_column_filter
-
-
-@pytest.fixture
-def train_data() -> pl.DataFrame:
-    """Devuelve un conjunto de entrenamiento con columnas redundantes.
-
-    Returns:
-        DataFrame con una columna constante, una binaria desbalanceada, una
-        binaria balanceada y dos variables numéricas perfectamente correlacionadas.
-    """
-    return pl.DataFrame(
-        {
-            "client_id": [f"client_{i}" for i in range(1, 11)],
-            "Target": [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-            "constant": [7] * 10,
-            "imbalanced": [0] * 9 + [1],
-            "balanced": [0, 1] * 5,
-            "feature_a": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
-            "feature_b": [
-                2.0,
-                4.0,
-                6.0,
-                8.0,
-                10.0,
-                12.0,
-                14.0,
-                16.0,
-                18.0,
-                20.0,
-            ],
-        }
-    )
-
-
-@pytest.fixture
-def test_data() -> pl.DataFrame:
-    """Devuelve un conjunto de prueba con el mismo esquema que el de entrenamiento.
-
-    Returns:
-        DataFrame de prueba con cuatro observaciones.
-    """
-    return pl.DataFrame(
-        {
-            "client_id": [f"test_{i}" for i in range(1, 5)],
-            "Target": [0, 1, 0, 1],
-            "constant": [7] * 4,
-            "imbalanced": [0, 0, 0, 1],
-            "balanced": [0, 1, 0, 1],
-            "feature_a": [11.0, 12.0, 13.0, 14.0],
-            "feature_b": [22.0, 24.0, 26.0, 28.0],
-        }
-    )
-
-
-@pytest.fixture
-def binary_frame() -> pl.DataFrame:
-    """Devuelve un DataFrame con target y feature binarios.
-
-    Returns:
-        DataFrame con una fila por valor binario.
-    """
-    return pl.DataFrame({"Target": [0, 1], "feature": [0, 1]})
-
-
-@pytest.fixture
-def redundant_filter(
-    train_data: pl.DataFrame,
-    test_data: pl.DataFrame,
-    settings: config.Settings,
-) -> redundant_column_filter.RedundantColumnFilter:
-    """Devuelve un filtro generado a partir de los datos de prueba.
-
-    Args:
-        train_data: Conjunto de entrenamiento con columnas redundantes.
-        test_data: Conjunto de prueba con el mismo esquema.
-        settings: Configuración global del proyecto.
-
-    Returns:
-        Filtro con las columnas redundantes ya detectadas.
-    """
-    return redundant_column_filter.RedundantColumnFilter.generate(
-        train=train_data,
-        test=test_data,
-        imbalanced_binary_threshold=0.2,
-        correlation_threshold=0.8,
-        settings=settings,
-    )
 
 
 def _orthonormal_features() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -156,7 +71,7 @@ def test_should_remove_constant_columns_from_train_and_test(
 ) -> None:
     """Verifica que las columnas constantes se eliminen de ambos conjuntos.
 
-    Args:
+    ## Args:
         settings: Configuración global del proyecto.
     """
     train = pl.DataFrame(
@@ -199,17 +114,20 @@ def test_should_remove_constant_columns_from_train_and_test(
 
 
 def test_should_remove_imbalanced_binary_columns_from_train_and_test(
-    redundant_filter: redundant_column_filter.RedundantColumnFilter,
-    train_data: pl.DataFrame,
-    test_data: pl.DataFrame,
+    settings: config.Settings,
 ) -> None:
     """Verifica que las columnas binarias desbalanceadas se eliminen de ambos conjuntos.
 
-    Args:
-        redundant_filter: Filtro generado a partir de los datos de prueba.
-        train_data: Conjunto de entrenamiento original.
-        test_data: Conjunto de prueba original.
+    ## Args:
+        settings: Configuración global del proyecto.
     """
+    train_data = tests.builders.unit.redundant_column_filter.build_train_data()
+    test_data = tests.builders.unit.redundant_column_filter.build_test_data()
+    redundant_filter = (
+        tests.builders.unit.redundant_column_filter.build_redundant_filter(
+            train_data, test_data, settings
+        )
+    )
     assert redundant_filter.imbalanced_binary_columns == ("imbalanced",)
     polars.testing.assert_frame_equal(
         redundant_filter.correlated_train,
@@ -222,15 +140,20 @@ def test_should_remove_imbalanced_binary_columns_from_train_and_test(
 
 
 def test_should_remove_correlated_columns_only_from_uncorrelated_train(
-    redundant_filter: redundant_column_filter.RedundantColumnFilter,
-    train_data: pl.DataFrame,
+    settings: config.Settings,
 ) -> None:
     """Verifica que las columnas correlacionadas se descarten del entrenamiento.
 
-    Args:
-        redundant_filter: Filtro generado a partir de los datos de prueba.
-        train_data: Conjunto de entrenamiento original.
+    ## Args:
+        settings: Configuración global del proyecto.
     """
+    train_data = tests.builders.unit.redundant_column_filter.build_train_data()
+    test_data = tests.builders.unit.redundant_column_filter.build_test_data()
+    redundant_filter = (
+        tests.builders.unit.redundant_column_filter.build_redundant_filter(
+            train_data, test_data, settings
+        )
+    )
     assert redundant_filter.correlated_columns == ("feature_b",)
     polars.testing.assert_frame_equal(
         redundant_filter.uncorrelated_train,
@@ -242,29 +165,23 @@ def test_should_remove_correlated_columns_only_from_uncorrelated_train(
 
 
 def test_should_use_global_settings_and_default_thresholds_when_not_provided(
-    mocker: pytest_mock.MockerFixture,
+    patch_global_settings: Callable[[config.Settings], None],
     settings: config.Settings,
-    train_data: pl.DataFrame,
 ) -> None:
     """Verifica los valores por defecto al omitir configuración y umbrales.
 
-    Args:
-        mocker: Utilidad para sustituir la obtención de la configuración global.
+    ## Args:
+        patch_global_settings: Helper para reemplazar la configuración global.
         settings: Configuración global simulada.
-        train_data: Conjunto de entrenamiento de prueba.
     """
-    get_settings = mocker.patch.object(
-        redundant_column_filter.config,
-        "get_settings",
-        return_value=settings,
-    )
+    train_data = tests.builders.unit.redundant_column_filter.build_train_data()
+    patch_global_settings(settings)
 
     result = redundant_column_filter.RedundantColumnFilter.generate(
         train=train_data,
         test=train_data,
     )
 
-    get_settings.assert_called_once_with()
     assert result.settings is settings
     assert result.imbalanced_binary_threshold == pytest.approx(0.1)
     assert result.correlation_threshold == pytest.approx(0.8)
@@ -272,7 +189,7 @@ def test_should_use_global_settings_and_default_thresholds_when_not_provided(
 
 def test_should_exclude_custom_id_and_target_from_correlation_analysis() -> None:
     """Verifica que se respeten los nombres personalizados de id y target."""
-    custom_settings = config.Settings(
+    custom_settings = tests.support.settings.build_settings_for_tests(
         dataset=config.DatasetColumns(id="customer", target="outcome")
     )
     train = pl.DataFrame(
@@ -313,7 +230,7 @@ def test_should_detect_imbalanced_binary_columns_at_threshold_boundaries(
 ) -> None:
     """Verifica la proporción mínima exigida para una columna binaria.
 
-    Args:
+    ## Args:
         settings: Configuración con el nombre de la columna target.
         zeros: Cantidad de ceros en la columna evaluada.
         ones: Cantidad de unos en la columna evaluada.
@@ -477,16 +394,15 @@ def test_should_apply_correlation_threshold_strictly(
 )
 def test_should_raise_value_error_during_generate_for_invalid_imbalanced_threshold(
     settings: config.Settings,
-    binary_frame: pl.DataFrame,
     threshold: float,
 ) -> None:
     """Verifica que la generación falle con un umbral binario inválido.
 
-    Args:
+    ## Args:
         settings: Configuración global del proyecto.
-        binary_frame: DataFrame con target y feature binarios.
         threshold: Umbral inválido para columnas binarias.
     """
+    binary_frame = tests.builders.unit.redundant_column_filter.build_binary_frame()
     with pytest.raises(ValueError, match="Invalid threshold"):
         redundant_column_filter.RedundantColumnFilter.generate(
             train=binary_frame,
@@ -510,7 +426,7 @@ def test_should_raise_value_error_during_generate_for_invalid_correlation_thresh
 ) -> None:
     """Verifica que la generación falle con un umbral de correlación inválido.
 
-    Args:
+    ## Args:
         settings: Configuración global del proyecto.
         threshold: Umbral de correlación inválido.
     """
@@ -533,13 +449,20 @@ def test_should_raise_value_error_during_generate_for_invalid_correlation_thresh
 
 
 def test_should_count_values_of_imbalanced_binary_columns(
-    redundant_filter: redundant_column_filter.RedundantColumnFilter,
+    settings: config.Settings,
 ) -> None:
     """Verifica la distribución de frecuencias de las columnas descartadas.
 
-    Args:
-        redundant_filter: Filtro con una columna binaria desbalanceada.
+    ## Args:
+        settings: Configuración global del proyecto.
     """
+    train_data = tests.builders.unit.redundant_column_filter.build_train_data()
+    test_data = tests.builders.unit.redundant_column_filter.build_test_data()
+    redundant_filter = (
+        tests.builders.unit.redundant_column_filter.build_redundant_filter(
+            train_data, test_data, settings
+        )
+    )
     expected = pl.DataFrame(
         {
             "Column name": ["imbalanced", "imbalanced"],
@@ -558,7 +481,7 @@ def test_should_filter_and_group_correlations_for_each_requested_column(
 ) -> None:
     """Verifica el filtrado, orden y agrupación de las correlaciones públicas.
 
-    Args:
+    ## Args:
         settings: Configuración global del proyecto.
     """
     data = _correlated_frame()
@@ -595,7 +518,7 @@ def test_should_apply_correlation_threshold_strictly_in_correlations_for_each(
 ) -> None:
     """Verifica la comparación estricta al filtrar correlaciones públicas.
 
-    Args:
+    ## Args:
         settings: Configuración global del proyecto.
     """
     data = _correlated_frame()

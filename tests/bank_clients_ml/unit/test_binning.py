@@ -4,30 +4,9 @@ import polars as pl
 import polars.testing
 import pytest
 
+import tests.builders.unit.binning
+import tests.support.settings
 from bank_clients_ml import binning, config
-
-
-@pytest.fixture
-def bivariate_table() -> pl.DataFrame:
-    """Construye una tabla bivariada canónica para los tests.
-
-    La tabla permite comprobar el cálculo ponderado del porcentaje de target:
-    el grupo de bines [1, 2] representa el 25 %, el grupo [4, 5] el 42.5 %
-    y el bin residual [3] el 10 %.
-
-    ## Returns:
-        Tabla con las columnas de bin, mínimo, máximo, clientes y target.
-    """
-    return pl.DataFrame(
-        {
-            "Bin": [1, 2, 3, 4, 5],
-            "Min": [0.0, 11.0, 21.0, 31.0, 41.0],
-            "Max": [10.0, 20.0, 30.0, 40.0, 50.0],
-            "Clients": [100, 300, 200, 300, 100],
-            "Target": [10, 90, 20, 120, 50],
-            "Target_pct": [10.0, 30.0, 10.0, 40.0, 50.0],
-        }
-    )
 
 
 def encode(
@@ -112,14 +91,13 @@ def test_should_raise_value_error_when_start_is_greater_than_end() -> None:
 
 def test_should_raise_value_error_when_no_bin_intervals_are_defined(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
 ) -> None:
     """Verifica que se rechace una feature sin intervalos de bines.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature")
 
     with pytest.raises(ValueError, match="must not be empty"):
@@ -135,7 +113,6 @@ def test_should_raise_value_error_when_no_bin_intervals_are_defined(
 )
 def test_should_raise_value_error_when_interval_exceeds_available_bins(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
     start: int,
     end: int | None,
 ) -> None:
@@ -143,10 +120,10 @@ def test_should_raise_value_error_when_interval_exceeds_available_bins(
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
         start: Número de bin inicial.
         end: Número de bin final, o None para un único bin.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature").merge_bins(start, end)
 
     with pytest.raises(ValueError, match="invalid interval"):
@@ -155,14 +132,13 @@ def test_should_raise_value_error_when_interval_exceeds_available_bins(
 
 def test_should_allow_interval_ending_at_last_bin(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
 ) -> None:
     """Verifica que se permita un intervalo que termina en el último bin.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature").merge_bins(5, 5)
 
     result = encode(binner, bivariate_table, [45.0], settings)
@@ -181,16 +157,15 @@ def test_should_allow_interval_ending_at_last_bin(
 )
 def test_should_raise_value_error_when_intervals_overlap(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
     intervals: list[tuple[int, int]],
 ) -> None:
     """Verifica que se rechacen intervalos con bines solapados.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
         intervals: Pares de extremos de los intervalos a validar.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature")
     for start, end in intervals:
         binner.merge_bins(start, end)
@@ -201,14 +176,13 @@ def test_should_raise_value_error_when_intervals_overlap(
 
 def test_should_allow_adjacent_intervals(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
 ) -> None:
     """Verifica que dos intervalos contiguos no se consideren solapados.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature").merge_bins(1, 2).merge_bins(3, 4)
 
     result = encode(binner, bivariate_table, [5.0, 25.0, 45.0], settings)
@@ -219,14 +193,13 @@ def test_should_allow_adjacent_intervals(
 
 def test_should_use_weighted_target_pct_when_bins_have_different_sizes(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
 ) -> None:
     """Verifica que el porcentaje de target se pondere por clientes.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature").merge_bins(1, 2)
 
     result = encode(binner, bivariate_table, [5.0, 15.0], settings)
@@ -237,14 +210,13 @@ def test_should_use_weighted_target_pct_when_bins_have_different_sizes(
 
 def test_should_encode_values_on_both_interval_boundaries(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
 ) -> None:
     """Verifica que se incluyan ambos extremos del intervalo.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature").merge_bins(1, 2)
 
     result = encode(binner, bivariate_table, [0.0, 20.0], settings)
@@ -281,16 +253,15 @@ def test_should_include_gap_values_when_bins_are_not_contiguous(
 @pytest.mark.parametrize("value", [-1.0, 51.0])
 def test_should_use_residual_target_pct_when_value_is_outside_all_intervals(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
     value: float,
 ) -> None:
     """Verifica que los valores externos reciban el porcentaje residual.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
         value: Valor externo a todos los intervalos.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature").merge_bins(1, 2).merge_bins(4, 5)
 
     result = encode(binner, bivariate_table, [value], settings)
@@ -301,14 +272,13 @@ def test_should_use_residual_target_pct_when_value_is_outside_all_intervals(
 
 def test_should_use_residual_target_pct_when_bin_is_not_in_any_interval(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
 ) -> None:
     """Verifica que un bin no cubierto reciba el porcentaje residual.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature").merge_bins(1, 2).merge_bins(4, 5)
 
     result = encode(binner, bivariate_table, [25.0], settings)
@@ -319,14 +289,13 @@ def test_should_use_residual_target_pct_when_bin_is_not_in_any_interval(
 
 def test_should_use_residual_target_pct_when_value_is_null(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
 ) -> None:
     """Verifica que los valores nulos reciban el porcentaje residual.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature").merge_bins(1, 2).merge_bins(4, 5)
 
     result = encode(binner, bivariate_table, [None], settings)
@@ -337,14 +306,13 @@ def test_should_use_residual_target_pct_when_value_is_null(
 
 def test_should_use_zero_as_residual_when_all_bins_are_covered(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
 ) -> None:
     """Verifica que el residual sea cero cuando se cubren todos los bines.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     binner = binning.Binner("feature", "Feature").merge_bins(1, 5)
 
     result = encode(binner, bivariate_table, [25.0, -1.0, 51.0, None], settings)
@@ -406,16 +374,15 @@ def test_should_ignore_interval_with_null_bounds_and_use_residual_target_pct(
 @pytest.mark.parametrize("column", ["Min", "Max"])
 def test_should_raise_type_error_when_bound_column_is_not_numeric(
     settings: config.Settings,
-    bivariate_table: pl.DataFrame,
     column: str,
 ) -> None:
     """Verifica que se rechacen columnas de límites no numéricas.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
-        bivariate_table: Tabla bivariada de referencia.
         column: Nombre de la columna que se reemplaza por valores de texto.
     """
+    bivariate_table = tests.builders.unit.binning.build_bivariate_table()
     table = bivariate_table.with_columns(
         pl.Series(column, ["not-a-number"] * bivariate_table.height)
     )
@@ -427,7 +394,7 @@ def test_should_raise_type_error_when_bound_column_is_not_numeric(
 
 def test_should_use_column_names_from_settings() -> None:
     """Verifica que se respeten los nombres de columna de la configuración."""
-    settings = config.Settings(
+    settings = tests.support.settings.build_settings_for_tests(
         dataset=config.DatasetColumns(target="target"),
         analysis=config.AnalysisColumns(
             bin="bucket",

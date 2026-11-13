@@ -8,6 +8,7 @@ import polars.testing
 import pytest
 import pytest_mock
 
+import tests.builders.unit.training
 from bank_clients_ml import binning, config, training
 
 
@@ -133,31 +134,6 @@ def _search_param_distributions(
     return search_call.kwargs["param_distributions"]
 
 
-@pytest.fixture
-def importances() -> pl.DataFrame:
-    """Devuelve una tabla de importancias ordenada de mayor a menor.
-
-    ## Returns:
-        Tabla con tres variables y sus importancias.
-    """
-    return pl.DataFrame(
-        {
-            "Feature": ["Feature_A", "Feature_B", "Feature_C"],
-            "Importance": [0.5, 0.3, 0.2],
-        }
-    )
-
-
-@pytest.fixture
-def minimal_train() -> pl.DataFrame:
-    """Devuelve un entrenamiento mínimo con target binario.
-
-    ## Returns:
-        DataFrame con una fila por clase del target.
-    """
-    return pl.DataFrame({"Target": [0, 1]})
-
-
 def test_should_build_expected_hyperparameter_distributions(
     mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
@@ -221,16 +197,15 @@ def test_should_adapt_min_child_samples_to_fold_size(
 )
 def test_should_raise_value_error_when_n_iter_is_less_than_one(
     settings: config.Settings,
-    minimal_train: pl.DataFrame,
     n_iter: int,
 ) -> None:
     """Verifica que no se entrene con una cantidad inválida de combinaciones.
 
     ## Args:
         settings: Configuración global del proyecto.
-        minimal_train: Entrenamiento mínimo con target binario.
         n_iter: Cantidad inválida de combinaciones a evaluar.
     """
+    minimal_train = tests.builders.unit.training.build_minimal_train()
     with pytest.raises(ValueError, match="Invalid n_iter"):
         training.LGBMTrainer.fit_and_build(minimal_train, [], settings, n_iter=n_iter)
 
@@ -241,16 +216,15 @@ def test_should_raise_value_error_when_n_iter_is_less_than_one(
 )
 def test_should_raise_value_error_when_splits_cross_validation_is_less_than_two(
     settings: config.Settings,
-    minimal_train: pl.DataFrame,
     splits_cross_validation: int,
 ) -> None:
     """Verifica que no se entrene con una validación cruzada insuficiente.
 
     ## Args:
         settings: Configuración global del proyecto.
-        minimal_train: Entrenamiento mínimo con target binario.
         splits_cross_validation: Cantidad inválida de particiones.
     """
+    minimal_train = tests.builders.unit.training.build_minimal_train()
     with pytest.raises(ValueError, match="Invalid splits_cross_validation"):
         training.LGBMTrainer.fit_and_build(
             minimal_train,
@@ -263,15 +237,14 @@ def test_should_raise_value_error_when_splits_cross_validation_is_less_than_two(
 def test_should_return_cv_results_sorted_by_rank_without_params(
     mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
-    importances: pl.DataFrame,
 ) -> None:
     """Verifica el orden y las columnas de los resultados de validación cruzada.
 
     ## Args:
         mocker: Utilidad para sustituir el buscador de scikit-learn.
         settings: Configuración global del proyecto.
-        importances: Tabla de importancias ordenada de mayor a menor.
     """
+    importances = tests.builders.unit.training.build_importances()
     cv_results = {
         "rank_test_score": [2, 1],
         "mean_test_score": [0.7, 0.9],
@@ -314,7 +287,6 @@ def test_should_return_cv_results_sorted_by_rank_without_params(
 def test_should_return_top_ranked_features_in_importance_order(
     mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
-    importances: pl.DataFrame,
     top_n: int,
     expected: tuple[str, ...],
 ) -> None:
@@ -323,10 +295,10 @@ def test_should_return_top_ranked_features_in_importance_order(
     ## Args:
         mocker: Utilidad para sustituir el buscador de scikit-learn.
         settings: Configuración global del proyecto.
-        importances: Tabla de importancias ordenada de mayor a menor.
         top_n: Cantidad de variables solicitada.
         expected: Variables esperadas en orden de importancia.
     """
+    importances = tests.builders.unit.training.build_importances()
     trainer = _build_trainer(mocker, settings, importances)
 
     result = trainer.get_top_ranked_features(top_n)
@@ -341,7 +313,6 @@ def test_should_return_top_ranked_features_in_importance_order(
 def test_should_raise_value_error_when_top_n_is_out_of_range(
     mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
-    importances: pl.DataFrame,
     top_n: int,
 ) -> None:
     """Verifica que se rechace una cantidad inválida de variables a seleccionar.
@@ -349,9 +320,9 @@ def test_should_raise_value_error_when_top_n_is_out_of_range(
     ## Args:
         mocker: Utilidad para sustituir el buscador de scikit-learn.
         settings: Configuración global del proyecto.
-        importances: Tabla de importancias ordenada de mayor a menor.
         top_n: Cantidad de variables fuera del rango permitido.
     """
+    importances = tests.builders.unit.training.build_importances()
     trainer = _build_trainer(mocker, settings, importances)
 
     with pytest.raises(ValueError, match=f"Invalid top_n {top_n}"):
@@ -361,15 +332,14 @@ def test_should_raise_value_error_when_top_n_is_out_of_range(
 def test_should_plot_importances_without_name_mapping(
     mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
-    importances: pl.DataFrame,
 ) -> None:
     """Verifica el gráfico de importancias cuando no se indica un mapeo.
 
     ## Args:
         mocker: Utilidad para sustituir la generación del gráfico.
         settings: Configuración global del proyecto.
-        importances: Tabla de importancias ordenada de mayor a menor.
     """
+    importances = tests.builders.unit.training.build_importances()
     plot_mock = mocker.patch.object(training.visualization, "plot_top_features")
     trainer = _build_trainer(
         mocker,
@@ -390,15 +360,14 @@ def test_should_plot_importances_without_name_mapping(
 def test_should_plot_importances_with_descriptive_feature_names(
     mocker: pytest_mock.MockerFixture,
     settings: config.Settings,
-    importances: pl.DataFrame,
 ) -> None:
     """Verifica que el mapeo de nombres se aplique solo al gráfico.
 
     ## Args:
         mocker: Utilidad para sustituir la generación del gráfico.
         settings: Configuración global del proyecto.
-        importances: Tabla de importancias ordenada de mayor a menor.
     """
+    importances = tests.builders.unit.training.build_importances()
     plot_mock = mocker.patch.object(training.visualization, "plot_top_features")
     trainer = _build_trainer(
         mocker,

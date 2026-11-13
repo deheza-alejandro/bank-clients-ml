@@ -7,165 +7,23 @@ import polars as pl
 import polars.testing
 import pytest
 
+import tests.builders.unit.feature_engineering
+import tests.support.monthly_columns
 from bank_clients_ml import column_groups, config, feature_engineering
-
-MONTHLY_COLUMNS: tuple[str, ...] = (
-    "Operations_Bank",
-    "Operations_Terminal",
-    "Operations_HomeBanking",
-    "Operations_Mobile",
-    "Operations_Ivr",
-    "Operations_Telemarketer",
-    "Operations_ATM",
-    "CreditCard_Payment_Aut_Debit",
-    "CreditCard_Payment_External",
-    "CreditCard_Payment_Cash",
-    "CreditCard_Payment_Web",
-    "CreditCard_Payment_ATM",
-    "CreditCard_Payment_TAS",
-    "SavingAccount_Balance_LastDate",
-    "SavingAccount_Balance_FirstDate",
-    "SavingAccount_Days_with_Debits",
-    "SavingAccount_Days_with_use",
-    "SavingAccount_Days_with_Credits",
-    "SavingAccount_Credits_Transactions",
-    "SavingAccount_Debits_Transactions",
-    "SavingAccount_Transactions_Transactions",
-    "SavingAccount_Salary_Payment_Transactions",
-    "SavingAccount_Transfer_In_Transactions",
-    "SavingAccount_ATM_Extraction_Transactions",
-    "SavingAccount_Service_Payment_Transactions",
-    "SavingAccount_CreditCard_Payment_Transactions",
-    "SavingAccount_Transfer_Out_Transactions",
-    "SavingAccount_DebitCard_Spend_Transactions",
-    "SavingAccount_Credits_Amounts",
-    "SavingAccount_Debits_Amounts",
-    "SavingAccount_Total_Amount",
-    "SavingAccount_Salary_Payment_Amount",
-    "SavingAccount_Transfer_In_Amount",
-    "SavingAccount_ATM_Extraction_Amount",
-    "SavingAccount_Service_Payment_Amount",
-    "SavingAccount_CreditCard_Payment_Amount",
-    "SavingAccount_Transfer_Out_Amount",
-    "SavingAccount_DebitCard_Spend_Amount",
-    "CreditCard_Balance_ARG",
-    "CreditCard_Balance_DOLLAR",
-    "CreditCard_Total_Limit",
-    "CreditCard_Total_Spending",
-    "CreditCard_Spending_1_Installment",
-    "CreditCard_Spending_Installments",
-    "CreditCard_Spending_CrossBoarder",
-    "CreditCard_Spending_Aut_Debits",
-    "CreditCard_Revolving",
-    "CreditCard_Premium",
-    "CreditCard_Active",
-    "Loan_Active",
-    "Mortgage_Active",
-    "SavingAccount_Active_ARG_Salary",
-    "SavingAccount_Active_ARG",
-    "SavingAccount_Active_DOLLAR",
-    "DebitCard_Active",
-    "Investment_Active",
-    "Insurance_Life",
-    "Insurance_Home",
-    "Insurance_Accidents",
-    "Insurance_Mobile",
-    "Insurance_ATM",
-    "Insurance_Unemployment",
-)
-
-EXTRA_TRANSFORMATION_COLUMNS: tuple[str, ...] = (
-    "SavingAccount_Days_with_use_count_nonzero",
-    "SavingAccount_Days_with_use_min",
-    "SavingAccount_CreditCard_Payment_Transactions_count_nonzero",
-    "Operations_total_count_nonzero",
-    "CreditCard_Payment_total_max",
-    "CreditCard_Payment_in_person_max",
-    "Operations_in_person_pct_max",
-    "CreditCard_Payment_Aut_Debit_max",
-    "CreditCard_Payment_TAS_max",
-    "SavingAccount_CreditCard_Payment_Amount_max",
-)
-
-
-def _build_float_frame(
-    columns: tuple[str, ...], rows: list[dict[str, float]]
-) -> pl.DataFrame:
-    """Construye un DataFrame de Float64 completando con cero las columnas ausentes.
-
-    ## Args:
-        columns: Nombres y orden de las columnas del DataFrame.
-        rows: Filas con los valores de las columnas que se desean definir.
-
-    ## Returns:
-        DataFrame con todas las columnas indicadas y tipo Float64.
-    """
-    return pl.DataFrame(
-        [{column: row.get(column, 0.0) for column in columns} for row in rows],
-        schema={column: pl.Float64 for column in columns},
-    )
-
-
-@pytest.fixture
-def identity_features() -> pl.DataFrame:
-    """Devuelve identity features con dos categorías y targets binarios.
-
-    ## Returns:
-        DataFrame con seis clientes, target balanceado y dos columnas categóricas.
-    """
-    return pl.DataFrame(
-        {
-            "client_id": [1, 2, 3, 4, 5, 6],
-            "Target": [1.0, 0.0, 1.0, 0.0, 0.0, 1.0],
-            "Region": ["A", "A", "A", "B", "B", "B"],
-            "CreditCard_Product": ["X", "Y", "X", "Y", "X", "Y"],
-        },
-        schema={
-            "client_id": pl.Int64,
-            "Target": pl.Float64,
-            "Region": pl.String,
-            "CreditCard_Product": pl.String,
-        },
-    )
-
-
-@pytest.fixture
-def training_data() -> pl.DataFrame:
-    """Devuelve historia mensual con las columnas categóricas a eliminar.
-
-    ## Returns:
-        DataFrame con identificador, mes, dos categóricas y un saldo.
-    """
-    return pl.DataFrame(
-        {
-            "client_id": [1, 2, 3],
-            "Month": [date(2024, 1, 1), date(2024, 2, 1), date(2024, 3, 1)],
-            "Region": ["A", "B", "A"],
-            "CreditCard_Product": ["X", "Y", "X"],
-            "Balance": [100.0, 200.0, 300.0],
-        },
-        schema={
-            "client_id": pl.Int64,
-            "Month": pl.Date,
-            "Region": pl.String,
-            "CreditCard_Product": pl.String,
-            "Balance": pl.Float64,
-        },
-    )
 
 
 def test_should_encode_multiple_categorical_columns_and_drop_them_from_training_data(
-    identity_features: pl.DataFrame,
-    training_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica la codificación de varias categóricas y su eliminación del histórico.
 
     ## Args:
-        identity_features: Identity features con target y categorías.
-        training_data: Historia mensual con las columnas categóricas.
         settings: Configuración con el nombre del target.
     """
+    identity_features = (
+        tests.builders.unit.feature_engineering.build_identity_features()
+    )
+    training_data = tests.builders.unit.feature_engineering.build_training_data()
     result, result_training = feature_engineering.target_encode_columns(
         identity_features=identity_features,
         training_data=training_data,
@@ -302,17 +160,17 @@ def test_should_use_default_categorical_columns_from_column_groups(
 
 
 def test_should_use_custom_target_column_in_target_encoding(
-    identity_features: pl.DataFrame,
-    training_data: pl.DataFrame,
     custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que se use el target configurado para calcular los porcentajes.
 
     ## Args:
-        identity_features: Identity features con target y categorías.
-        training_data: Historia mensual con las columnas categóricas.
         custom_dataset_settings: Configuración con el target alternativo.
     """
+    identity_features = (
+        tests.builders.unit.feature_engineering.build_identity_features()
+    )
+    training_data = tests.builders.unit.feature_engineering.build_training_data()
     renamed_identity = identity_features.rename({"Target": "churn"})
 
     result, _ = feature_engineering.target_encode_columns(
@@ -327,19 +185,19 @@ def test_should_use_custom_target_column_in_target_encoding(
 
 
 def test_should_use_global_settings_when_settings_is_not_provided_for_target_encoding(
-    identity_features: pl.DataFrame,
-    training_data: pl.DataFrame,
     custom_dataset_settings: config.Settings,
     patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que se use la configuración global si no se recibe una explícita.
 
     ## Args:
-        identity_features: Identity features con target y categorías.
-        training_data: Historia mensual con las columnas categóricas.
         custom_dataset_settings: Configuración con el target alternativo.
         patch_global_settings: Helper para reemplazar la configuración global.
     """
+    identity_features = (
+        tests.builders.unit.feature_engineering.build_identity_features()
+    )
+    training_data = tests.builders.unit.feature_engineering.build_training_data()
     patch_global_settings(custom_dataset_settings)
     renamed_identity = identity_features.rename({"Target": "churn"})
 
@@ -486,8 +344,8 @@ def test_should_generate_expected_monthly_transformations() -> None:
     Usa una fila con valores distintos por canal, tipo y producto para detectar
     columnas mal calculadas, fórmulas intercambiadas y columnas faltantes o extra.
     """
-    data = _build_float_frame(
-        MONTHLY_COLUMNS,
+    data = tests.builders.unit.feature_engineering.build_float_frame(
+        tests.support.monthly_columns.MONTHLY_TRANSFORMATION_INPUT_COLS,
         [
             {
                 "Operations_Bank": 1.0,
@@ -654,13 +512,18 @@ def test_should_generate_expected_monthly_transformations() -> None:
     )
 
     assert result.height == 1
-    assert result.columns == [*MONTHLY_COLUMNS, *expected.columns]
+    assert result.columns == [
+        *tests.support.monthly_columns.MONTHLY_TRANSFORMATION_INPUT_COLS,
+        *expected.columns,
+    ]
     polars.testing.assert_frame_equal(result.select(expected.columns), expected)
 
 
 def test_should_protect_divisions_by_zero_in_monthly_transformations() -> None:
     """Verifica que las divisiones por cero no produzcan valores infinitos."""
-    data = _build_float_frame(MONTHLY_COLUMNS, [{}])
+    data = tests.builders.unit.feature_engineering.build_float_frame(
+        tests.support.monthly_columns.MONTHLY_TRANSFORMATION_INPUT_COLS, [{}]
+    )
 
     result = feature_engineering.with_transformations(data)
 
@@ -673,45 +536,15 @@ def test_should_protect_divisions_by_zero_in_monthly_transformations() -> None:
         assert result[column].is_finite().all()
 
 
-@pytest.fixture
-def monthly_history() -> pl.DataFrame:
-    """Devuelve historia mensual desordenada para dos clientes.
-
-    ## Returns:
-        DataFrame con tres meses del cliente 1 y dos del cliente 2.
-    """
-    return pl.DataFrame(
-        {
-            "client_id": [1, 1, 1, 2, 2],
-            "Month": [
-                date(2024, 3, 1),
-                date(2024, 1, 1),
-                date(2024, 2, 1),
-                date(2024, 1, 1),
-                date(2024, 2, 1),
-            ],
-            "Operations_total": [30.0, 10.0, 20.0, 5.0, 5.0],
-            "Balance": [3000.0, 1000.0, 2000.0, 1000.0, 1000.0],
-        },
-        schema={
-            "client_id": pl.Int64,
-            "Month": pl.Date,
-            "Operations_total": pl.Float64,
-            "Balance": pl.Float64,
-        },
-    )
-
-
 def test_should_aggregate_monthly_history_and_compute_quantity_statistics(
-    monthly_history: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica la agregación a una fila por cliente y sus estadísticas mensuales.
 
     ## Args:
-        monthly_history: Historia mensual de dos clientes.
         settings: Configuración con los nombres de las columnas.
     """
+    monthly_history = tests.builders.unit.feature_engineering.build_monthly_history()
     result = feature_engineering.aggregate_monthly_to_client(
         monthly_history,
         columns_with_monetary_values=["Balance"],
@@ -783,15 +616,14 @@ def test_should_round_monetary_values_before_counting_unique_values(
 
 
 def test_should_use_custom_identifier_and_month_columns_in_aggregation(
-    monthly_history: pl.DataFrame,
     custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que se usen el identificador y el mes configurados.
 
     ## Args:
-        monthly_history: Historia mensual de dos clientes.
         custom_dataset_settings: Configuración con identificador y mes alternativos.
     """
+    monthly_history = tests.builders.unit.feature_engineering.build_monthly_history()
     data = monthly_history.rename(
         {"client_id": "customer_id", "Month": "snapshot_month"}
     )
@@ -809,17 +641,16 @@ def test_should_use_custom_identifier_and_month_columns_in_aggregation(
 
 
 def test_should_use_global_settings_when_settings_is_not_provided_for_aggregation(
-    monthly_history: pl.DataFrame,
     custom_dataset_settings: config.Settings,
     patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que se use la configuración global si no se recibe una explícita.
 
     ## Args:
-        monthly_history: Historia mensual de dos clientes.
         custom_dataset_settings: Configuración con identificador y mes alternativos.
         patch_global_settings: Helper para reemplazar la configuración global.
     """
+    monthly_history = tests.builders.unit.feature_engineering.build_monthly_history()
     patch_global_settings(custom_dataset_settings)
     data = monthly_history.rename(
         {"client_id": "customer_id", "Month": "snapshot_month"}
@@ -862,43 +693,21 @@ def test_should_use_default_column_groups_when_columns_are_not_provided(
     assert result["SavingAccount_Balance_Average_min"].item() == 0.0
 
 
-@pytest.fixture
-def extra_transformations_data() -> pl.DataFrame:
-    """Devuelve dos filas con indicadores de uso en cero y diez.
-
-    ## Returns:
-        DataFrame con todas las columnas requeridas por las transformaciones extra.
-    """
-    return _build_float_frame(
-        EXTRA_TRANSFORMATION_COLUMNS,
-        [
-            {column: 0.0 for column in EXTRA_TRANSFORMATION_COLUMNS},
-            {column: 10.0 for column in EXTRA_TRANSFORMATION_COLUMNS},
-        ],
+def test_should_sum_normalized_use_indicators_and_binary_flags() -> None:
+    """Verifica la suma de indicadores normalizados y banderas binarias."""
+    extra_transformations_data = (
+        tests.builders.unit.feature_engineering.build_extra_transformations_data()
     )
-
-
-def test_should_sum_normalized_use_indicators_and_binary_flags(
-    extra_transformations_data: pl.DataFrame,
-) -> None:
-    """Verifica la suma de indicadores normalizados y banderas binarias.
-
-    ## Args:
-        extra_transformations_data: Datos con indicadores de uso en cero y diez.
-    """
     result = feature_engineering.with_extra_transformations(extra_transformations_data)
 
     assert result["SUM_OF_USES"].to_list() == pytest.approx([0.0, 9.0])
 
 
-def test_should_weight_normalized_amount_by_operation_and_transaction_counts(
-    extra_transformations_data: pl.DataFrame,
-) -> None:
-    """Verifica el monto normalizado ponderado por operaciones y transacciones.
-
-    ## Args:
-        extra_transformations_data: Datos con indicadores de uso en cero y diez.
-    """
+def test_should_weight_normalized_amount_by_operation_and_transaction_counts() -> None:
+    """Verifica el monto normalizado ponderado por operaciones y transacciones."""
+    extra_transformations_data = (
+        tests.builders.unit.feature_engineering.build_extra_transformations_data()
+    )
     result = feature_engineering.with_extra_transformations(extra_transformations_data)
 
     assert result["Amount_operations"].to_list() == pytest.approx([0.0, 10.0])
@@ -908,9 +717,10 @@ def test_should_weight_normalized_amount_by_operation_and_transaction_counts(
 
 def test_should_return_zero_for_constant_columns_in_sum_of_uses() -> None:
     """Verifica que las columnas constantes no aporten a la suma de usos."""
-    data = _build_float_frame(
-        EXTRA_TRANSFORMATION_COLUMNS,
-        [{column: 5.0 for column in EXTRA_TRANSFORMATION_COLUMNS}] * 2,
+    extra_columns = tests.builders.unit.feature_engineering.EXTRA_TRANSFORMATION_COLUMNS
+    data = tests.builders.unit.feature_engineering.build_float_frame(
+        extra_columns,
+        [{column: 5.0 for column in extra_columns}] * 2,
     ).with_columns(
         pl.lit(0.0).alias("Operations_in_person_pct_max"),
         pl.lit(0.0).alias("CreditCard_Payment_Aut_Debit_max"),

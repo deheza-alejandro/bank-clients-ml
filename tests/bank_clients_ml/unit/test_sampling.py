@@ -8,129 +8,8 @@ import polars as pl
 import polars.testing
 import pytest
 
+import tests.builders.unit.sampling
 from bank_clients_ml import config, sampling
-
-
-@pytest.fixture
-def clean_data() -> pl.DataFrame:
-    """Devuelve datos limpios con clientes válidos e inválidos para las ventanas.
-
-    ## Returns:
-        DataFrame con diez meses de historia y siete clientes que cubren los
-        criterios de cantidad de meses y banderas de producto.
-    """
-    months = [date(2024, month, 1) for month in range(1, 11)]
-    clients = {
-        1: ((date(2024, 2, 1),), "No", "No", 1),
-        2: ((date(2024, 3, 1),), "No", "No", 0),
-        3: ((date(2024, 4, 1),), "Yes", "No", 1),
-        4: ((date(2024, 5, 1),), "No", "Yes", 0),
-        5: ((), "No", "No", 1),
-        6: ((date(2024, 7, 1),), "No", "No", 0),
-        7: ((date(2024, 2, 1), date(2024, 3, 1)), "No", "No", 1),
-    }
-    rows = []
-    for client_id, client in clients.items():
-        missing_months, package_active, co_branding, target = client
-        for month in months:
-            if month in missing_months:
-                continue
-            is_last_training_month = month == date(2024, 7, 1)
-            rows.append(
-                {
-                    "client_id": client_id,
-                    "Month": month,
-                    "Package_Active": (
-                        package_active if is_last_training_month else "No"
-                    ),
-                    "CreditCard_CoBranding": (
-                        co_branding if is_last_training_month else "No"
-                    ),
-                    "Target": target,
-                    "Balance": float(client_id * 100 + month.month),
-                }
-            )
-    return pl.DataFrame(
-        rows,
-        schema={
-            "client_id": pl.Int64,
-            "Month": pl.Date,
-            "Package_Active": pl.String,
-            "CreditCard_CoBranding": pl.String,
-            "Target": pl.Int64,
-            "Balance": pl.Float64,
-        },
-    )
-
-
-@pytest.fixture
-def renamed_clean_data(clean_data: pl.DataFrame) -> pl.DataFrame:
-    """Renombra las columnas de los datos limpios según la configuración alternativa.
-
-    ## Args:
-        clean_data: Datos limpios con los nombres por defecto.
-
-    ## Returns:
-        DataFrame con los nombres de columna alternativos.
-    """
-    return clean_data.rename(
-        {
-            "client_id": "customer_id",
-            "Target": "churn",
-            "Month": "snapshot_month",
-            "Package_Active": "has_package",
-            "CreditCard_CoBranding": "has_branding",
-        }
-    )
-
-
-@pytest.fixture
-def abt_data() -> pl.DataFrame:
-    """Devuelve una tabla balanceada para probar la partición estratificada.
-
-    ## Returns:
-        DataFrame con veinte clientes por cada clase del target.
-    """
-    return pl.DataFrame(
-        {
-            "client_id": list(range(1, 41)),
-            "Target": [0] * 20 + [1] * 20,
-            "Feature": [float(value) for value in range(40)],
-        }
-    )
-
-
-@pytest.fixture
-def imbalanced_train() -> pl.DataFrame:
-    """Devuelve un conjunto desbalanceado con mayoría de target cero.
-
-    ## Returns:
-        DataFrame con treinta clientes de target cero y cinco de target uno.
-    """
-    return pl.DataFrame(
-        {
-            "client_id": list(range(1, 36)),
-            "Target": [0] * 30 + [1] * 5,
-            "Feature": [float(value) for value in range(35)],
-        }
-    )
-
-
-@pytest.fixture
-def time_window_split(
-    clean_data: pl.DataFrame,
-    settings: config.Settings,
-) -> sampling.TimeWindowSplit:
-    """Devuelve la partición temporal por defecto de los datos limpios.
-
-    ## Args:
-        clean_data: Datos limpios con diez meses de historia.
-        settings: Configuración con los nombres de las columnas.
-
-    ## Returns:
-        Ventana temporal con dos meses de predicción y un mes de separación.
-    """
-    return sampling.TimeWindowSplit.generate(clean_data, 2, settings=settings)
 
 
 @pytest.mark.parametrize(
@@ -157,7 +36,6 @@ def time_window_split(
     ],
 )
 def test_should_build_training_and_prediction_windows_with_one_lead_month(
-    clean_data: pl.DataFrame,
     settings: config.Settings,
     prediction_window_size: int,
     expected_training: tuple[date, ...],
@@ -166,12 +44,12 @@ def test_should_build_training_and_prediction_windows_with_one_lead_month(
     """Verifica que las ventanas respeten el tamaño y dejen un mes de separación.
 
     ## Args:
-        clean_data: Datos limpios con diez meses de historia.
         settings: Configuración con el nombre de la columna de meses.
         prediction_window_size: Cantidad de meses reservados para predicción.
         expected_training: Meses esperados en la ventana de entrenamiento.
         expected_prediction: Meses esperados en la ventana de predicción.
     """
+    clean_data = tests.builders.unit.sampling.build_clean_data()
     split = sampling.TimeWindowSplit.generate(
         clean_data, prediction_window_size, settings=settings
     )
@@ -183,13 +61,16 @@ def test_should_build_training_and_prediction_windows_with_one_lead_month(
 
 
 def test_should_build_expected_windows_and_expose_boundary_months(
-    time_window_split: sampling.TimeWindowSplit,
+    settings: config.Settings,
 ) -> None:
     """Verifica las ventanas generadas y los meses límite expuestos.
 
     ## Args:
-        time_window_split: Ventana temporal construida con los datos limpios.
+        settings: Configuración con los nombres de las columnas.
     """
+    time_window_split = tests.builders.unit.sampling.build_time_window_split(
+        tests.builders.unit.sampling.build_clean_data(), settings
+    )
     split = time_window_split
 
     expected_training = tuple(date(2024, month, 1) for month in range(1, 8))
@@ -202,17 +83,16 @@ def test_should_build_expected_windows_and_expose_boundary_months(
 
 @pytest.mark.parametrize("prediction_window_size", [0, -1])
 def test_should_raise_value_error_if_prediction_window_size_is_less_than_one(
-    clean_data: pl.DataFrame,
     settings: config.Settings,
     prediction_window_size: int,
 ) -> None:
     """Verifica que se rechacen tamaños de ventana de predicción inválidos.
 
     ## Args:
-        clean_data: Datos limpios con diez meses de historia.
         settings: Configuración con los nombres de las columnas.
         prediction_window_size: Tamaño de ventana inválido.
     """
+    clean_data = tests.builders.unit.sampling.build_clean_data()
     with pytest.raises(ValueError, match="Invalid prediction_window_size"):
         sampling.TimeWindowSplit.generate(
             clean_data, prediction_window_size, settings=settings
@@ -220,7 +100,7 @@ def test_should_raise_value_error_if_prediction_window_size_is_less_than_one(
 
 
 def test_should_select_only_clients_with_nine_months_and_valid_flags(
-    time_window_split: sampling.TimeWindowSplit,
+    settings: config.Settings,
 ) -> None:
     """Verifica que el universo solo incluya clientes elegibles.
 
@@ -228,8 +108,11 @@ def test_should_select_only_clients_with_nine_months_and_valid_flags(
     co-branding en el último mes de entrenamiento.
 
     ## Args:
-        time_window_split: Ventana temporal construida con los datos limpios.
+        settings: Configuración con los nombres de las columnas.
     """
+    time_window_split = tests.builders.unit.sampling.build_time_window_split(
+        tests.builders.unit.sampling.build_clean_data(), settings
+    )
     split = time_window_split
 
     assert split.universe_and_target.columns == ["client_id", "Target"]
@@ -242,13 +125,16 @@ def test_should_select_only_clients_with_nine_months_and_valid_flags(
 
 
 def test_should_keep_full_history_for_selected_clients(
-    time_window_split: sampling.TimeWindowSplit,
+    settings: config.Settings,
 ) -> None:
     """Verifica que los datos del universo conserven toda la historia.
 
     ## Args:
-        time_window_split: Ventana temporal construida con los datos limpios.
+        settings: Configuración con los nombres de las columnas.
     """
+    time_window_split = tests.builders.unit.sampling.build_time_window_split(
+        tests.builders.unit.sampling.build_clean_data(), settings
+    )
     split = time_window_split
 
     expected_months = {date(2024, month, 1) for month in range(1, 11)}
@@ -258,13 +144,16 @@ def test_should_keep_full_history_for_selected_clients(
 
 
 def test_should_keep_a_single_target_column_in_universe_data(
-    time_window_split: sampling.TimeWindowSplit,
+    settings: config.Settings,
 ) -> None:
     """Verifica que el target no se duplique al unir el universo con la historia.
 
     ## Args:
-        time_window_split: Ventana temporal construida con los datos limpios.
+        settings: Configuración con los nombres de las columnas.
     """
+    time_window_split = tests.builders.unit.sampling.build_time_window_split(
+        tests.builders.unit.sampling.build_clean_data(), settings
+    )
     split = time_window_split
 
     assert split.universe_and_target_data.columns.count("Target") == 1
@@ -279,13 +168,16 @@ def test_should_keep_a_single_target_column_in_universe_data(
 
 
 def test_should_restrict_training_data_to_training_months(
-    time_window_split: sampling.TimeWindowSplit,
+    settings: config.Settings,
 ) -> None:
     """Verifica que el entrenamiento use solo la ventana de entrenamiento.
 
     ## Args:
-        time_window_split: Ventana temporal construida con los datos limpios.
+        settings: Configuración con los nombres de las columnas.
     """
+    time_window_split = tests.builders.unit.sampling.build_time_window_split(
+        tests.builders.unit.sampling.build_clean_data(), settings
+    )
     split = time_window_split
 
     assert split.training_data.height == 12
@@ -295,13 +187,16 @@ def test_should_restrict_training_data_to_training_months(
 
 
 def test_should_restrict_prediction_data_to_prediction_months(
-    time_window_split: sampling.TimeWindowSplit,
+    settings: config.Settings,
 ) -> None:
     """Verifica que la predicción use solo la ventana de predicción.
 
     ## Args:
-        time_window_split: Ventana temporal construida con los datos limpios.
+        settings: Configuración con los nombres de las columnas.
     """
+    time_window_split = tests.builders.unit.sampling.build_time_window_split(
+        tests.builders.unit.sampling.build_clean_data(), settings
+    )
     split = time_window_split
 
     assert split.prediction_data.height == 4
@@ -311,13 +206,16 @@ def test_should_restrict_prediction_data_to_prediction_months(
 
 
 def test_should_exclude_lead_month_from_training_and_prediction_data(
-    time_window_split: sampling.TimeWindowSplit,
+    settings: config.Settings,
 ) -> None:
     """Verifica que el mes intermedio no aparezca en ninguno de los conjuntos.
 
     ## Args:
-        time_window_split: Ventana temporal construida con los datos limpios.
+        settings: Configuración con los nombres de las columnas.
     """
+    time_window_split = tests.builders.unit.sampling.build_time_window_split(
+        tests.builders.unit.sampling.build_clean_data(), settings
+    )
     split = time_window_split
 
     lead_month = date(2024, 8, 1)
@@ -328,7 +226,6 @@ def test_should_exclude_lead_month_from_training_and_prediction_data(
 
 
 def test_should_take_universe_target_from_prediction_months(
-    clean_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que el target del universo provenga de la ventana de predicción.
@@ -337,9 +234,9 @@ def test_should_take_universe_target_from_prediction_months(
     el universo debe conservar el valor 1.
 
     ## Args:
-        clean_data: Datos limpios con clientes válidos e inválidos.
         settings: Configuración con los nombres de las columnas.
     """
+    clean_data = tests.builders.unit.sampling.build_clean_data()
     data = clean_data.with_columns(
         pl.when((pl.col("client_id") == 1) & (pl.col("Month") < date(2024, 8, 1)))
         .then(pl.lit(0, dtype=pl.Int64))
@@ -368,7 +265,6 @@ def test_should_take_universe_target_from_prediction_months(
 
 
 def test_should_return_one_row_per_client_when_target_varies_across_prediction_months(
-    clean_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que el universo agregue el target variable de predicción.
@@ -378,9 +274,9 @@ def test_should_return_one_row_per_client_when_target_varies_across_prediction_m
     única fila con target 0.
 
     ## Args:
-        clean_data: Datos limpios con clientes válidos e inválidos.
         settings: Configuración con los nombres de las columnas.
     """
+    clean_data = tests.builders.unit.sampling.build_clean_data()
     data = clean_data.with_columns(
         pl.when((pl.col("client_id") == 1) & (pl.col("Month") == date(2024, 10, 1)))
         .then(pl.lit(0, dtype=pl.Int64))
@@ -430,15 +326,14 @@ def test_should_ignore_product_flags_outside_last_training_month(
 
 
 def test_should_return_empty_datasets_when_no_client_has_exactly_nine_months(
-    clean_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica el resultado vacío cuando ningún cliente cumple el historial.
 
     ## Args:
-        clean_data: Datos limpios con clientes válidos e inválidos.
         settings: Configuración con los nombres de las columnas.
     """
+    clean_data = tests.builders.unit.sampling.build_clean_data()
     data = clean_data.filter(pl.col("client_id") == 5)
 
     split = sampling.TimeWindowSplit.generate(data, 2, settings=settings)
@@ -451,15 +346,16 @@ def test_should_return_empty_datasets_when_no_client_has_exactly_nine_months(
 
 
 def test_should_use_custom_column_names_in_time_window_split(
-    renamed_clean_data: pl.DataFrame,
     custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que se respeten los nombres de columna configurados.
 
     ## Args:
-        renamed_clean_data: Datos con nombres de columna alternativos.
         custom_dataset_settings: Configuración con los nombres alternativos.
     """
+    renamed_clean_data = tests.builders.unit.sampling.build_renamed_clean_data(
+        tests.builders.unit.sampling.build_clean_data()
+    )
     split = sampling.TimeWindowSplit.generate(
         renamed_clean_data, 2, settings=custom_dataset_settings
     )
@@ -471,17 +367,18 @@ def test_should_use_custom_column_names_in_time_window_split(
 
 
 def test_should_use_global_settings_when_settings_is_not_provided_for_time_windows(
-    renamed_clean_data: pl.DataFrame,
     custom_dataset_settings: config.Settings,
     patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que se use la configuración global si no se recibe una explícita.
 
     ## Args:
-        renamed_clean_data: Datos con nombres de columna alternativos.
         custom_dataset_settings: Configuración con los nombres alternativos.
         patch_global_settings: Helper para reemplazar la configuración global.
     """
+    renamed_clean_data = tests.builders.unit.sampling.build_renamed_clean_data(
+        tests.builders.unit.sampling.build_clean_data()
+    )
     patch_global_settings(custom_dataset_settings)
 
     split = sampling.TimeWindowSplit.generate(renamed_clean_data, 2)
@@ -492,31 +389,29 @@ def test_should_use_global_settings_when_settings_is_not_provided_for_time_windo
 
 @pytest.mark.parametrize("test_ratio", [0.0, 1.0, -0.1, 1.1])
 def test_should_raise_value_error_if_test_ratio_is_out_of_open_interval(
-    abt_data: pl.DataFrame,
     settings: config.Settings,
     test_ratio: float,
 ) -> None:
     """Verifica que se rechacen proporciones de prueba inválidas.
 
     ## Args:
-        abt_data: Tabla balanceada para la partición.
         settings: Configuración con el nombre del target.
         test_ratio: Proporción de prueba inválida.
     """
+    abt_data = tests.builders.unit.sampling.build_abt_data()
     with pytest.raises(ValueError, match="Invalid test_ratio"):
         sampling.stratified_train_test_split(abt_data, test_ratio, settings=settings)
 
 
 def test_should_split_each_class_according_to_test_ratio(
-    abt_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que la partición conserve la proporción de cada clase.
 
     ## Args:
-        abt_data: Tabla balanceada para la partición.
         settings: Configuración con el nombre del target.
     """
+    abt_data = tests.builders.unit.sampling.build_abt_data()
     train, test = sampling.stratified_train_test_split(abt_data, 0.3, settings=settings)
 
     assert train.height == 28
@@ -529,15 +424,14 @@ def test_should_split_each_class_according_to_test_ratio(
 
 
 def test_should_preserve_all_rows_after_split(
-    abt_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que la partición no pierda ni duplique filas.
 
     ## Args:
-        abt_data: Tabla balanceada para la partición.
         settings: Configuración con el nombre del target.
     """
+    abt_data = tests.builders.unit.sampling.build_abt_data()
     train, test = sampling.stratified_train_test_split(abt_data, 0.3, settings=settings)
 
     combined = pl.concat([train, test]).sort("client_id")
@@ -546,15 +440,14 @@ def test_should_preserve_all_rows_after_split(
 
 
 def test_should_return_only_original_columns_after_split(
-    abt_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que se eliminen las columnas internas de la partición.
 
     ## Args:
-        abt_data: Tabla balanceada para la partición.
         settings: Configuración con el nombre del target.
     """
+    abt_data = tests.builders.unit.sampling.build_abt_data()
     train, test = sampling.stratified_train_test_split(abt_data, 0.3, settings=settings)
 
     assert train.columns == abt_data.columns
@@ -562,15 +455,14 @@ def test_should_return_only_original_columns_after_split(
 
 
 def test_should_produce_same_split_for_same_random_state(
-    abt_data: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que la partición sea reproducible con la misma semilla.
 
     ## Args:
-        abt_data: Tabla balanceada para la partición.
         settings: Configuración con el nombre del target y la semilla.
     """
+    abt_data = tests.builders.unit.sampling.build_abt_data()
     first_train, first_test = sampling.stratified_train_test_split(
         abt_data, 0.3, settings=settings
     )
@@ -605,15 +497,14 @@ def test_should_split_single_class_data_according_to_test_ratio(
 
 
 def test_should_use_custom_target_column_in_split(
-    abt_data: pl.DataFrame,
     custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que se use el nombre de target configurado.
 
     ## Args:
-        abt_data: Tabla balanceada para la partición.
         custom_dataset_settings: Configuración con el target alternativo.
     """
+    abt_data = tests.builders.unit.sampling.build_abt_data()
     data = abt_data.rename({"client_id": "customer_id", "Target": "churn"})
 
     train, test = sampling.stratified_train_test_split(
@@ -627,17 +518,16 @@ def test_should_use_custom_target_column_in_split(
 
 
 def test_should_use_global_settings_when_settings_is_not_provided_for_split(
-    abt_data: pl.DataFrame,
     custom_dataset_settings: config.Settings,
     patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que la partición use la configuración global si no se indica.
 
     ## Args:
-        abt_data: Tabla balanceada para la partición.
         custom_dataset_settings: Configuración con el target alternativo.
         patch_global_settings: Helper para reemplazar la configuración global.
     """
+    abt_data = tests.builders.unit.sampling.build_abt_data()
     data = abt_data.rename({"client_id": "customer_id", "Target": "churn"})
     patch_global_settings(custom_dataset_settings)
 
@@ -649,17 +539,16 @@ def test_should_use_global_settings_when_settings_is_not_provided_for_split(
 
 @pytest.mark.parametrize("target_proportion", [0.0, 1.0, -0.1, 1.1])
 def test_should_raise_value_error_if_target_proportion_is_out_of_open_interval(
-    imbalanced_train: pl.DataFrame,
     settings: config.Settings,
     target_proportion: float,
 ) -> None:
     """Verifica que se rechacen proporciones objetivo inválidas.
 
     ## Args:
-        imbalanced_train: Conjunto desbalanceado de entrenamiento.
         settings: Configuración con los nombres de columnas.
         target_proportion: Proporción objetivo inválida.
     """
+    imbalanced_train = tests.builders.unit.sampling.build_imbalanced_train()
     with pytest.raises(ValueError, match="Invalid target_proportion"):
         sampling.oversample_with_unique_ids(
             imbalanced_train, target_proportion, settings=settings
@@ -667,15 +556,14 @@ def test_should_raise_value_error_if_target_proportion_is_out_of_open_interval(
 
 
 def test_should_keep_all_majority_rows_unchanged(
-    imbalanced_train: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que la clase mayoritaria se conserve intacta.
 
     ## Args:
-        imbalanced_train: Conjunto desbalanceado de entrenamiento.
         settings: Configuración con los nombres de columnas.
     """
+    imbalanced_train = tests.builders.unit.sampling.build_imbalanced_train()
     balanced = sampling.oversample_with_unique_ids(
         imbalanced_train, 0.5, settings=settings
     )
@@ -694,7 +582,6 @@ def test_should_keep_all_majority_rows_unchanged(
     ],
 )
 def test_should_oversample_minority_class_to_requested_proportion(
-    imbalanced_train: pl.DataFrame,
     settings: config.Settings,
     target_proportion: float,
     expected_minority_count: int,
@@ -702,11 +589,11 @@ def test_should_oversample_minority_class_to_requested_proportion(
     """Verifica que la clase minoritaria alcance la proporción solicitada.
 
     ## Args:
-        imbalanced_train: Conjunto desbalanceado de entrenamiento.
         settings: Configuración con los nombres de columnas.
         target_proportion: Proporción objetivo de la clase minoritaria.
         expected_minority_count: Cantidad esperada de filas minoritarias.
     """
+    imbalanced_train = tests.builders.unit.sampling.build_imbalanced_train()
     balanced = sampling.oversample_with_unique_ids(
         imbalanced_train, target_proportion, settings=settings
     )
@@ -720,15 +607,14 @@ def test_should_oversample_minority_class_to_requested_proportion(
 
 
 def test_should_assign_unique_ids_to_all_rows(
-    imbalanced_train: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que el oversampling asigne identificadores únicos.
 
     ## Args:
-        imbalanced_train: Conjunto desbalanceado de entrenamiento.
         settings: Configuración con los nombres de columnas.
     """
+    imbalanced_train = tests.builders.unit.sampling.build_imbalanced_train()
     balanced = sampling.oversample_with_unique_ids(
         imbalanced_train, 0.5, settings=settings
     )
@@ -740,15 +626,14 @@ def test_should_assign_unique_ids_to_all_rows(
 
 
 def test_should_preserve_columns_and_schema_after_oversampling(
-    imbalanced_train: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que el oversampling conserve columnas y tipos de datos.
 
     ## Args:
-        imbalanced_train: Conjunto desbalanceado de entrenamiento.
         settings: Configuración con los nombres de columnas.
     """
+    imbalanced_train = tests.builders.unit.sampling.build_imbalanced_train()
     balanced = sampling.oversample_with_unique_ids(
         imbalanced_train, 0.5, settings=settings
     )
@@ -758,15 +643,14 @@ def test_should_preserve_columns_and_schema_after_oversampling(
 
 
 def test_should_produce_same_balanced_data_for_same_random_state(
-    imbalanced_train: pl.DataFrame,
     settings: config.Settings,
 ) -> None:
     """Verifica que el oversampling sea reproducible con la misma semilla.
 
     ## Args:
-        imbalanced_train: Conjunto desbalanceado de entrenamiento.
         settings: Configuración con los nombres de columnas y la semilla.
     """
+    imbalanced_train = tests.builders.unit.sampling.build_imbalanced_train()
     first_balanced = sampling.oversample_with_unique_ids(
         imbalanced_train, 0.5, settings=settings
     )
@@ -778,15 +662,14 @@ def test_should_produce_same_balanced_data_for_same_random_state(
 
 
 def test_should_use_custom_column_names_in_oversampling(
-    imbalanced_train: pl.DataFrame,
     custom_dataset_settings: config.Settings,
 ) -> None:
     """Verifica que se usen los nombres de identificador y target configurados.
 
     ## Args:
-        imbalanced_train: Conjunto desbalanceado de entrenamiento.
         custom_dataset_settings: Configuración con los nombres alternativos.
     """
+    imbalanced_train = tests.builders.unit.sampling.build_imbalanced_train()
     data = imbalanced_train.rename({"client_id": "customer_id", "Target": "churn"})
 
     balanced = sampling.oversample_with_unique_ids(
@@ -799,17 +682,16 @@ def test_should_use_custom_column_names_in_oversampling(
 
 
 def test_should_use_global_settings_when_settings_is_not_provided_for_oversampling(
-    imbalanced_train: pl.DataFrame,
     custom_dataset_settings: config.Settings,
     patch_global_settings: Callable[[config.Settings], None],
 ) -> None:
     """Verifica que el oversampling use la configuración global si no se indica.
 
     ## Args:
-        imbalanced_train: Conjunto desbalanceado de entrenamiento.
         custom_dataset_settings: Configuración con los nombres alternativos.
         patch_global_settings: Helper para reemplazar la configuración global.
     """
+    imbalanced_train = tests.builders.unit.sampling.build_imbalanced_train()
     data = imbalanced_train.rename({"client_id": "customer_id", "Target": "churn"})
     patch_global_settings(custom_dataset_settings)
 
