@@ -23,13 +23,19 @@ pre-commit:
             fail_text: "Run `uv run lefthook run auto-fix-staged-markdown` to fix all issues in the staged files that can be automatically resolved"
           - run: uv run --no-sync --no-progress rumdl fmt --check --silent {staged_files}
             fail_text: "Run `uv run lefthook run auto-fix-staged-markdown` to fix all issues in the staged files that can be automatically resolved"
+    - name: docker-compose-config-check
+      glob: "compose.y*ml"
+      run: docker compose config --quiet
+    - name: validate-lefthook
+      glob: "{.,}lefthook*.{yml,yaml}"
+      run: uv run --no-sync --no-progress lefthook validate
 
 commit-msg:
   piped: true
   commands:
     01-format-commit-body:
       priority: 1
-      run: uv run .lefthook/commit-msg/format_commit_body.py {1}
+      run: uv run scripts/commit_msg/format_commit_body.py {1}
     02-commitizen-check:
       priority: 2
       run: uv run cz check --allow-abort --commit-msg-file {1} --message-length-limit 50
@@ -41,12 +47,17 @@ pre-push:
       priority: 1
       glob: "*.py"
       run: uv run --locked pyrefly check
-    test:
+    python-versions-check:
       priority: 2
-      run: uv run --locked pytest --cov=bank_clients_ml --cov-fail-under=80
+      glob: "{Dockerfile,.python-version,pyproject.toml,scripts/check_python_versions.py}"
+      run: uv run --locked scripts/check_python_versions.py
     cspell:
       priority: 3
       run: bun cspell --no-must-find-files {all_files}
+    test:
+      priority: 4
+      run: uv run --locked pytest --cov=bank_clients_ml --cov-fail-under=80
+    
 
 post-checkout:
   commands:
