@@ -56,6 +56,7 @@ pre-push:
       run: bun cspell --no-must-find-files {all_files}
     test:
       priority: 4
+      glob: "*.py"
       run: uv run --locked pytest --cov=bank_clients_ml --cov-fail-under=80
     
 
