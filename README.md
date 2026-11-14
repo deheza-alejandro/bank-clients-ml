@@ -617,5 +617,5 @@ para revisar el proyecto.
 ## Licencia
 
 Este proyecto está bajo los términos de la **Licencia MIT**. Consulta el archivo
-[LICENSE] para más detalles. Las dependencias externas utilizadas
+[LICENSE](LICENSE) para más detalles. Las dependencias externas utilizadas
 mantienen sus respectivas licencias, tales como Apache 2.0.
