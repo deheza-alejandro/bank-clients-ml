@@ -1,6 +1,4 @@
-// cSpell Settings
 {
-    // Version of the setting file.  Always 0.2
     "version": "0.2",
     "language": "en,es",
     "import": [
@@ -34,7 +32,7 @@
         "**/*.yaml",
         "**/*.toml"
     ],
-    // words - list of words to be always considered correct
+    // list of words to be always considered correct
     "words": [
         "addopts",
         "allclose",
@@ -137,7 +135,7 @@
         "ylim",
         "yticklabels"
     ],
-    // flagWords - list of words to be always considered incorrect
+    // list of words to be always considered incorrect
     // This is useful for offensive words and common spelling errors.
     // For example "hte" should be "the"
     "flagWords": [
