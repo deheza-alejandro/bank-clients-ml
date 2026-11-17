@@ -1,8 +1,8 @@
 """Cuaderno principal del proyecto bank_clients_ml.
 
-Documenta el flujo completo de modelado en Marimo, desde el análisis
-exploratorio y la limpieza inicial hasta la ingeniería de variables,
-la selección de features y la evaluación final del modelo.
+Documenta el flujo de modelado en Marimo, desde el análisis exploratorio hasta
+la evaluación final. Remitir las decisiones de arquitectura a la sección
+"Decisiones de arquitectura (ADRs)" del README.
 """
 
 import marimo
@@ -98,7 +98,7 @@ def _():
     mo.md(r"""
     ## 1.1 Initial Data Cleaning
 
-    Se elimina el registro identificado en la celda anterior, el cual solo tenia valores nulos. También se modifican los tipos de las variables de fechas y la variable id para evitar que se propaguen errores de tipo.
+    Se elimina el registro detectado en la celda anterior, que solo contenía valores nulos. También se modifican los tipos de las variables de fechas y la variable id para evitar errores de tipo en las etapas posteriores.
     """)
     return
 
@@ -124,15 +124,18 @@ def _():
     mo.md(r"""
     # 2. Universe and Target Definition
 
-    Se obtienen los meses de las ventanas de entrenamiento y predicción, con una lead window de 1 mes.
+    Se definen los meses de las ventanas de entrenamiento y predicción, con un mes de separación (lead window).
 
     ## 2.1 Universe Filtering Criteria
 
-    Se conservan en el universo los clientes que:
-    - Tienen 9 meses de historia
-    - No tienen en el último mes de la ventana de entrenamiento:
-        - `Package_Active`, para que el modelo aprenda a predecir la primera compra y no la renovación o el uso ya existente.
-        - `CreditCard_CoBranding`, por regla de negocio ya se sabe que estos clientes no suelen comprar, esta inversamente correlacionada con el target.
+    Se conservan en el universo los clientes que cumplan estas condiciones:
+    - Tienen 9 meses de historia.
+    - No tienen, en el último mes de la ventana de entrenamiento:
+        - `Package_Active`, para que el modelo aprenda a predecir la primera
+          compra y no la renovación o el uso ya existente.
+        - `CreditCard_CoBranding`, por regla de negocio ya se sabe que estos
+          clientes no suelen comprar y la variable está inversamente
+          correlacionada con el target.
     """)
     return
 
@@ -177,6 +180,8 @@ def _():
     mo.md(r"""
     # 3. Feature Engineering
     ## 3.1 Missing Value Imputation
+
+    Se analiza la ausencia de valores.
     """)
     return
 
@@ -222,7 +227,11 @@ def _(time_window_split):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    Ante la imposibilidad de recalcular el promedio diario exacto con los datos disponibles, se aproxima como el promedio entre el saldo inicial y final (`SavingAccount_Balance_FirstDate` y `SavingAccount_Balance_LastDate`). Son solo cuatro registros, por lo que el impacto en el modelo es mínimo.
+    Ante la imposibilidad de recalcular el promedio diario exacto con los datos
+    disponibles, se aproxima como el promedio entre el saldo inicial y final
+    (`SavingAccount_Balance_FirstDate` y `SavingAccount_Balance_LastDate`). En
+    esta ejecución de ejemplo son solo cuatro registros, por lo que el impacto en
+    el modelo es mínimo (ver ADR-004 en el README).
     """)
     return
 
@@ -254,7 +263,11 @@ def _():
     mo.md(r"""
     ### 3.1.2 Region
 
-    `Region` es una variable estable del cliente, por lo que un nulo en entrenamiento suele deberse a un vacío de carga y no a un cambio real. Por lo tanto, se obtienen estos datos desde la ventana de predicción, y para los nulos restantes, se los llena con la Region mas común (`BUENOS AIRES`).
+    `Region` es una variable estable del cliente, por lo que un nulo en
+    entrenamiento suele deberse a un vacío de carga y no a un cambio real. Por
+    lo tanto, se obtienen estos datos desde la ventana de predicción y se completan los
+    nulos restantes con la región más común (`BUENOS AIRES`) (ver ADR-004 en el
+    README).
     """)
     return
 
@@ -304,11 +317,12 @@ def _():
     mo.md(r"""
     ### 3.1.3 CreditCard Product
 
-    Se traen los tipos de tarjeta de crédito (`CreditCard_Product`) de la ventana de predicción.
+    Se incorpora el tipo de tarjeta (`CreditCard_Product`) desde la ventana de
+    predicción: se toma el valor del primer mes y, si es nulo o no existe, el del
+    segundo, incluso si también es nulo.
 
-    Hay algunos clientes que tienen un tipo de tarjeta en el primer mes de predicción y otro tipo de tarjeta en el segundo mes de predicción. Por lo tanto se obtiene el valor del primer mes de la ventana de predicción y, si este es null o no existe, se toma el valor del segundo mes como fallback, incluso si también es null.
-
-    Luego para llenar los nulos restantes, se usa el tipo de tarjeta (`CreditCard_Product`) mas común cuando el cliente no tiene tarjeta activa (`CreditCard_Active`) en la ventana de predicción pero si tiene tarjeta activa en la ventana de entrenamiento. En los demás casos se llenan los nulls con "0" (cuando no tiene tarjeta activa en la ventana de predicción ni en la ventana de entrenamiento o cuando no tiene tarjeta activa en la ventana de entrenamiento, por mas que lo tenga en la ventana de predicción).
+    Para los nulos restantes, si `CreditCard_Active` es "No" en la ventana de predicción, y es "Yes"  en la ventana de entrenamiento, se asigna el tipo de tarjeta mas común `J55660104XX012`; en los demás casos se asigna "0" (cuando no tiene tarjeta activa en la ventana de predicción ni en la ventana de entrenamiento o cuando no tiene tarjeta activa en la ventana de entrenamiento, por mas que lo tenga en la ventana de predicción), que
+    representa la ausencia de tarjeta (ver ADR-004 en el README).
     """)
     return
 
@@ -370,7 +384,9 @@ def _():
     mo.md(r"""
     ## 3.2 Identity Features
 
-    Las Identity Features se toman del último mes de la ventana de entrenamiento. Ademas, las variables con valores `Yes/No` y `M/F` se pasan a valores binarios (0 ó 1).
+    Se toman las identity features del último mes de la ventana de entrenamiento y
+    se convierten las variables con valores `Yes/No` y `M/F` a valores binarios
+    (0 ó 1).
     """)
     return
 
@@ -408,7 +424,8 @@ def _():
     mo.md(r"""
     ## 3.3 Categorical Features Encoding
 
-    Las variables `Client_Age_grp`, `Region` y `CreditCard_Product` se codifican con su porcentaje respecto al target, para capturar su relación con el target sin expandir la dimensionalidad con técnicas como "one hot encoding".
+    Se codifican `Client_Age_grp`, `Region` y `CreditCard_Product` con su porcentaje
+    respecto al target (ver ADR-003 en el README).
     """)
     return
 
@@ -441,7 +458,9 @@ def _():
     mo.md(r"""
     ## 3.4 Date-Derived Features
 
-    Las fechas absolutas se reemplazan por "diferencia entre primer y último producto" y por "recencia" desde el último producto, que expresan lo mismo en una escala relativa y estable en el tiempo.
+    Se reemplazan las fechas absolutas por la diferencia entre el primer y el último
+    producto y por la recencia hasta el mes siguiente al último mes de
+    entrenamiento (ver ADR-005 en el README).
     """)
     return
 
@@ -466,7 +485,8 @@ def _(identity_features_1, time_window_split):
 def _():
     mo.md(r"""
     ## 3.5 Feature Transformation
-    Se analizan:
+
+    Se analizan antes de aplicar las transformaciones:
     - Valores con ceros
     - Valores monetarios de CreditCard
     - Valores mínimos
@@ -497,7 +517,7 @@ def _(training_data_5):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    Se aplican transformaciones.
+    Se aplican las transformaciones.
     """)
     return
 
@@ -544,7 +564,8 @@ def _():
     mo.md(r"""
     ## 3.6 Aggregate Features
 
-    La historia de nueve meses debe convertirse en una tabla con un registro por cliente para el entrenamiento supervisado (ABT). En esta parte se realizan las agregaciones para poder conseguir esto.
+    Se consolida la historia de nueve meses en una tabla con un registro por
+    cliente para el entrenamiento supervisado.
     """)
     return
 
@@ -562,7 +583,8 @@ def _():
     mo.md(r"""
     # 4. Analytical Base Table (ABT) and Train-Test Split
 
-    Luego de obtener la ABT se aplican algunas transformaciones adicionales. Luego se realiza una partición estratificada para obtener el set de "train" y el set de "test", preservando la tasa del target en ambos conjuntos.
+    Se aplican transformaciones adicionales sobre la ABT y se realiza una partición
+    estratificada para preservar la tasa del target en el set de entrenamiento y el set de prueba.
     """)
     return
 
@@ -593,7 +615,9 @@ def _():
     # 5. Feature Selection
     ## 5.1 Dimensionality Reduction
 
-    Se eliminan columnas constantes, columnas binarias desbalanceadas y columnas altamente correlacionadas, para disminuir el costo computacional antes del ranking con LightGBM.
+    Se eliminan columnas constantes, columnas binarias desbalanceadas y columnas
+    altamente correlacionadas antes del ranking con LightGBM (ver ADR-006 en el
+    README).
     """)
     return
 
@@ -626,9 +650,11 @@ def _(test, train):
 def _():
     mo.md(r"""
     ## 5.2 Group-Wise Importance Ranking
-    Para poder ordenar las variables según su importancia, se agrupan las variables por fuente de negocio y se entrena un modelo LightGBM por grupo, además de un modelo con todas las variables. Esta comparación permite identificar qué origen aporta más. Luego se entrena un modelo con las mejores variables de todos los grupos.
 
-    No se estandariza el dataframe porque los algoritmos basados en arboles como lightGBM no lo necesitan.
+    Se entrena un modelo LightGBM por grupo de variables y luego un modelo con
+    las mejores variables de cada grupo (ver ADR-007 en el README).
+
+    No se aplica estandarización (ver ADR-009 en el README).
     """)
     return
 
@@ -690,7 +716,7 @@ def _():
     mo.md(r"""
     ## 5.3 Bivariate Analysis
 
-    Se realiza análisis bivariado sobre las variables mas relevantes.
+    Se analiza la relación entre las variables más relevantes y el target.
     """)
     return
 
@@ -724,7 +750,8 @@ def _():
     mo.md(r"""
     ## 5.4 Review of Correlated Features
 
-    Se revisan las variables descartadas por correlación para poder intercambiar las variables mas importantes por variables mas fáciles de interpretar, si es que existen.
+    Se revisan las variables descartadas por correlación para intercambiar las variables más
+    importantes por otras más fáciles de interpretar, cuando existan.
     """)
     return
 
@@ -761,15 +788,19 @@ def _():
     mo.md(r"""
     ## 5.5 Feature Binning
 
-    Las features mas relevantes se agrupan en bines y se codifican con su porcentaje respecto al target. A las features categóricas solo se las agrupa en bines (ya se codificaron anteriormente).
+    Se agrupan las features relevantes en bines y se codifican con su porcentaje
+    respecto al target (ver ADR-008 en el README).
 
+    Features más relevantes:
 
-    Features mas relevantes:
-
-    - `Client_Age_grp`: se fusionan los tramos de 50 a 69 años; el resto se fusionan en un solo bin ("Entre 18 y 49 años" + "Mayor a 70 años").
-    - `Operations_total_mean` y `Operations_total_median`.
-    - `CreditCard_Product`: se conservan los bines de los tipos de tarjeta 202 y 104 por separado; los demás tipos de tarjetas, que tienen bajo porcentaje de target o son tipos de tarjetas poco representativas, se consolidan en un solo bin (sin tarjeta de crédito + 102 + 123 + 124 + 702 + 1002).
-    - `CreditCard_Active` (no hace falta codificar ni agrupar en bines).
+    - `Client_Age_grp`: se fusionan los tramos de 50 a 69 años; el resto se fusionan en
+      un solo bin ("Entre 18 y 49 años" + "Mayor a 70 años").
+    - `Operations_total_mean`.
+    - `CreditCard_Product`: se conservan los bines de los tipos 202 y 104 por
+      separado; se consolidan los demás tipos, con bajo porcentaje de target o poca
+      representatividad, en un solo bin (sin tarjeta de crédito + 102 + 123 +
+      124 + 702 + 1002).
+    - `CreditCard_Active` (no requiere codificación ni binning).
     - `Quantity_Active_Products_min`.
     """)
     return
@@ -825,7 +856,10 @@ def _():
     mo.md(r"""
     # 6. Final Training and Performance Evaluation
 
-    El modelo final se entrena solo con las 4 features finales seleccionadas luego del binning y se evalúa el mejor modelo con los mejores hiperparámetros encontrados. No se aplica balanceo sobre los datos porque la proporción del target, cercana al 30%, ya es suficiente.
+    Se entrena el modelo final con las cuatro features seleccionadas después del
+    binning y se evalúa el mejor modelo con los hiperparámetros encontrados
+    (ver ADR-010 en el README). No se aplica balanceo (ver ADR-009 en el
+    README).
     """)
     return
 
@@ -860,15 +894,21 @@ def _():
     {mo.image(src=settings.paths.images / "plot_evaluation_metrics" / "lightgbm.svg")}
     {mo.image(src=settings.paths.images / "plot_evaluation_metrics" / "deciles.svg")}
 
+    Los valores siguientes corresponden a la ejecución del notebook con
+    `data/example_data.parquet`; son ilustrativos y pueden variar si cambia el
+    conjunto de datos.
+
     ### Training
 
-    - Ordenamiento correcto en todos los deciles, con una distribución relativamente homogénea.
-    - Lift del 1er decil de 2,4 y KS de 47,03 en el 5to decil.
+    - Ordenamiento correcto en todos los deciles, con una distribución
+      relativamente homogénea.
+    - Lift del primer decil de 2,4 y KS de 47,03 en el quinto decil.
 
     ### Testing
 
-    - Ordenamiento correcto en todos los deciles, con una distribución relativamente homogénea.
-    - Lift del 1er decil de 2,39 y KS de 48,19 en el 4to decil.
+    - Ordenamiento correcto en todos los deciles, con una distribución
+      relativamente homogénea.
+    - Lift del primer decil de 2,39 y KS de 48,19 en el cuarto decil.
 
     ### Stability Gap
 
