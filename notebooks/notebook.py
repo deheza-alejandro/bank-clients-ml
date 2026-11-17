@@ -1,8 +1,8 @@
 """Cuaderno principal del proyecto bank_clients_ml.
 
 Documenta el flujo de modelado en Marimo, desde el análisis exploratorio hasta
-la evaluación final. Remitir las decisiones de arquitectura a la sección
-"Decisiones de arquitectura (ADRs)" del README.
+la evaluación final. Las decisiones de arquitectura están documentadas en
+`docs/architecture/decisions.md`.
 """
 
 import marimo
@@ -231,7 +231,7 @@ def _():
     disponibles, se aproxima como el promedio entre el saldo inicial y final
     (`SavingAccount_Balance_FirstDate` y `SavingAccount_Balance_LastDate`). En
     esta ejecución de ejemplo son solo cuatro registros, por lo que el impacto en
-    el modelo es mínimo (ver ADR-004 en el README).
+    el modelo es mínimo (ver ADR-004 en `docs/architecture/decisions.md`).
     """)
     return
 
@@ -266,8 +266,8 @@ def _():
     `Region` es una variable estable del cliente, por lo que un nulo en
     entrenamiento suele deberse a un vacío de carga y no a un cambio real. Por
     lo tanto, se obtienen estos datos desde la ventana de predicción y se completan los
-    nulos restantes con la región más común (`BUENOS AIRES`) (ver ADR-004 en el
-    README).
+    nulos restantes con la región más común (`BUENOS AIRES`) (ver ADR-004 en
+    `docs/architecture/decisions.md`).
     """)
     return
 
@@ -322,7 +322,7 @@ def _():
     segundo, incluso si también es nulo.
 
     Para los nulos restantes, si `CreditCard_Active` es "No" en la ventana de predicción, y es "Yes"  en la ventana de entrenamiento, se asigna el tipo de tarjeta mas común `J55660104XX012`; en los demás casos se asigna "0" (cuando no tiene tarjeta activa en la ventana de predicción ni en la ventana de entrenamiento o cuando no tiene tarjeta activa en la ventana de entrenamiento, por mas que lo tenga en la ventana de predicción), que
-    representa la ausencia de tarjeta (ver ADR-004 en el README).
+    representa la ausencia de tarjeta (ver ADR-004 en `docs/architecture/decisions.md`).
     """)
     return
 
@@ -425,7 +425,7 @@ def _():
     ## 3.3 Categorical Features Encoding
 
     Se codifican `Client_Age_grp`, `Region` y `CreditCard_Product` con su porcentaje
-    respecto al target (ver ADR-003 en el README).
+    respecto al target (ver ADR-003 en `docs/architecture/decisions.md`).
     """)
     return
 
@@ -460,7 +460,7 @@ def _():
 
     Se reemplazan las fechas absolutas por la diferencia entre el primer y el último
     producto y por la recencia hasta el mes siguiente al último mes de
-    entrenamiento (ver ADR-005 en el README).
+    entrenamiento (ver ADR-005 en `docs/architecture/decisions.md`).
     """)
     return
 
@@ -616,8 +616,8 @@ def _():
     ## 5.1 Dimensionality Reduction
 
     Se eliminan columnas constantes, columnas binarias desbalanceadas y columnas
-    altamente correlacionadas antes del ranking con LightGBM (ver ADR-006 en el
-    README).
+    altamente correlacionadas antes del ranking con LightGBM (ver ADR-006 en
+    `docs/architecture/decisions.md`).
     """)
     return
 
@@ -652,9 +652,9 @@ def _():
     ## 5.2 Group-Wise Importance Ranking
 
     Se entrena un modelo LightGBM por grupo de variables y luego un modelo con
-    las mejores variables de cada grupo (ver ADR-007 en el README).
+    las mejores variables de cada grupo (ver ADR-007 en `docs/architecture/decisions.md`).
 
-    No se aplica estandarización (ver ADR-009 en el README).
+    No se aplica estandarización (ver ADR-009 en `docs/architecture/decisions.md`).
     """)
     return
 
@@ -789,7 +789,7 @@ def _():
     ## 5.5 Feature Binning
 
     Se agrupan las features relevantes en bines y se codifican con su porcentaje
-    respecto al target (ver ADR-008 en el README).
+    respecto al target (ver ADR-008 en `docs/architecture/decisions.md`).
 
     Features más relevantes:
 
@@ -858,8 +858,8 @@ def _():
 
     Se entrena el modelo final con las cuatro features seleccionadas después del
     binning y se evalúa el mejor modelo con los hiperparámetros encontrados
-    (ver ADR-010 en el README). No se aplica balanceo (ver ADR-009 en el
-    README).
+    (ver ADR-010 en `docs/architecture/decisions.md`). No se aplica balanceo (ver ADR-009 en
+    `docs/architecture/decisions.md`).
     """)
     return
 
