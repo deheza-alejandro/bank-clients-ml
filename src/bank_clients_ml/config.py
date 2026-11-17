@@ -1,21 +1,11 @@
 """Configuración central del proyecto.
 
 Centraliza los parámetros globales compartidos por casi todos los módulos
-del proyecto.
+del proyecto. Los valores se pueden redefinir mediante variables de entorno
+con el prefijo `ML_` y, opcionalmente, un archivo `.env` en la raíz del
+proyecto; los campos anidados usan el separador `__`.
 
-La configuración se expone mediante la clase `Settings`. Para reutilizar
-una única instancia durante el proceso se usa `Settings.settings_cached()`;
-`Settings()` crea una instancia nueva y `Settings.settings_clear_cache()`
-invalida la instancia cacheada.
-
-Los valores se pueden redefinir mediante variables de entorno con el
-prefijo `ML_` y, opcionalmente, un archivo `.env` en la raíz del proyecto.
-Los campos anidados usan el separador `__`.
-
-La precedencia es la de Pydantic: argumentos, variables de entorno,
-`.env` y valores por defecto.
-
-por ejemplo "ML_PATHS__RAW_DATA_FILE_NAME=example_data.parquet"
+Ejemplo: `ML_PATHS__RAW_DATA_FILE_NAME=example_data.parquet`.
 """
 
 import pathlib
@@ -125,14 +115,14 @@ class Settings(pydantic_settings.BaseSettings):
     Agrupa rutas y nombres de columnas para mantener una referencia única y
     consistente en todos los módulos.
 
-    La precedencia es: argumentos del constructor, variables de entorno del
+    La precedencia es la de Pydantic: argumentos del constructor, variables de entorno del
     sistema, archivo `.env` y valores por defecto.
 
-    `Settings()` construye una instancia nueva con el entorno y el archivo
-    `.env` vigentes. Para compartir una única instancia durante el proceso,
-    usar `Settings.settings_cached()`. La instancia cacheada se calcula una
-    sola vez. Si se modifican las variables de entorno o el archivo `.env`,
-    reiniciar el proceso o llamar a `Settings.settings_clear_cache()`.
+    Usar `Settings()` para construir una instancia nueva con el entorno y el
+    archivo `.env` vigentes. Para compartir una única instancia durante el
+    proceso, usar `Settings.settings_cached()`, que la calcula una sola vez. Si
+    se modifican las variables de entorno o el archivo `.env`, reiniciar el
+    proceso o llamar a `Settings.settings_clear_cache()`.
 
     ## Attributes:
         debug: Indica si el modo de depuración está activado.

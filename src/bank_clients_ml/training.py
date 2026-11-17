@@ -2,10 +2,6 @@
 
 Centraliza el ajuste de hiperparámetros con RandomizedSearchCV y StratifiedKFold y
 el cálculo de importancias.
-
-## Clases exportadas:
-    LGBMTrainer: Entrenador de un modelo LightGBM, expone métricas y gráficos.
-    GroupsLGBMTrainer: Entrenador de modelos LightGBM por grupos de variables (usa LGBMTrainer).
 """
 
 import contextlib
@@ -188,7 +184,7 @@ class LGBMTrainer:
     """Entrenador de un modelo LightGBM, expone métricas y gráficos.
 
     Encapsula el resultado de la búsqueda aleatoria de hiperparámetros junto con
-    los datos de entrenamiento y la tabla de importancias. Permite consultar el
+    la tabla de importancias y los logs de la búsqueda. Permite consultar el
     ranking de variables, visualizar las más relevantes y evaluar el mejor modelo
     sobre un conjunto de prueba.
 
@@ -356,7 +352,7 @@ class LGBMTrainer:
         )
 
     def get_top_ranked_features(self, top_n: int = 5) -> tuple[str, ...]:
-        """Retorna los nombres de las variables más relevantes según importancia.
+        """Devuelve los nombres de las variables más relevantes según importancia.
 
         Consulta la tabla de importancias ordenada de mayor a menor y selecciona
         las primeras filas.
@@ -489,7 +485,7 @@ class GroupsLGBMTrainer:
         return cls(trainers, n_iter, splits_cross_validation, settings)
 
     def items(self) -> ItemsView[column_groups.ValidColumnGroup, LGBMTrainer]:
-        """Retorna los pares de grupo y entrenador asociado.
+        """Devuelve los pares de grupo y entrenador asociado.
 
         ## Returns:
             Vista con los grupos y sus entrenadores correspondientes para
@@ -539,11 +535,11 @@ class GroupsLGBMTrainer:
             trainer.plot_top_features(group.snake_case_name)
 
     def get_top_grouped_features(self) -> tuple[str, ...]:
-        """Retorna las mejores variables de cada grupo según importancia.
+        """Devuelve las mejores variables de cada grupo según importancia.
 
         Combina las variables mejor posicionadas de todos los grupos. El grupo
         de referencia, que contiene todas las columnas, no aporta variables por
-        tener su cantidad a seleccionar en cero (ver modulo `column_groups`).
+        tener su cantidad a seleccionar en cero (ver el módulo `column_groups`).
 
         ## Returns:
             Nombres de las variables seleccionadas por grupo.

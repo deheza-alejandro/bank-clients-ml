@@ -2,11 +2,6 @@
 
 Las tablas resultantes sirven como base para el análisis exploratorio y las
 visualizaciones.
-
-## Clases exportadas:
-    BivariateTable: Contenedor inmutable con la tabla de análisis bivariado de una variable.
-## Funciones exportadas:
-    build_bivariate_tables: Construye tablas de análisis bivariado para las variables indicadas.
 """
 
 import dataclasses

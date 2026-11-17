@@ -1,19 +1,4 @@
-"""Funciones para el análisis exploratorio de datos con Polars.
-
-## Funciones exportadas:
-    describe: Retorna el resumen estadístico del DataFrame en formato transpuesto.
-    inspect_dataframe: Inspecciona la estructura y la calidad general del DataFrame.
-    count_row_matches: Cuenta, por columna, las filas que cumplen una condición.
-    filter_columns_by_cardinality: Filtra columnas según su cantidad de valores únicos.
-    low_cardinality_value_counts: Filtra columnas de baja cardinalidad e indica las ocurrencias.
-    get_clients_by_months: Resume la cantidad de meses registrados por cliente.
-    mins_in_range: Detecta columnas numéricas cuyo valor mínimo pertenece a un intervalo abierto.
-    columns_with_zeros: Identifica columnas numéricas que contienen valores iguales a cero.
-    filter_nonzero: Filtra las filas donde todas las columnas son distintas de cero.
-
-## Constantes exportadas:
-    OPERATORS: funciones del módulo `operator` asociadas a símbolos de comparación.
-"""
+"""Funciones para el análisis exploratorio de datos con Polars."""
 
 import operator
 import types
@@ -120,6 +105,7 @@ OPERATORS: Final[types.MappingProxyType[ConditionSymbol, ComparisonFunction]] = 
         }
     )
 )
+"""Mapeo de símbolos de comparación a funciones del módulo `operator`."""
 
 
 def _get_operator(condition: ConditionSymbol) -> ComparisonFunction:
@@ -231,7 +217,7 @@ def low_cardinality_value_counts(
     ## Returns:
         Nuevo DataFrame con el nombre de la columna, el valor y el conteo,
         ordenado por columna y frecuencia descendente. Si ninguna columna
-        cumple el criterio, retorna un DataFrame vacío con dicho esquema.
+        cumple el criterio, devuelve un DataFrame vacío con dicho esquema.
     """
     settings = settings or config.Settings.settings_cached()
 
@@ -309,7 +295,7 @@ def mins_in_range(
 
     ## Returns:
         Nuevo DataFrame con las columnas que cumplen el criterio y su valor
-        mínimo correspondiente. Si ninguna columna cumple la condición, retorna
+        mínimo correspondiente. Si ninguna columna cumple la condición, devuelve
         un DataFrame vacío con dicho esquema.
     """
     settings = settings or config.Settings.settings_cached()

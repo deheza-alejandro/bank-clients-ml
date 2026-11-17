@@ -1,13 +1,7 @@
 """Helpers para visualización de resultados en cuadernos Marimo.
 
-Las funciones están pensadas para uso interactivo en cuadernos Marimo,
-donde algunos resultados se anexan directamente a la salida visible.
-
-## Funciones exportadas:
-    build_plot_tabs: Presenta imágenes SVG como pestañas en Marimo.
-    build_trainer_cv_view: Muestra los resultados de validación cruzada de un entrenador.
-    build_group_cv_views: Muestra los resultados de validación cruzada por grupo.
-    build_correlation_tabs: Presenta tablas de correlación como pestañas en Marimo.
+Las funciones están pensadas para uso interactivo, donde algunos resultados se
+anexan directamente a la salida visible.
 """
 
 import pathlib

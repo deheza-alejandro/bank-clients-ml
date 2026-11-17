@@ -8,9 +8,6 @@ correlacionadas.
 El flujo habitual consiste en crear `RedundantColumnFilter` con los conjuntos de
 entrenamiento y prueba, inspeccionar los descartes y analizar las correlaciones
 de las variables más relevantes.
-
-## Clases exportadas:
-    RedundantColumnFilter: Filtro secuencial de columnas redundantes con análisis de correlación.
 """
 
 import dataclasses
@@ -38,7 +35,7 @@ def _get_true_column_names(df: pl.DataFrame) -> tuple[str, ...]:
 
 
 def _get_constant_columns(df: pl.DataFrame) -> tuple[str, ...]:
-    """Retorna las columnas con un único valor.
+    """Devuelve las columnas con un único valor.
 
     ## Args:
         df: DataFrame sobre el que se evalúa la cardinalidad.
@@ -55,7 +52,7 @@ def _get_imbalanced_binary_columns(
     threshold: float,
     settings: config.Settings,
 ) -> tuple[str, ...]:
-    """Retorna las columnas binarias desbalanceadas.
+    """Devuelve las columnas binarias desbalanceadas.
 
     Detecta las columnas con exactamente dos valores únicos. La proporción se
     calcula contra el primer valor de cada columna y se considera desbalanceada

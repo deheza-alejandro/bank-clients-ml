@@ -1,8 +1,4 @@
-"""Limpieza inicial de datos crudos de bank_clients_ml.
-
-## Funciones exportadas:
-    clean_up_data: Limpia y normaliza el DataFrame crudo de clientes.
-"""
+"""Limpieza inicial de datos crudos de bank_clients_ml."""
 
 import polars as pl
 

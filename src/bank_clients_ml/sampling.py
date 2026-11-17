@@ -1,13 +1,6 @@
 """Ventanas temporales y muestreo para el modelo de "bank_clients_ml".
 
 Centraliza las funciones de muestreo del proyecto basadas en Polars.
-
-## Funciones exportadas:
-    stratified_train_test_split: Divide en sets de entrenamiento y prueba de forma estratificada.
-    oversample_with_unique_ids: Aplica oversampling con identificadores únicos.
-
-## Clases exportadas:
-    TimeWindowSplit: Resultado de la partición de ventanas de entrenamiento y predicción.
 """
 
 import dataclasses
@@ -85,7 +78,7 @@ class TimeWindowSplit:
         universe_and_target: Universo de clientes con su variable target.
             Si un cliente del universo es target en al menos un mes de
             predicción, este cliente mantiene una única fila con target 1.
-            Caso contrario mantiene una única fila con target 0.
+            En caso contrario mantiene una única fila con target 0.
         universe_and_target_data: Datos completos del universo con la variable
             target incorporada.
         training_data: Registros del universo restringidos a los meses de
@@ -172,12 +165,12 @@ class TimeWindowSplit:
 
     @property
     def last_training_month(self) -> datetime.date:
-        """Retorna el último mes de la ventana de entrenamiento."""
+        """Devuelve el último mes de la ventana de entrenamiento."""
         return self.training_months[-1]
 
     @property
     def first_prediction_month(self) -> datetime.date:
-        """Retorna el primer mes de la ventana de predicción."""
+        """Devuelve el primer mes de la ventana de predicción."""
         return self.prediction_months[0]
 
 

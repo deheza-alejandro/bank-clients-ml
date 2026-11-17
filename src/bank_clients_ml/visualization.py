@@ -3,17 +3,6 @@
 Este módulo centraliza las visualizaciones utilizadas en el notebook.
 Por defecto, todas las figuras se guardan como archivos SVG optimizados con SVGO
 a través de Bun. La estrategia de guardado puede sustituirse con `figure_saver`.
-
-## Tipos exportados:
-    FigureSaver: Alias de `Callable[[Figure, pathlib.Path], None]` para las
-        estrategias de guardado. El figure_saver escribe la figura en la ruta indicada;
-        el cierre de la figura lo gestiona este módulo.
-
-## Funciones exportadas:
-    plot_top_features: Genera y guarda un gráfico con las variables más importantes.
-    plot_bivariate_charts: Genera y guarda gráficos bivariados para un conjunto de variables.
-    plot_roc_curve: Genera y guarda una curva ROC con métricas de evaluación.
-    plot_deciles: Genera y guarda un gráfico con tablas de deciles de entrenamiento y prueba.
 """
 
 import concurrent.futures
@@ -39,6 +28,7 @@ matplotlib.rcParams["svg.hashsalt"] = "fixed_seed_for_this_project"
 matplotlib.rcParams["svg.fonttype"] = "path"
 
 FigureSaver = Callable[[Figure, pathlib.Path], None]
+"""Estrategia de guardado que escribe una figura en la ruta indicada."""
 
 
 @contextmanager

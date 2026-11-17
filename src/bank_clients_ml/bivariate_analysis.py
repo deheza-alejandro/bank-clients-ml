@@ -1,9 +1,4 @@
-"""Análisis bivariado y selección de variables para "bank_clients_ml".
-
-## Clases exportadas:
-    FeaturesSelection: Selección de variables para el modelado.
-    BivariateAnalyzer: Analizador bivariado sobre conjuntos con variables correlacionadas.
-"""
+"""Análisis bivariado y selección de variables para "bank_clients_ml"."""
 
 import dataclasses
 from collections.abc import Iterable
@@ -125,7 +120,6 @@ class FeaturesSelection:
         curva ROC y el gráfico de deciles con los nombres indicados.
 
         ## Args:
-            test: Datos de prueba que incluyen la variable target.
             roc_curve_name: Nombre del archivo de salida SVG de la curva ROC,
                 sin extensión.
             deciles_name: Nombre del archivo de salida SVG de la tabla de

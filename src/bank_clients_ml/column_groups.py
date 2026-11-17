@@ -2,24 +2,6 @@
 
 Centraliza las reglas de agrupamiento utilizadas durante la exploración y
 la selección de variables con LightGBM.
-
-## Funciones exportadas:
-    get_identity_features_cols: Retorna las identity features del cliente.
-    get_columns_with_quantities: Retorna las columnas con cantidades.
-    group_columns_by_source: Agrupa las columnas de un DataFrame según su fuente de negocio.
-
-## Constantes exportadas:
-    SAVING_ACCOUNT_COLS: Columnas monetarias asociadas a la caja de ahorro.
-    CATEGORICAL_COLS: Nombres de las categorical features del cliente.
-    BINARY_IDENTITY_FEATURES_COLS: Identity features binarias del cliente.
-    CREDIT_CARD_COLS: Columnas monetarias asociadas a la tarjeta de crédito.
-    COLUMNS_WITH_MONETARY_VALUES: Columnas con valores monetarios.
-    CREDIT_CARD_EXCLUDED: Columnas de tarjeta de crédito excluidas del grupo monetario.
-
-## Clases exportadas:
-    ColumnGroup: Configuración de un grupo de columnas.
-    ValidColumnGroup: Grupos válidos para la selección por fuente.
-    GeneratedColumnGroups: Agrupamiento validado de columnas por fuente.
 """
 
 import dataclasses
@@ -84,7 +66,7 @@ BINARY_IDENTITY_FEATURES_COLS: Final[tuple[str, ...]] = (
 def get_identity_features_cols(
     settings: config.Settings | None = None,
 ) -> tuple[str, ...]:
-    """Retorna las identity features del cliente.
+    """Devuelve las identity features del cliente.
 
     Representan la foto del cliente en el último mes de entrenamiento.
     Combinan identificador, target, categorical features, fechas de
@@ -136,7 +118,7 @@ COLUMNS_WITH_MONETARY_VALUES: Final[tuple[str, ...]] = (
 
 
 def _get_columns_without_quantities(settings: config.Settings) -> set[str]:
-    """Retorna los nombres de columnas sin cantidades.
+    """Devuelve los nombres de columnas sin cantidades.
 
     Reúne columnas monetarias, identity features, mes y fechas de producto
     para excluirlas de la detección de columnas con cantidades.
@@ -159,7 +141,7 @@ def _get_columns_without_quantities(settings: config.Settings) -> set[str]:
 def get_columns_with_quantities(
     transformed_training_data: pl.DataFrame, settings: config.Settings
 ) -> tuple[str, ...]:
-    """Retorna las columnas con cantidades.
+    """Devuelve las columnas con cantidades.
 
     Identifica por exclusión, conservando el orden original del DataFrame.
 
@@ -218,7 +200,7 @@ class ValidColumnGroup(enum.Enum):
 
     @classmethod
     def members(cls) -> tuple[Self, ...]:
-        """Retorna los miembros del enum.
+        """Devuelve los miembros del enum.
 
         ## Returns:
             Tupla con todos los grupos válidos en orden de definición.
@@ -237,7 +219,7 @@ class ValidColumnGroup(enum.Enum):
 
     @property
     def snake_case_name(self) -> str:
-        """Retorna el nombre del grupo en formato snake case.
+        """Devuelve el nombre del grupo en formato snake case.
 
         Convierte el nombre legible a minúsculas, elimina paréntesis y
         reemplaza espacios por guiones bajos.
@@ -352,7 +334,7 @@ class GeneratedColumnGroups:
             )
 
     def items(self) -> ItemsView[ValidColumnGroup, tuple[str, ...]]:
-        """Retorna los pares de grupo y columnas asignadas.
+        """Devuelve los pares de grupo y columnas asignadas.
 
         ## Returns:
             Vista con los grupos y sus tuplas de columnas correspondientes para

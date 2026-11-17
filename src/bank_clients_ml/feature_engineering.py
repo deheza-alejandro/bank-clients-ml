@@ -1,12 +1,6 @@
 """Feature Engineering con Polars para el modelo de "bank_clients_ml".
 
-## Funciones exportadas:
-    target_encode_columns: Reemplaza columnas categóricas por su porcentaje respecto al target.
-    transform_date_features: Genera variables a partir de las fechas de producto.
-    with_transformations: Genera variables transformadas mensuales.
-    aggregate_monthly_to_client: Genera agregaciones a una fila por cliente.
-    with_extra_transformations: Crea transformaciones adicionales.
-    standardize: Estandariza las variables numéricas.
+Construye las variables mensuales y agregadas que utiliza el modelo.
 """
 
 import datetime
@@ -134,8 +128,8 @@ def _safe_denominator(
 ) -> pl.Expr:
     """Reemplaza un denominador para evitar división por cero.
 
-    Reemplaza el valor buscado por un valor alternativo en la expresión del denominador
-    para evitar divisiones por cero en cálculos posteriores.
+    Sustituye el valor buscado por un valor alternativo en la expresión del
+    denominador.
 
     ## Args:
         denominator: Nombre de columna o expresión de Polars que actúa como denominador.

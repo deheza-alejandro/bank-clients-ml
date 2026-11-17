@@ -3,10 +3,6 @@
 Reúne utilidades para combinar los bines del análisis bivariado en grupos
 con un mismo porcentaje de target y generar expresiones de Polars que
 reemplazan los valores originales por dicho porcentaje.
-
-## Clases exportadas:
-    Binner: Asociación entre una feature y los intervalos de bines a agrupar.
-    NameMapping: Mapeo entre nombres internos y nombres descriptivos.
 """
 
 import dataclasses
@@ -335,7 +331,7 @@ class Binner:
 class DualNamed(Protocol):
     """Protocolo para objetos con doble denominación.
 
-    Define el contrato de los objetos que exponen un nombre interno y un
+    Definir la interfaz de los objetos que exponen un nombre interno y un
     nombre descriptivo para presentación.
     """
 

@@ -1,11 +1,4 @@
-"""Evaluación de desempeño de modelos de clasificación binaria.
-
-## Funciones exportadas:
-    evaluate: Evalúa las predicciones de un modelo sobre los conjuntos de datos.
-
-## Clases exportadas:
-    EvaluationMetrics: Métricas de evaluación de un modelo de clasificación binaria.
-"""
+"""Evaluación de desempeño de modelos de clasificación binaria."""
 
 import dataclasses
 from collections.abc import Sequence
