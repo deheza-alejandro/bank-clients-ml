@@ -1,5 +1,4 @@
-# Contributing
+# Contribución
 
-Gracias por tu interés en colaborar. Actualmente este proyecto no acepta
-contribuciones externas. Si deseas realizar cambios, te recomiendo hacer un fork
-del repositorio.
+Este proyecto no acepta contribuciones externas. Para realizar cambios, crear un
+fork del repositorio.
