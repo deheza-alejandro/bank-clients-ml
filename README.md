@@ -64,7 +64,7 @@ accesible desde otra máquina de la red) y se ejecuta sin token de acceso. El
 contenedor arranca Marimo con `--watch` y recarga el notebook cuando el archivo
 se guarda desde el host.
 
-Para detenerlo:
+Para detener y eliminar el contenedor:
 
 ```bash
 docker compose down
@@ -95,9 +95,10 @@ después de un cambio necesita red si hay paquetes nuevos que descargar.
 
 El entrypoint ejecuta `uv sync --locked` contra `/opt/venv` para Python; si los
 locks cambiaron, actualiza el entorno. Para JavaScript, ejecuta
-`bun install --frozen-lockfile` en el volumen `node_modules` cuando cambian
-`package.json`, `bun.lock` o la versión de Bun. Si el entorno ya está al día, no
-reinstala nada.
+`bun install --frozen-lockfile` en el volumen `node_modules` cuando el hash de
+`package.json`, `bun.lock` y la versión de Bun difiere de
+`node_modules/.bun-install-hash`. Si el entorno ya está al día, no reinstala
+nada.
 
 Como el entrypoint usa `--locked` y `--frozen-lockfile`, si los locks no están
 sincronizados la sincronización falla; ver
@@ -111,10 +112,11 @@ arranca un contenedor nuevo. `/opt/venv` no es un volumen: cada contenedor parte
 de la copia de la imagen y sincroniza si hace falta; al detener el contenedor se
 descartan los cambios. `node_modules` sí es un named volume.
 
-`docker compose down` elimina el contenedor y `docker compose down -v` también
-el volumen `node_modules`, que se regenera en el próximo arranque. Ninguno borra
-`data/` ni `notebooks/images/`, porque forman parte del montaje del proyecto.
-Para actualizar la copia base de `/opt/venv`, reconstruir la imagen.
+Para restablecer el volumen
+`node_modules`, ver [Dependencias y locks](#dependencias-y-locks). Ninguna de
+estas operaciones borra `data/` ni `notebooks/images/`, porque forman parte del
+montaje del proyecto. Para actualizar la copia base de `/opt/venv`, reconstruir
+la imagen.
 
 <details>
   <summary><b>Detalles de la imagen Docker</b></summary>
@@ -125,7 +127,7 @@ El Dockerfile separa Python y uv (`python-base`), las librerías del sistema
 (`js-deps`). `py-deps` instala solo dependencias de terceros, de modo que los
 cambios en `src/` no invalidan la capa de dependencias. La imagen final es el
 entorno `dev`, que incluye Python, uv, Marimo, tests, linters, Bun, SVGO y
-cspell.
+cspell; no hay un entorno de producción todavía.
 
 Los entornos de dependencias pueden construirse en paralelo; cambiar `apt`, el
 UID/GID o Bun no invalida las dependencias de Python. `system-deps` usa cache
@@ -134,17 +136,12 @@ monta `.python-version` para fallar rápido si la versión no coincide con la
 imagen. El entrypoint no descarga intérpretes (`UV_PYTHON_DOWNLOADS=never`); solo
 sincroniza paquetes con el intérprete de la imagen.
 
-No hay un entorno de
-producción todavía.
-
 El entrypoint vive en `scripts/docker_entrypoint.py`; se copia a
 `/usr/local/bin` durante la construcción, así que sus cambios requieren
-reconstruir la imagen. Para JavaScript compara un hash de `package.json`,
-`bun.lock` y la versión de Bun con `node_modules/.bun-install-hash`; si cambió,
-reinstala antes de iniciar Marimo. Si cambia la versión de Bun en el Dockerfile,
-hay que reconstruir y el volumen se actualiza en el siguiente arranque. La
-primera vez que se usa un volumen creado antes de este cambio, el marker no
-existe y la instalación se ejecuta una vez.
+reconstruir la imagen. Si cambia la versión de Bun en el Dockerfile, hay que
+reconstruir y el volumen se actualiza en el siguiente arranque. La primera vez
+que se usa un volumen creado con una versión anterior del entrypoint, el marker
+no existe y se ejecuta una instalación completa.
 
 </details>
 
@@ -152,7 +149,8 @@ existe y la instalación se ejecuta una vez.
 
 ### Opción 2: Local
 
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) 0.12 o superior.
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) 0.12.1, o una
+  version superior que sea menor a 0.13.0.
 - [Bun](https://bun.sh/docs/installation) 1.4 o superior.
 - Python 3.13; uv puede instalarlo automáticamente.
 
@@ -207,8 +205,8 @@ herramientas que no necesitan `bank_clients_ml`, como `uv lock` o `bun install`.
 Para tests o scripts que importan el paquete, usar
 `docker compose run --rm dev ...`.
 
-En Docker y en local, si se usa `--watch` al ejecutar el notebook marimo, evitar
-editar la misma celda en dos lugares al mismo tiempo .
+En Docker y en local, si se usa `--watch` al ejecutar el notebook de Marimo,
+evitar editar la misma celda en dos lugares al mismo tiempo.
 
 | Tarea | Comando |
 | --- | --- |
@@ -398,18 +396,20 @@ uv run lefthook install
 
 Con los hooks activos:
 
-- Commit: comprueba los lockfiles si cambian, formatea y revisa con Ruff los
-  archivos Python, ejecuta pytest sin los tests "slow" con cobertura mínima del
-  80 %, revisa los Markdown con rumdl y valida el mensaje de commit con
-  Commitizen.
-- Push: ejecuta Pyrefly, el chequeo de versiones de Python y uv, todos los tests
-  de pytest (unitarios + integración) y cspell.
-- Checkout y merge: sincroniza el entorno con `uv sync --locked`.
+- Commit: se comprueban los lockfiles si cambian; se formatean y revisan con
+  Ruff los archivos Python; se ejecuta pytest sin los tests "slow" con
+  cobertura mínima del 80 %; se revisan los Markdown con rumdl y rumdl fmt; se
+  validan la configuración de Docker Compose, la de Lefthook y el mensaje de
+  commit con Commitizen.
+- Push: se ejecuta Pyrefly, el chequeo de versiones de Python y uv, todos los
+  tests de pytest (unitarios + integración) y cspell.
+- Checkout, merge y rewrite: se sincroniza el entorno con `uv sync --locked`.
 
 El hook `python-versions-check` ejecuta `scripts/check_python_versions.py`
-cuando cambian el Dockerfile, `.python-version` o `pyproject.toml`. Si falla,
-corregir los valores para que `ARG PYTHON_VERSION`, `.python-version`,
-`requires-python` y `UV_VERSION` queden alineados con el rango de `uv_build`.
+cuando cambian el Dockerfile, `.python-version`, `pyproject.toml` o el propio
+script. Si falla, corregir los valores para que `ARG PYTHON_VERSION`,
+`.python-version`, `requires-python` y `UV_VERSION` queden alineados con el
+rango de `uv_build`.
 
 Para desactivarlos:
 
@@ -434,8 +434,7 @@ Esta sección cubre los errores de `uv sync --locked` y
 | `uv.lock` | `uv lock` | `docker compose run --rm --entrypoint dev uv lock` |
 | `bun.lock` | `bun install` | `docker compose run --rm --entrypoint dev bun install` |
 
-Los comandos con `--entrypoint` solo actualizan el lock; no ejecutan la
-sincronización ni instalan el proyecto (ver
+Los comandos con `--entrypoint` solo actualizan el lock (ver
 [Comandos comunes](#comandos-comunes)). Los cambios se escriben en el host a
 través del bind mount; revisar el diff y reiniciar:
 
@@ -555,11 +554,10 @@ contenedor están en [Configuración](#configuración).
 ## Contribución
 
 Este repositorio se mantiene como un proyecto personal, por lo que no se aceptan
-contribuciones de código ni Pull Requests en este momento. Si se desea adaptar o
-modificar el proyecto, se puede hacer un fork bajo los términos de la licencia.
+contribuciones externas. Ver [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licencia
 
-Este proyecto está bajo los términos de la **Licencia MIT**. Consulta el archivo
-[LICENSE](LICENSE) para más detalles. Las dependencias externas utilizadas
-mantienen sus respectivas licencias, tales como Apache 2.0.
+Este proyecto está bajo los términos de la **Licencia MIT**. Consultar el
+archivo [LICENSE](LICENSE) para más detalles. Las dependencias externas
+utilizadas mantienen sus respectivas licencias, tales como Apache 2.0.
