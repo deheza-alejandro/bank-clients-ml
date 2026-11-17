@@ -30,3 +30,6 @@ __marimo__/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Documentation site
+site/
