@@ -161,7 +161,7 @@ def validate_python(
 
     if not SIMPLE_VERSION_PATTERN.fullmatch(file_value):
         errors.append(
-            f".python-version ({file_value}) is not a simple version like 3.13 o 3.13.5;"
+            f".python-version ({file_value}) is not a simple version like 3.13 or 3.13.5;"
             "this check cannot compare it with requires-python."
         )
         return errors
@@ -173,7 +173,7 @@ def validate_python(
         packaging.version.InvalidVersion,
         packaging.specifiers.InvalidSpecifier,
     ) as err:
-        errors.append(f"Could not parse .python-version o requires-python: {err}")
+        errors.append(f"Could not parse .python-version or requires-python: {err}")
         return errors
 
     if not specifier.contains(version, prereleases=True):

@@ -1,4 +1,7 @@
-"""Mantiene las dependencias de JavaScript y Python sincronizadas."""
+"""Sincroniza las dependencias de JavaScript y Python.
+
+También ejecuta el comando de entrada del contenedor.
+"""
 
 import hashlib
 import os

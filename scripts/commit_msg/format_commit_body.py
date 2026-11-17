@@ -11,7 +11,7 @@ def format_commit_body(file_path: str) -> None:
     El título se conserva sin cambios y los párrafos del cuerpo se
     reajustan por separado para mantener las líneas en blanco entre ellos.
     Las líneas de comentario que comienzan con `#` se descartan al procesar
-    el mensaje. Si el archivo no existe, está vacío o no contiene cuerpo,
+    el mensaje. Si el archivo no existe, está vacío o no contiene body,
     el archivo se deja sin modificar.
 
     ## Args:
