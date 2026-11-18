@@ -6,11 +6,7 @@
   "license": "MIT",
   "devDependencies": {
     "@cspell/dict-es-es": "^3.0.8",
-    "@types/bun": "latest",
     "cspell": "^10.3.2",
     "svgo": "^4.1.0"
-  },
-  "peerDependencies": {
-    "typescript": "^7"
   }
 }
