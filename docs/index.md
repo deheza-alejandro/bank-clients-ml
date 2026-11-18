@@ -10,7 +10,7 @@ Instalación y puesta en marcha con Docker o en local.
 
 - [Descripción general](architecture/overview.md): módulos, pruebas y
   limitaciones.
-- [Decisiones tomadas](architecture/decisions.md): ADR-001 a ADR-023.
+- [Decisiones tomadas](architecture/decisions.md): formato ADR.
 
 ## Desarrollo
 
