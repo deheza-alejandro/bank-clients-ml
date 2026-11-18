@@ -867,7 +867,7 @@ def _():
 @app.cell
 def _(result):
     result.plot_top_features(plot_name="best_features")
-    result.evaluate_and_plot_metrics(roc_curve_name="lightgbm", deciles_name="deciles")
+    result.evaluate_and_plot_metrics(roc_curve_name="roc_curve", deciles_name="deciles")
     mo.ui.tabs(
         {
             "Best Features Importances": mo.image(
@@ -891,7 +891,7 @@ def _(result):
 def _():
     mo.md(rf"""
     ## 6.1 Performance Metrics
-    {mo.image(src=settings.paths.images / "plot_evaluation_metrics" / "lightgbm.svg")}
+    {mo.image(src=settings.paths.images / "plot_evaluation_metrics" / "roc_curve.svg")}
     {mo.image(src=settings.paths.images / "plot_evaluation_metrics" / "deciles.svg")}
 
     Los valores siguientes corresponden a la ejecución del notebook con
