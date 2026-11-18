@@ -6,6 +6,10 @@ pre-commit:
     - name: uv-lock-check
       glob: "{pyproject.toml,uv.lock}"
       run: uv lock --check --no-progress
+    - name: bun-lock-check
+      glob: "{package.json,bun.lock}"
+      run: bun install --frozen-lockfile --dry-run --no-progress
+      fail_text: "Run `bun install` and add the updated `bun.lock` to the commit."
     - name: python-format-lint-test-check
       glob: "*.py"
       group:
