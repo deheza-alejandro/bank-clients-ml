@@ -7,6 +7,7 @@ pre-commit:
     - name: uv-lock-check
       glob: "{pyproject.toml,uv.lock}"
       run: uv lock --check --no-progress
+      fail_text: "Run `uv sync` and stage the updated `uv.lock`."
     - name: bun-lock-check
       glob: "{package.json,bun.lock}"
       run: bun install --frozen-lockfile --dry-run --no-progress
@@ -17,8 +18,11 @@ pre-commit:
         piped: true
         jobs:
           - run: uv run --no-sync --no-progress ruff format --check {staged_files}
+            fail_text: "Run `uv run --no-sync ruff format` and stage the formatted files."
           - run: uv run --no-sync --no-progress ruff check {staged_files}
+            fail_text: "Run `uv run --no-sync ruff check --fix` and fix the remaining issues manually."
           - run: uv run --no-sync --no-progress pytest -m 'not slow' --cov=bank_clients_ml --cov-fail-under=80
+            fail_text: "Fix the failing tests or the coverage gap before committing."
     - name: markdown-format-lint-check
       glob: "*.md"
       group:
@@ -31,9 +35,11 @@ pre-commit:
     - name: docker-compose-config-check
       glob: "compose.y*ml"
       run: docker compose config --quiet
+      fail_text: "Fix `compose.yaml` and validate it with `docker compose config --quiet`."
     - name: validate-lefthook
       glob: "{.,}lefthook*.{yml,yaml}"
       run: uv run --no-sync --no-progress lefthook validate
+      fail_text: "Fix the Lefthook configuration and run `uv run --no-sync lefthook validate`."
 
 commit-msg:
   piped: true
@@ -44,6 +50,7 @@ commit-msg:
     02-commitizen-check:
       priority: 2
       run: uv run cz check --allow-abort --commit-msg-file {1} --message-length-limit 50
+      fail_text: "Write a Conventional Commits message with a header of 50 characters or fewer."
 
 pre-push:
   piped: true
@@ -52,17 +59,21 @@ pre-push:
       priority: 1
       glob: "*.py"
       run: uv run --locked pyrefly check
+      fail_text: "Fix the type errors reported by Pyrefly before pushing."
     python-versions-check:
       priority: 2
       glob: "{Dockerfile,.python-version,pyproject.toml,scripts/check_python_versions.py}"
       run: uv run --locked scripts/check_python_versions.py
+      fail_text: "Align the versions in `Dockerfile`, `.python-version` and `pyproject.toml`; see `docs/development/hooks.md`."
     cspell:
       priority: 3
       run: bun cspell --no-must-find-files {all_files}
+      fail_text: "Fix the misspellings or add legitimate words to `cspell.json`."
     test:
       priority: 4
       glob: "*.py"
       run: uv run --locked pytest --cov=bank_clients_ml --cov-fail-under=80
+      fail_text: "Fix the failing tests or the coverage gap before pushing."
     
 
 post-checkout:
@@ -71,6 +82,7 @@ post-checkout:
       files: git diff --name-only HEAD@{1} HEAD
       glob: "{pyproject.toml,uv.lock}"
       run: uv sync --locked
+      fail_text: "The environment could not be synchronized with `uv sync --locked`. See `docs/troubleshooting.md#sincronización-fallida-tras-checkout-merge-o-rewrite` for diagnosis and fixes."
 
 post-merge:
   commands:
@@ -78,6 +90,7 @@ post-merge:
       files: git diff --name-only ORIG_HEAD HEAD
       glob: "{pyproject.toml,uv.lock}"
       run: uv sync --locked
+      fail_text: "The environment could not be synchronized with `uv sync --locked`. See `docs/troubleshooting.md#sincronización-fallida-tras-checkout-merge-o-rewrite` for diagnosis and fixes."
 
 post-rewrite:
   commands:
@@ -85,6 +98,7 @@ post-rewrite:
       files: git diff-tree -r --name-only HEAD@{1} HEAD
       glob: "{pyproject.toml,uv.lock}"
       run: uv sync --locked
+      fail_text: "The environment could not be synchronized with `uv sync --locked`. See `docs/troubleshooting.md#sincronización-fallida-tras-checkout-merge-o-rewrite` for diagnosis and fixes."
 
 auto-fix-staged-markdown:
   piped: true

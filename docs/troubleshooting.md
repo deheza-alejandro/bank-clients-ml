@@ -109,3 +109,47 @@ puede generar las visualizaciones.
 
 Sincronizar el entorno virtual con `uv sync --locked`; ver
 [Primeros pasos](getting-started.md#inicio-rápido-en-local).
+
+### Sincronización fallida tras checkout, merge o rewrite
+
+El hook `uv-sync-locked` falla cuando `uv sync --locked` no puede sincronizar
+el entorno después de una operación de checkout, merge o rewrite. Para
+determinar la causa, ejecutar:
+
+```bash
+uv lock --check
+```
+
+Si el comando falla, el lockfile está desactualizado, falta o no se puede
+resolver. En ese caso:
+
+1. Revisar `git status` y guardar temporalmente o descartar los cambios
+   locales en `pyproject.toml` que no se vayan a incluir en el commit, ya que
+   `uv lock` los incorporaría al lockfile.
+2. Verificar la versión de uv si el error menciona un lockfile no soportado;
+   una versión incompatible puede reescribir el lockfile con un formato
+   distinto.
+3. Ejecutar `uv lock`.
+4. Revisar el diff de `uv.lock` y confirmar que solo cambió lo esperado para
+   no mezclar el arreglo con otras dependencias.
+5. Ejecutar `uv sync --locked`.
+6. Agregar `uv.lock` al commit.
+
+Si `uv.lock` tiene marcadores de conflicto o no se puede leer, restaurarlo
+desde Git o resolver el conflicto antes de ejecutar `uv lock`. Si `uv lock`
+falla por red, credenciales o un conflicto de versiones, corregir esa causa
+antes de reintentar.
+
+Si `uv lock --check` pasa, el problema no es el lockfile. Las causas posibles
+son:
+
+| Causa | Acción |
+| --- | --- |
+| Falta el intérprete de Python | Ejecutar `uv python install <versión>` con la versión de `.python-version`. |
+| Red, índice o credenciales | Revisar la conexión y la configuración del índice; reintentar. |
+| Falla la compilación de una dependencia | Revisar el error; instalar las dependencias del sistema o usar Docker. |
+| Permisos, disco o caché | Corregir permisos y espacio; si se sospecha corrupción, ejecutar `uv cache clean` y, si el problema persiste, eliminar `.venv`. |
+
+En un checkout de solo lectura, sin intención de crear un commit,
+`uv sync --frozen` instala desde el lockfile sin comprobar si está
+actualizado. Es una salida temporal; no corrige la inconsistencia.

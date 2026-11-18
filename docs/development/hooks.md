@@ -26,7 +26,10 @@ Con los hooks activos:
 - Push: se ejecuta Pyrefly, el chequeo de versiones de Python y uv, todos los
   tests de pytest (unitarios + integración) y cspell. Los comandos concretos
   están en [Comandos de desarrollo](commands.md).
-- Checkout, merge y rewrite: se sincroniza el entorno con `uv sync --locked`.
+- Checkout, merge y rewrite: se sincroniza el entorno con `uv sync --locked`,
+  que no modifica el lockfile y permite detectar inconsistencias en lugar de
+  corregirlas automáticamente. Si falla, ver
+  [Solución de problemas](../troubleshooting.md#sincronización-fallida-tras-checkout-merge-o-rewrite).
 
 El hook `python-versions-check` ejecuta `scripts/check_python_versions.py`
 cuando cambian el Dockerfile, `.python-version`, `pyproject.toml` o el propio
