@@ -25,9 +25,9 @@ pre-commit:
         piped: true
         jobs:
           - run: uv run --no-sync --no-progress rumdl check {staged_files}
-            fail_text: "Run `uv run lefthook run auto-fix-staged-markdown` to fix all issues in the staged files that can be automatically resolved"
+            fail_text: "Run `uv run --no-sync lefthook run auto-fix-staged-markdown` to fix all issues in the staged files that can be automatically resolved."
           - run: uv run --no-sync --no-progress rumdl fmt --check --silent {staged_files}
-            fail_text: "Run `uv run lefthook run auto-fix-staged-markdown` to fix all issues in the staged files that can be automatically resolved"
+            fail_text: "Run `uv run --no-sync lefthook run auto-fix-staged-markdown` to fix all issues in the staged files that can be automatically resolved."
     - name: docker-compose-config-check
       glob: "compose.y*ml"
       run: docker compose config --quiet
