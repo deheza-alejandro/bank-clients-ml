@@ -19,12 +19,7 @@ ML_DATASET__TARGET=Target
 
 El listado completo de variables y sus valores por defecto está en `Settings`,
 `DirectoryPaths`, `DatasetColumns` y `AnalysisColumns`, en
-`src/bank_clients_ml/config.py`. Las rutas `raw_data` e `images` se calculan a
-partir de `paths.project`; `raw_data` es
-`paths.project / "data" / paths.raw_data_file_name`. No se configuran de forma
-independiente. En el uso normal no hace falta definir `ML_PATHS__PROJECT`: se
-calcula desde la ubicación de `config.py` y en el contenedor de desarrollo
-corresponde a `/app`.
+`src/bank_clients_ml/config.py`.
 
 También se puede crear un archivo `.env` en la raíz del proyecto. Es opcional
 y está ignorado por Git. Del archivo solo se leen las variables con prefijo
@@ -34,6 +29,15 @@ montaje del proyecto; no se copia dentro de la imagen.
 
 Las variables de entorno del sistema tienen prioridad sobre el `.env`, y este
 sobre los valores por defecto.
+
+En el uso normal no hace falta definir `ML_PATHS__PROJECT`: se
+calcula desde la ubicación de `config.py` y en el contenedor de desarrollo
+corresponde a `/app`.
+
+Las rutas `raw_data` e `images` se calculan a
+partir de `paths.project`; `raw_data` es
+`paths.project / "data" / paths.raw_data_file_name`. No se configuran de forma
+independiente.
 
 Si se reemplaza el conjunto de datos, conservar el nombre
 `example_data.parquet` o definir `ML_PATHS__RAW_DATA_FILE_NAME`. Después de

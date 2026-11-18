@@ -1,8 +1,7 @@
 # Decisiones de arquitectura
 
-Registro de las decisiones de diseño que condicionan el flujo del notebook y
-del paquete. Cada entrada indica el contexto, la decisión adoptada y sus
-consecuencias.
+Registro de las decisiones de diseño que condicionan el notebook y el paquete.
+Cada entrada indica el contexto, la decisión adoptada y sus consecuencias.
 
 ## ADR-001: Polars como librería de procesamiento
 
@@ -27,8 +26,7 @@ consecuencias.
   categóricas y one-hot ampliaría la dimensionalidad.
 - **Decisión:** codificar cada categoría con su porcentaje de target.
 - **Consecuencias:** se captura la relación con el target en una sola columna,
-  sin expandir la dimensionalidad; se valida que el target esté presente en
-  cada categoría.
+  sin expandir la dimensionalidad.
 
 ## ADR-004: Imputación de valores nulos
 
@@ -82,7 +80,7 @@ consecuencias.
   Y la proporción del target, cercana al 30 %, no está muy desbalanceada.
 - **Decisión:** entrenar LightGBM sobre las variables transformadas sin
   estandarizar ni realizar oversampling.
-- **Consecuencias:** flujo más simple.
+- **Consecuencias:** pipeline más simple.
 
 ## ADR-010: Validación cruzada y búsqueda de hiperparámetros
 

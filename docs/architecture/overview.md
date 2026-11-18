@@ -1,6 +1,6 @@
 # Arquitectura
 
-El proyecto separa el notebook como orquestador del flujo, de la lógica
+El proyecto separa el notebook, que orquesta el pipeline, de la lógica
 reutilizable del paquete. El notebook ejecuta y documenta el análisis; el
 paquete `bank_clients_ml` implementa las operaciones del pipeline. Las
 decisiones de diseño se registran en [Decisiones de arquitectura](decisions.md).
@@ -37,7 +37,7 @@ mínima exigida es del 80 %. Los comandos de validación están en
 
 ## Limitaciones y próximos pasos
 
-El repositorio cubre el flujo analítico y de experimentación. No incluye un
+El repositorio cubre el proceso analítico y de experimentación. No incluye un
 servicio de inferencia, CI, monitoreo de drift ni registro de modelos.
 
 Los próximos pasos posibles son:

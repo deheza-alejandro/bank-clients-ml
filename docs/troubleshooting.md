@@ -1,16 +1,22 @@
 # Solución de problemas
 
+## El notebook no encuentra el conjunto de datos
+
+Verificar que exista `data/example_data.parquet`. Si se cambió el nombre del
+archivo, definir `ML_PATHS__RAW_DATA_FILE_NAME`. Si se movió la raíz del
+proyecto, definir `ML_PATHS__PROJECT` con una ruta válida dentro del entorno
+donde se ejecuta el notebook. La derivación de `raw_data` y la ruta `/app` del
+contenedor están en [Configuración](configuration.md).
+
 ## Con Docker
 
 ### Dependencias y locks
 
 Si el error menciona `--locked` o `--frozen-lockfile`, el lock no está
 sincronizado. Para actualizarlo, ver
-[Docker: actualizar locks](development/docker.md#comandos-para-actualizar-locks). Los
-comandos con `--entrypoint` solo actualizan el lock; ver
-[Comandos de desarrollo](development/commands.md). Los cambios se escriben en
-el host a través del bind mount; revisar el diff y reiniciar el contenedor,
-como se describe en la sección de actualización de locks.
+[Docker: actualizar locks](development/docker.md#comandos-para-actualizar-locks).
+Si el error ocurrió durante `docker compose build`, reconstruir después de
+actualizar el lock.
 
 Si el error es de red, comprobar la conexión y reiniciar.
 
@@ -102,11 +108,3 @@ puede generar las visualizaciones.
 
 Sincronizar el entorno virtual con `uv sync --locked`; ver
 [Primeros pasos](getting-started.md#inicio-rápido-en-local).
-
-## El notebook no encuentra el conjunto de datos
-
-Verificar que exista `data/example_data.parquet`. Si se cambió el nombre del
-archivo, definir `ML_PATHS__RAW_DATA_FILE_NAME`. Si se movió la raíz del
-proyecto, definir `ML_PATHS__PROJECT` con una ruta válida dentro del entorno
-donde se ejecuta el notebook. La derivación de `raw_data` y la ruta `/app` del
-contenedor están en [Configuración](configuration.md).

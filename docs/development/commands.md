@@ -2,20 +2,12 @@
 
 Ejecutar los comandos desde la raíz del proyecto. En local, usar el comando tal
 cual; con Docker, anteponer `docker compose run --rm dev`, que crea un
-contenedor temporal y reutiliza la imagen y el volumen de `node_modules`. El
-entrypoint sincroniza las dependencias Python y JavaScript antes de ejecutar el
-comando; ver [Docker: actualizar el entorno](docker.md#actualizar-el-entorno).
+contenedor temporal y reutiliza la imagen y el volumen de `node_modules`.
 Por ejemplo:
 
 ```bash
 docker compose run --rm dev uv run pytest -m "not slow"
 ```
-
-Los comandos con `--entrypoint` reemplazan el entrypoint y se saltan la
-sincronización de dependencias y la instalación del proyecto. Usarlos solo para
-herramientas que no necesitan `bank_clients_ml`, como `uv lock` o
-`bun install`. Para tests o scripts que importan el paquete, usar
-`docker compose run --rm dev ...`.
 
 | Tarea | Comando |
 | --- | --- |
@@ -27,3 +19,23 @@ herramientas que no necesitan `bank_clients_ml`, como `uv lock` o
 | Validar versiones de Python y uv | `uv run python scripts/check_python_versions.py` |
 | Revisar Markdown | `uv run rumdl check .` |
 | Revisar ortografía | `bun cspell --no-must-find-files "**"` |
+
+## Con docker
+
+## Interactuar con el contenedor
+
+Los comandos `exec` y `logs` requieren que el servicio esté [en ejecución en
+segundo plano](../getting-started.md#ejecutar-en-segundo-plano).
+
+| Tarea | Comando |
+| --- | --- |
+| Abrir una terminal temporal | `docker compose run --rm dev bash` |
+| Abrir una terminal | `docker compose exec dev bash` |
+| Ver logs | `docker compose logs -f dev` |
+
+`docker compose exec dev ...` no ejecuta el
+[entrypoint](docker.md#entrypoint), porque el contenedor ya está
+iniciado.
+
+Para aplicar cambios de dependencias, ver
+[Docker](docker.md#actualizar-el-entorno).
