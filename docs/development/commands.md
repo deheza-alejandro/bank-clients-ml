@@ -9,6 +9,9 @@ Por ejemplo:
 docker compose run --rm dev uv run pytest -m "not slow"
 ```
 
+La cobertura mínima exigida es del 80 %; el comando de todos los tests la
+aplica con `--cov-fail-under=80`.
+
 | Tarea | Comando |
 | --- | --- |
 | Ejecutar tests rápidos | `uv run pytest -m "not slow"` |
@@ -22,7 +25,7 @@ docker compose run --rm dev uv run pytest -m "not slow"
 
 ## Con docker
 
-## Interactuar con el contenedor
+### Interactuar con el contenedor
 
 Los comandos `exec` y `logs` requieren que el servicio esté [en ejecución en
 segundo plano](../getting-started.md#ejecutar-en-segundo-plano).

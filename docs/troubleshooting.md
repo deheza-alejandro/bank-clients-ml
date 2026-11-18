@@ -5,7 +5,7 @@
 Verificar que exista `data/example_data.parquet`. Si se cambió el nombre del
 archivo, definir `ML_PATHS__RAW_DATA_FILE_NAME`. Si se movió la raíz del
 proyecto, definir `ML_PATHS__PROJECT` con una ruta válida dentro del entorno
-donde se ejecuta el notebook. La derivación de `raw_data` y la ruta `/app` del
+donde se ejecuta el notebook. La derivación de rutas y la configuración del
 contenedor están en [Configuración](configuration.md).
 
 ## Con Docker
@@ -25,9 +25,10 @@ Si el error menciona que no se encuentra el intérprete de Python, ejecutar
 `PYTHON_VERSION` en el Dockerfile. Cambiar la versión de Python requiere
 reconstruir la imagen.
 
-Como el proyecto se instala al arrancar el contenedor, un error de empaquetado
-(por ejemplo, un `pyproject.toml` inválido o un `README.md` faltante) también
-aparece en este paso, no durante `docker compose build`. Si el contenedor se
+Un error de empaquetado (por ejemplo, un `pyproject.toml` inválido o un
+`README.md` faltante) aparece al iniciar el contenedor, no durante
+`docker compose build`; el motivo está en
+[Docker](development/docker.md#detalles-de-la-imagen). Si el contenedor se
 inició con `--entrypoint`, ese paso no se ejecuta; usar `uv sync --locked`
 dentro del contenedor o `docker compose run --rm dev ...`.
 
@@ -90,7 +91,7 @@ docker compose logs -f dev
 Verificar que se esté accediendo a <http://localhost:2718> y que el puerto no
 esté ocupado por otro proceso.
 
-### El proyecto está en Windows y el montaje es lento
+### El sistema host es Windows y el montaje es lento
 
 Se recomienda clonar el repositorio dentro del sistema de archivos de WSL2 y
 trabajar desde allí. Docker Desktop debe tener habilitada la integración con la

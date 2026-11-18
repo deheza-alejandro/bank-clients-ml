@@ -4,17 +4,27 @@ Documentación técnica de bank-clients-ml.
 
 ## [Primeros pasos](getting-started.md)
 
+Instalación y puesta en marcha con Docker o en local.
+
 ## Arquitectura
 
-- [Descripción general](architecture/overview.md)
-- [Decisiones tomadas](architecture/decisions.md)
+- [Descripción general](architecture/overview.md): módulos, pruebas y
+  limitaciones.
+- [Decisiones tomadas](architecture/decisions.md): ADR-001 a ADR-023.
 
 ## Desarrollo
 
-- [Comandos útiles](development/commands.md)
-- [Docker](development/docker.md)
-- [Hooks de Git](development/hooks.md)
+- [Comandos útiles](development/commands.md): tests, lint, comprobación
+  estática de tipos y calidad.
+- [Docker](development/docker.md): imagen, entrypoint, actualización del
+  entorno y locks.
+- [Hooks de Git](development/hooks.md): validaciones opcionales antes de
+  commit y push.
 
 ## [Configuración](configuration.md)
 
+Variables de entorno `ML_*` y archivo `.env`.
+
 ## [Solución de problemas](troubleshooting.md)
+
+Diagnóstico de errores y cómo resolverlos.

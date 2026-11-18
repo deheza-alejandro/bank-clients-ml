@@ -61,16 +61,7 @@ docs/                   Documentación detallada del proyecto
 
 ## Documentación
 
-| Documento | Contenido |
-| --- | --- |
-| [Primeros pasos](docs/getting-started.md) | Instalación y puesta en marcha con Docker o en local |
-| [Arquitectura](docs/architecture/overview.md) | Módulos, pruebas y limitaciones |
-| [Decisiones de arquitectura](docs/architecture/decisions.md) | ADR-001 a ADR-010 |
-| [Configuración](docs/configuration.md) | Variables de entorno `ML_*` y archivo `.env` |
-| [Comandos de desarrollo](docs/development/commands.md) | Tests, lint, comprobación estática de tipos y calidad |
-| [Docker](docs/development/docker.md) | Imagen, entrypoint, actualización del entorno y locks |
-| [Hooks de Git](docs/development/hooks.md) | Validaciones opcionales antes de commit y push |
-| [Solución de problemas](docs/troubleshooting.md) | Diagnóstico de errores y cómo resolverlos |
+La documentación completa está en [docs/index.md](docs/index.md).
 
 ## Stack tecnológico
 

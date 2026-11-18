@@ -28,12 +28,11 @@ Las visualizaciones se generan como SVG y se optimizan con SVGO en
 
 ## Estrategia de pruebas
 
-Las pruebas unitarias cubren los módulos del paquete; las pruebas de
-integración validan la carga de datos, la preparación y el pipeline completo.
-El marcador `slow` identifica las pruebas que exceden el umbral acordado; el
-marcador `requires_svg` identifica las que necesitan Bun y SVGO. La cobertura
-mínima exigida es del 80 %. Los comandos de validación están en
-[Comandos de desarrollo](../development/commands.md).
+Las pruebas unitarias cubren los módulos del paquete; las de integración
+validan la carga de datos, la preparación y el pipeline completo. Los marcadores
+`slow`, `requires_svg` y `requires_real_env` identifican requisitos específicos
+y se definen en `pyproject.toml`. La política de cobertura y los comandos de
+validación están en [Comandos de desarrollo](../development/commands.md).
 
 ## Limitaciones y próximos pasos
 

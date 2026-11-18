@@ -49,8 +49,8 @@ docker compose down
 docker compose up -d
 ```
 
-Si usas Windows y el montaje es lento, ver
-[esto](troubleshooting.md#el-proyecto-está-en-windows-y-el-montaje-es-lento).
+Si se usa Windows y el montaje es lento, ver
+[Solución de problemas](troubleshooting.md#el-sistema-host-es-windows-y-el-montaje-es-lento).
 
 ## Opción 2: Local
 
