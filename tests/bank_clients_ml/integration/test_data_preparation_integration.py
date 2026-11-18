@@ -1,4 +1,4 @@
-"""Tests de integración del flujo de preparación de datos."""
+"""Tests de integración del pipeline de preparación de datos."""
 
 from typing import cast
 
@@ -247,7 +247,7 @@ def test_should_build_abt_and_split_preserving_target_rate(
 def test_should_run_data_preparation_with_custom_column_names(
     custom_columns_settings: config.Settings,
 ) -> None:
-    """Verifica que el flujo respete identificador, target, mes y fechas propios.
+    """Verifica que la preparación respete identificador, target, mes y fechas propios.
 
     ## Args:
         custom_columns_settings: Configuración con columnas personalizadas.

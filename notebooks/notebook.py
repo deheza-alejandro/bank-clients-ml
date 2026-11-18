@@ -1,6 +1,6 @@
 """Cuaderno principal del proyecto bank_clients_ml.
 
-Documenta el flujo de modelado en Marimo, desde el análisis exploratorio hasta
+Documenta el proceso de modelado en Marimo, desde el análisis exploratorio hasta
 la evaluación final. Las decisiones de arquitectura están documentadas en
 `docs/architecture/decisions.md`.
 """

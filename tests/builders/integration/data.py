@@ -1,4 +1,4 @@
-"""Constructores del flujo de preparación de datos de integración."""
+"""Constructores del pipeline de preparación de datos de integración."""
 
 import dataclasses
 import datetime
@@ -25,7 +25,7 @@ _CREDIT_CARD_PRODUCTS: tuple[str, ...] = ("VISA", "MASTERCARD", "AMEX")
 
 @dataclasses.dataclass(frozen=True)
 class IntegrationPreparedData:
-    """Resultado del flujo de preparación de datos hasta la partición final.
+    """Resultado del pipeline de preparación de datos hasta la partición final.
 
     ## Attributes:
         clean_data: Datos crudos ya limpiados y tipados.
@@ -277,7 +277,7 @@ def prepare_data(
         prediction_window_size: Cantidad de meses reservados para predicción.
 
     ## Returns:
-        Artefactos intermedios y finales del flujo de preparación.
+        Artefactos intermedios y finales del pipeline de preparación.
     """
     time_window_split = build_time_window_split(
         clean_data,
@@ -339,14 +339,14 @@ def build_prepared_data(
     settings: config.Settings,
     prediction_window_size: int = 2,
 ) -> IntegrationPreparedData:
-    """Construye el flujo completo desde los datos crudos hasta la partición.
+    """Construye el pipeline completo desde los datos crudos hasta la partición.
 
     ## Args:
         settings: Configuración con los nombres de las columnas.
         prediction_window_size: Cantidad de meses reservados para predicción.
 
     ## Returns:
-        Artefactos intermedios y finales del flujo de preparación.
+        Artefactos intermedios y finales del pipeline de preparación.
     """
     raw_bank_data = build_raw_bank_data()
     clean_data = build_clean_data(raw_bank_data, settings)

@@ -5,7 +5,7 @@ modelado para reducir la dimensionalidad. Elimina en forma secuencial columnas
 constantes, columnas binarias desbalanceadas y columnas numéricas altamente
 correlacionadas.
 
-El flujo habitual consiste en crear `RedundantColumnFilter` con los conjuntos de
+El uso habitual consiste en crear `RedundantColumnFilter` con los conjuntos de
 entrenamiento y prueba, inspeccionar los descartes y analizar las correlaciones
 de las variables más relevantes.
 """
