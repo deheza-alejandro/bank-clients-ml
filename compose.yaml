@@ -1,3 +1,4 @@
+# See documentation in docs/development/docker.md
 name: bank-clients-ml
 
 services:
@@ -14,9 +15,6 @@ services:
       - "127.0.0.1:${MARIMO_HOST_PORT:-2718}:2718"
     volumes:
       - .:/app
-      # Named volume for Node: module resolution requires node_modules inside
-      # the project, and the bind mount would expose the host's binaries.
-      # Python has no such constraint.
       - node_modules:/app/node_modules
     healthcheck:
       test:

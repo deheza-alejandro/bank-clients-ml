@@ -1,8 +1,6 @@
-# Keep README.md: uv_build reads it when the entrypoint installs the project at
-# container startup and when the image is used without the bind mount.
-# Keep .gitignore: cspell uses it through useGitignore.
+# See documentation in docs/development/docker.md#dockerignore
 
-# Example data: in development, these are provided via bind mount.
+# Example data
 data/
 
 # Version control metadata
@@ -46,7 +44,7 @@ notebooks/images/
 # Generated documents
 *.pdf
 
-# Docker files are not needed inside the image
+# Docker files
 Dockerfile
 .dockerignore
 compose.yaml
