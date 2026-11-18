@@ -69,7 +69,7 @@ def build_redundant_filter(
     test_data: pl.DataFrame,
     settings: config.Settings,
 ) -> redundant_column_filter.RedundantColumnFilter:
-    """Devuelve un filtro generado a partir de los datos de prueba.
+    """Devuelve un filtro generado a partir de los datos de entrenamiento y prueba.
 
     ## Args:
         train_data: Conjunto de entrenamiento con columnas redundantes.
