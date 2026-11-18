@@ -1,3 +1,4 @@
+# See documentation in docs/development/hooks.md
 no_tty: true
 
 pre-commit:

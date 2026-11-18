@@ -6,6 +6,8 @@ con el prefijo `ML_` y, opcionalmente, un archivo `.env` en la raíz del
 proyecto; los campos anidados usan el separador `__`.
 
 Ejemplo: `ML_PATHS__RAW_DATA_FILE_NAME=example_data.parquet`.
+
+Ver documentación en docs/configuration.md
 """
 
 import pathlib
