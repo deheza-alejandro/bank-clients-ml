@@ -18,7 +18,6 @@ El repositorio contiene:
 - Un entorno de desarrollo reproducible con Docker, o con uv y Bun en local.
 - Configuración centralizada con Pydantic Settings.
 - Calidad verificada con Ruff, Pyrefly, rumdl, cspell y hooks opcionales.
-- Diagramas y gráficos centralizados en `docs/assets/`.
 - Decisiones de arquitectura documentadas como ADRs.
 
 ## Pipeline

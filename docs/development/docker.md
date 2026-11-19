@@ -36,7 +36,7 @@ dentro de `/app`, por lo que permanece en la imagen y sus cambios se descartan
 al eliminar el contenedor. La sincronización de dependencias se detalla en
 [Entrypoint](#entrypoint).
 
-`data/` y `docs/assets/plots/` forman parte del bind mount; las operaciones de
+`data/` y `docs/assets/` forman parte del bind mount; las operaciones de
 volúmenes no afectan su contenido.
 
 ## Actualizar el entorno
