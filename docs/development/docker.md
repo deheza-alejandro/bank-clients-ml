@@ -2,20 +2,42 @@
 
 ## Entorno y volúmenes
 
-La imagen aporta las dependencias de terceros de Python en `/opt/venv` y las de
-JavaScript en `node_modules`; el entrypoint las sincroniza si los locks
-cambiaron.
+El bind mount y el volumen `node_modules` persisten al recrear el contenedor.
 
-`/opt/venv` no es un volumen: cada contenedor parte de la copia de la imagen y
-sincroniza si hace falta; al detener el contenedor se descartan los cambios.
+```mermaid
+flowchart LR
+  HOST["Proyecto en el host"]
+  VOL[(node_modules)]
+  IMG["Imagen<br/>bank-clients-ml:dev"]
 
-`node_modules` sí es un named volume. La resolución de módulos requiere
-`node_modules` dentro del proyecto y el bind mount expondría los binarios del
-host; Python no tiene esa restricción. Si se reconstruye la imagen,
-`node_modules` se actualiza en el siguiente arranque.
+  subgraph CONT["Contenedor dev"]
+    APP["/app"]
+    NODE["/app/node_modules<br/>(JavaScript)"]
+    VENV["/opt/venv<br/>(Python)"]
+  end
 
-`data/` y `docs/assets/plots/` forman parte del bind mount. Ninguna operación
-de volúmenes borra su contenido.
+  HOST -->|bind mount| APP
+  VOL -->|named volume| NODE
+  IMG -->|provee| VENV
+  IMG -.->|copia inicial| NODE
+
+  classDef focus fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A;
+  classDef neutral fill:#F3F4F6,stroke:#6B7280,color:#111827;
+  class HOST,VOL,APP,NODE focus;
+  class IMG,VENV neutral;
+```
+
+*Figura 1. Origen de las rutas principales del contenedor.*
+
+`node_modules` debe estar dentro de `/app` pero un bind mount expondría los
+binarios del host, por lo tanto se monta desde un named volume. En cambio,
+`/opt/venv` no es un volumen: Python no requiere que las dependencias estén
+dentro de `/app`, por lo que permanece en la imagen y sus cambios se descartan
+al eliminar el contenedor. La sincronización de dependencias se detalla en
+[Entrypoint](#entrypoint).
+
+`data/` y `docs/assets/plots/` forman parte del bind mount; las operaciones de
+volúmenes no afectan su contenido.
 
 ## Actualizar el entorno
 
@@ -88,10 +110,10 @@ La imagen se organiza en etapas que parten de una base común:
 
 ```mermaid
 flowchart TB
-  PB[python-base] -->|Es base de| SD[system-deps]
-  PB -->|Es base de| PD[py-deps]
-  PB -->|Es base de| JD[js-deps]
-  SD -->|Es base de| DEV[dev]
+  PB[python-base] -->|Sirve de base a| SD[system-deps]
+  PB -->|Sirve de base a| PD[py-deps]
+  PB -->|Sirve de base a| JD[js-deps]
+  SD -->|Sirve de base a| DEV[dev]
   PD -->|Copia /opt/venv| DEV
   JD -->|Copia node_modules| DEV
   classDef base fill:#F3F4F6,stroke:#6B7280,color:#111827;
@@ -100,7 +122,7 @@ flowchart TB
   class SD,PD,JD,DEV deps;
 ```
 
-*Figura. La separación permite construir dependencias en paralelo y reutilizar
+*Figura 2. La separación permite construir dependencias en paralelo y reutilizar
 los artefactos en la imagen final.*
 
 `python-base` contiene solo Python y uv. Mantener fuera `apt`, el usuario de
