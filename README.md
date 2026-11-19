@@ -18,29 +18,23 @@ El repositorio contiene:
 - Un entorno de desarrollo reproducible con Docker, o con uv y Bun en local.
 - Configuración centralizada con Pydantic Settings.
 - Calidad verificada con Ruff, Pyrefly, rumdl, cspell y hooks opcionales.
+- Diagramas y gráficos centralizados en `docs/assets/`.
 - Decisiones de arquitectura documentadas como ADRs.
+
+## Pipeline
+
+El pipeline cubre seis etapas, desde el EDA y la limpieza hasta la evaluación
+por deciles. La tabla de etapas y los diagramas están en
+[Pipeline](docs/architecture/pipeline.md#etapas-del-pipeline).
 
 ## Resultados
 
-Con el conjunto de datos de ejemplo, el decil de mayor propensión obtiene un
-lift de 2,4 en entrenamiento y 2,39 en prueba. La estadística KS es de 47,03 y
-48,19, respectivamente, con una diferencia de lift de 0,01 entre ambos
-conjuntos. Estos valores son ilustrativos y pueden variar si cambia el
-conjunto de datos.
+El detalle de lift, KS y deciles está en
+[Resultados del pipeline](docs/architecture/pipeline.md#resultados).
 
-## Etapas del pipeline
+![Deciles en entrenamiento y prueba][deciles]
 
-| Etapa | Resultado |
-| --- | --- |
-| 1. EDA y limpieza inicial | Dataset consistente y tipado |
-| 2. Universo, target y ventanas temporales | Primera compra definida sin fugas de información temporales |
-| 3. Feature engineering | Variables derivadas de saldos, operaciones, tarjetas y recencia |
-| 4. ABT y partición entrenamiento/prueba | Tabla analítica base y split estratificado |
-| 5. Selección de features | Eliminación de redundancias y ranking por grupos |
-| 6. Entrenamiento y evaluación | Evaluación por deciles, lift y KS |
-
-La ejecución detallada está en `notebooks/notebook.py`. Las decisiones de
-diseño están en [Decisiones de arquitectura](docs/architecture/decisions.md).
+*Figura. El decil superior mantiene el mayor lift en entrenamiento y prueba.*
 
 ## Cómo probarlo
 
@@ -52,11 +46,12 @@ pasos de instalación y puesta en marcha están en
 
 ```text
 src/bank_clients_ml/    Paquete con la lógica del pipeline
-notebooks/              Notebook de Marimo y visualizaciones
+notebooks/              Notebook de Marimo
 tests/                  Pruebas unitarias y de integración
 scripts/                Entrypoint de Docker y validaciones
 data/                   Conjunto de datos de ejemplo
-docs/                   Documentación detallada del proyecto
+docs/                   Documentación del proyecto
+docs/assets/            Diagramas, gráficos y capturas
 ```
 
 ## Documentación
@@ -69,6 +64,7 @@ La documentación completa está en [docs/index.md](docs/index.md).
 | --- | --- |
 | Datos y modelo | Polars, NumPy, SciPy, scikit-learn, LightGBM, Matplotlib |
 | Notebook | Marimo |
+| Diagramas | Mermaid, SVG |
 | Configuración | Pydantic Settings |
 | Calidad | pytest, Ruff, Pyrefly, rumdl, cspell, SVGO |
 | Entorno | Python 3.13, uv, Bun, Docker Compose, Lefthook, Commitizen |
@@ -83,3 +79,5 @@ aceptan contribuciones externas. Ver [CONTRIBUTING.md](CONTRIBUTING.md).
 Este proyecto está bajo los términos de la **Licencia MIT**. Consultar el
 archivo [LICENSE](LICENSE) para más detalles. Las dependencias externas
 utilizadas mantienen sus respectivas licencias, tales como Apache 2.0.
+
+[deciles]: docs/assets/plots/plot_evaluation_metrics/deciles.svg

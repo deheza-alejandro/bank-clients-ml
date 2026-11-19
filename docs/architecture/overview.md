@@ -1,9 +1,24 @@
 # Arquitectura
 
-El proyecto separa el notebook, que orquesta el pipeline, de la lógica
-reutilizable del paquete. El notebook ejecuta y documenta el análisis; el
-paquete `bank_clients_ml` implementa las operaciones del pipeline. Las
-decisiones de diseño se registran en [Decisiones de arquitectura](decisions.md).
+El notebook orquesta y documenta el análisis; el paquete `bank_clients_ml`
+implementa la lógica reutilizable del pipeline. Las decisiones de diseño se
+registran en [Decisiones de arquitectura](decisions.md).
+
+## Mapa de componentes
+
+```mermaid
+flowchart LR
+  N[Notebook Marimo] -->|Orquesta| P[Paquete bank_clients_ml]
+  N -->|Lee| D[(Datos)]
+  P -->|Escribe| F[(Gráficos SVG)]
+  T[Tests] -.->|Validan| P
+  classDef focus fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A;
+  classDef data fill:#F3F4F6,stroke:#6B7280,color:#111827;
+  class N,P focus;
+  class D,F,T data;
+```
+
+*Figura. La lógica se concentra en el paquete; el recorrido visual está en [Pipeline](pipeline.md).*
 
 ## Módulos
 
@@ -23,8 +38,8 @@ decisiones de diseño se registran en [Decisiones de arquitectura](decisions.md)
 | `bivariate_table.py` | Construcción de tablas para el análisis bivariado. |
 | `marimo_utils.py` | Helpers para mostrar resultados en cuadernos Marimo. |
 
-Las visualizaciones se generan como SVG y se optimizan con SVGO en
-`notebooks/images/`.
+La generación de gráficos y diagramas se rige por
+[Convenciones visuales](../development/visuals.md).
 
 ## Estrategia de pruebas
 

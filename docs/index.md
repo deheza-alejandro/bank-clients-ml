@@ -8,9 +8,11 @@ Instalación y puesta en marcha con Docker o en local.
 
 ## Arquitectura
 
-- [Descripción general](architecture/overview.md): módulos, pruebas y
+- [Pipeline](architecture/pipeline.md): interacción entre componentes, selección de variables
+  y resultados.
+- [Arquitectura general](architecture/overview.md): módulos, pruebas y
   limitaciones.
-- [Decisiones tomadas](architecture/decisions.md): formato ADR.
+- [Decisiones de arquitectura](architecture/decisions.md): formato ADR.
 
 ## Desarrollo
 
@@ -20,6 +22,7 @@ Instalación y puesta en marcha con Docker o en local.
   entorno y locks.
 - [Hooks de Git](development/hooks.md): validaciones opcionales antes de
   commit y push.
+- [Convenciones visuales](development/visuals.md): diagramas, gráficos, imágenes.
 
 ## [Configuración](configuration.md)
 

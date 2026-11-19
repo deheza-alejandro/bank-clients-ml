@@ -55,7 +55,8 @@ las consecuencias los trade-offs.
 - **Contexto:** después del feature engineering hay columnas que no aportan
   información.
 - **Decisión:** aplicar tres filtros sucesivos: columnas constantes, columnas
-  binarias desbalanceadas y columnas numéricas con correlación alta.
+  binarias desbalanceadas con una clase por debajo del 10 % y columnas numéricas
+  con correlación absoluta superior a 0,80.
 - **Consecuencias:** el orden importa porque cada filtro reduce el conjunto del
   siguiente; se obtiene menor costo computacional y menos ruido antes del
   ranking, y los descartes se conservan para inspección.
@@ -180,9 +181,8 @@ las consecuencias los trade-offs.
   archivos más pesados.
 - **Decisión:** adoptar SVGO para optimizar los SVG generados.
 - **Consecuencias:** agrega una dependencia JavaScript ejecutada con Bun y los
-  tests que escriben SVG requieren SVGO. Los artefactos optimizados se guardan
-  en `notebooks/images/`; la estrategia se describe en
-  [Arquitectura](overview.md).
+  tests que escriben SVG requieren SVGO. La ubicación de los gráficos y el
+  procedimiento se describen en [Convenciones visuales](../development/visuals.md).
 
 ## Herramientas del entorno
 
@@ -193,7 +193,7 @@ las consecuencias los trade-offs.
   herramientas; Poetry, con otro formato de lockfile; y conda, más pesado para
   este alcance.
 - **Decisión:** adoptar uv para gestionar el entorno y las dependencias Python.
-- **Consecuencias:** un solo flujo cubre entorno, lockfile y ejecución; el
+- **Consecuencias:** una sola herramienta cubre entorno, lockfile y ejecución; el
   lockfile habilita `--locked` y el contenedor desactiva la descarga de
   intérpretes. La versión de uv debe permanecer alineada con el backend de
   construcción y con el chequeo de versiones. Los detalles del contenedor están

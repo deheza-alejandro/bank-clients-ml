@@ -84,11 +84,30 @@ estos comandos solo para herramientas que no necesitan `bank_clients_ml`, como
 
 ## Detalles de la imagen
 
-La imagen se organiza en etapas encadenadas. `python-base` contiene solo Python
-y uv: mantener fuera `apt`, el usuario de desarrollo y Bun permite que las
-etapas de dependencias empiecen antes y sobrevivan a cambios en esos elementos.
-`system-deps` agrega las librerías del sistema sobre `python-base`; `py-deps` y
-`js-deps` construyen las dependencias en paralelo; `dev` es la imagen final.
+La imagen se organiza en etapas que parten de una base común:
+
+```mermaid
+flowchart TB
+  PB[python-base] -->|Es base de| SD[system-deps]
+  PB -->|Es base de| PD[py-deps]
+  PB -->|Es base de| JD[js-deps]
+  SD -->|Es base de| DEV[dev]
+  PD -->|Copia /opt/venv| DEV
+  JD -->|Copia node_modules| DEV
+  classDef base fill:#F3F4F6,stroke:#6B7280,color:#111827;
+  classDef deps fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A;
+  class PB base;
+  class SD,PD,JD,DEV deps;
+```
+
+*Figura. La separación permite construir dependencias en paralelo y reutilizar
+los artefactos en la imagen final.*
+
+`python-base` contiene solo Python y uv. Mantener fuera `apt`, el usuario de
+desarrollo y Bun permite que las etapas de dependencias empiecen antes y
+sobrevivan a cambios en esos elementos. `system-deps` agrega las librerías del
+sistema sobre `python-base`; `py-deps` y `js-deps` construyen las dependencias
+en paralelo. `dev` es la imagen final.
 
 `system-deps` instala `libgomp1`, requerido por LightGBM, y
 `fonts-dejavu-core`, que mantiene reproducible la salida de Matplotlib. Los
@@ -105,7 +124,7 @@ contra la imagen. El primer `uv sync` monta `.python-version` para fallar rápid
 si la versión no coincide con la imagen.
 
 `js-deps` instala las herramientas JavaScript que usan SVGO y cspell. Esta etapa
-hereda Python solo para el helper del marker; no espera a `apt` ni al usuario de
+toma Python solo para el helper del marker; no espera a `apt` ni al usuario de
 desarrollo. La imagen de Bun distribuye `bunx` como symlink, así que al copiar
 solo el binario `bun` se recrea el enlace.
 
