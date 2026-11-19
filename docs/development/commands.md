@@ -23,7 +23,7 @@ aplica con `--cov-fail-under=80`.
 | Revisar Markdown | `uv run rumdl check .` |
 | Revisar ortografía | `bun cspell --no-must-find-files "**"` |
 
-## Con docker
+## Con Docker
 
 ### Interactuar con el contenedor
 
