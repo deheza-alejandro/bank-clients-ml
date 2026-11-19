@@ -1,7 +1,7 @@
 """Generación y guardado de gráficos para análisis y evaluación del modelo.
 
 Este módulo centraliza las visualizaciones utilizadas en el notebook.
-Por defecto, todas las figuras se guardan como archivos SVG optimizados con SVGO
+Por defecto, todos los gráficos se guardan como archivos SVG optimizados con SVGO
 a través de Bun. La estrategia de guardado puede sustituirse con `figure_saver`.
 """
 
@@ -84,29 +84,29 @@ def _save_fig_with_svgo(fig: Figure, svg_path: pathlib.Path) -> None:
 def _save_fig_as_svg(
     fig: Figure,
     plot_name: str,
-    images_dir: pathlib.Path,
-    images_sub_dir: str = "",
+    plots_dir: pathlib.Path,
+    plots_sub_dir: str = "",
     *,
     figure_saver: FigureSaver,
 ) -> None:
-    """Guarda una figura en la ruta SVG correspondiente y la cierra.
+    """Guarda un gráfico en la ruta SVG correspondiente y lo cierra.
 
     Crea la carpeta de destino si no existe y delega la escritura en la
     estrategia de guardado indicada. La figura se cierra siempre al finalizar,
     incluso si el guardado falla.
 
     El resultado se exporta a:
-    {images_dir}/{images_sub_dir}/{plot_name}.svg
+    {plots_dir}/{plots_sub_dir}/{plot_name}.svg
 
     ## Args:
         fig: Figura de Matplotlib a guardar. Queda cerrada tras la operación.
         plot_name: Nombre base del archivo, sin extensión.
-        images_dir: Directorio base donde se guardan las imágenes.
-        images_sub_dir: Subdirectorio opcional dentro del directorio base.
+        plots_dir: Directorio base donde se guardan los gráficos.
+        plots_sub_dir: Subdirectorio opcional dentro del directorio base.
         figure_saver: Estrategia que escribe la figura en la ruta indicada.
     """
     with _closing_figure(fig):
-        output_folder = images_dir / images_sub_dir
+        output_folder = plots_dir / plots_sub_dir
         output_folder.mkdir(parents=True, exist_ok=True)
         svg_path = output_folder / f"{plot_name}.svg"
         figure_saver(fig, svg_path)
@@ -183,8 +183,8 @@ def plot_top_features(
 ) -> None:
     """Genera y guarda un gráfico con las variables más importantes.
 
-    La figura se exporta a:
-    {settings.paths.images}/plot_top_features/{plot_name}.svg
+    El gráfico se exporta a:
+    {settings.paths.plots}/plot_top_features/{plot_name}.svg
 
     ## Args:
         variables_to_plot: Tabla con las variables y sus importancias,
@@ -193,7 +193,7 @@ def plot_top_features(
         roc_auc: Métrica ROC AUC a mostrar en el título del gráfico.
         top_n: Cantidad máxima de variables a incluir en el gráfico.
         settings: Configuración con los nombres de columnas de variable e importancia,
-            y el directorio base donde se guarda la imagen.
+            y el directorio base donde se guarda el gráfico.
         figure_saver: Estrategia de guardado. Si no se indica, se usa el guardado SVG
             optimizado con SVGO.
     """
@@ -209,7 +209,7 @@ def plot_top_features(
     _save_fig_as_svg(
         fig,
         plot_name,
-        settings.paths.images,
+        settings.paths.plots,
         "plot_top_features",
         figure_saver=figure_saver,
     )
@@ -233,7 +233,7 @@ def _build_bivariate_chart_figure(
 ) -> Figure:
     """Construye el gráfico bivariado individual para una variable.
 
-    Construye una figura con dos secciones: una tabla de análisis en la parte
+    Construye un gráfico con dos secciones: una tabla de análisis en la parte
     superior, y en la parte inferior un gráfico bivariado de barras con la cantidad de
     clientes por bin junto con una línea del porcentaje de la variable
     target en un eje secundario.
@@ -298,8 +298,8 @@ def _plot_single_bivariate_chart(
 ) -> None:
     """Genera y guarda el gráfico bivariado individual para una variable.
 
-    La figura se exporta a:
-    {settings.paths.images}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
+    El gráfico se exporta a:
+    {settings.paths.plots}/bivariate_analysis/{analysis_name}/{variable_to_plot}.svg
 
     ## Args:
         bivariate_table: Análisis bivariado con el nombre de la variable
@@ -308,14 +308,14 @@ def _plot_single_bivariate_chart(
             como nombre del archivo generado.
         analysis_name: Nombre del análisis. Define el subdirectorio de salida.
         settings: Configuración con el nombre de la columna target y el directorio
-            base donde se guarda la imagen.
+            base donde se guarda el gráfico.
         figure_saver: Estrategia que escribe la figura en la ruta indicada.
     """
     fig = _build_bivariate_chart_figure(bivariate_table, settings)
     _save_fig_as_svg(
         fig,
         bivariate_table.snake_case_name,
-        settings.paths.images,
+        settings.paths.plots,
         f"bivariate_analysis/{analysis_name}",
         figure_saver=figure_saver,
     )
@@ -336,14 +336,14 @@ def plot_bivariate_charts(
     hay pocas tablas, y ejecución en paralelo con procesos separados en caso
     contrario para acelerar la generación de una gran cantidad de gráficos.
 
-    Las imágenes se exportan a:
-    {settings.paths.images}/bivariate_analysis/{analysis_name}/
+    Los gráficos se exportan a:
+    {settings.paths.plots}/bivariate_analysis/{analysis_name}/
 
     ## Args:
         bivariate_tables: Tablas de análisis bivariados a graficar.
         analysis_name: Nombre del análisis. Define el subdirectorio de salida.
         settings: Configuración con el nombre de la columna target y el
-            directorio base donde se guardan las imágenes.
+            directorio base donde se guardan los gráficos.
         max_workers: Cantidad máxima de procesos en paralelo. Si no se indica,
             se usan todos los núcleos disponibles. Si se indica el valor 1 o si
             hay menos de 20 tablas, se utiliza ejecución secuencial.
@@ -425,13 +425,13 @@ def plot_roc_curve(
 ) -> None:
     """Genera y guarda una curva ROC con las métricas resumidas de evaluación.
 
-    La figura se exporta a:
-    {settings.paths.images}/plot_evaluation_metrics/{plot_name}.svg
+    El gráfico se exporta a:
+    {settings.paths.plots}/plot_evaluation_metrics/{plot_name}.svg
 
     ## Args:
         evaluation_metrics: Métricas del modelo.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
-        settings: Configuración con el directorio base donde se guarda la imagen.
+        settings: Configuración con el directorio base donde se guarda el gráfico.
         figure_saver: Estrategia de guardado. Si no se indica, se usa el guardado SVG
             optimizado con SVGO.
     """
@@ -441,7 +441,7 @@ def plot_roc_curve(
     _save_fig_as_svg(
         fig,
         plot_name,
-        settings.paths.images,
+        settings.paths.plots,
         "plot_evaluation_metrics",
         figure_saver=figure_saver,
     )
@@ -535,13 +535,13 @@ def plot_deciles(
 ) -> None:
     """Genera y guarda un gráfico con tablas de deciles de entrenamiento y prueba.
 
-    La figura se exporta a:
-    {settings.paths.images}/plot_evaluation_metrics/{plot_name}.svg
+    El gráfico se exporta a:
+    {settings.paths.plots}/plot_evaluation_metrics/{plot_name}.svg
 
     ## Args:
         evaluation_metrics: Métricas del modelo.
         plot_name: Nombre base del archivo SVG a generar, sin extensión.
-        settings: Configuración con el directorio base donde se guarda la imagen.
+        settings: Configuración con el directorio base donde se guarda el gráfico.
         figure_saver: Estrategia de guardado. Si no se indica, se usa el guardado SVG
             optimizado con SVGO.
     """
@@ -551,7 +551,7 @@ def plot_deciles(
     _save_fig_as_svg(
         fig,
         plot_name,
-        settings.paths.images,
+        settings.paths.plots,
         "plot_evaluation_metrics",
         figure_saver=figure_saver,
     )

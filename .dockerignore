@@ -34,7 +34,7 @@ node_modules/
 
 # Marimo session state and generated artifacts
 notebooks/__marimo__/
-notebooks/images/
+docs/assets/plots/
 
 # Local secrets and environment overrides
 .env

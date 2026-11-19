@@ -688,7 +688,7 @@ def _(column_filter):
 @app.cell
 def _(group_trainers):
     mo_utils.build_plot_tabs(
-        group_trainers.groups_name_mapping, settings.paths.images / "plot_top_features"
+        group_trainers.groups_name_mapping, settings.paths.plots / "plot_top_features"
     )
     return
 
@@ -699,7 +699,7 @@ def _(group_trainers, top_grouped_features_trainer):
     mo.ui.tabs(
         {
             "Top grouped features importances": mo.image(
-                src=settings.paths.images
+                src=settings.paths.plots
                 / "plot_top_features"
                 / "top_grouped_features.svg"
             ),
@@ -740,7 +740,7 @@ def _(bivariate_analyzer, top_grouped_features_trainer):
     bivariate_analyzer.plot_bivariate(_uncorrelated_name_mapping, "uncorrelated")
     mo_utils.build_plot_tabs(
         _uncorrelated_name_mapping,
-        settings.paths.images / "bivariate_analysis" / "uncorrelated",
+        settings.paths.plots / "bivariate_analysis" / "uncorrelated",
     )
     return
 
@@ -778,7 +778,7 @@ def _(bivariate_analyzer, correlations_dict):
     bivariate_analyzer.plot_bivariate(_correlated_name_mapping, "correlated")
     mo_utils.build_plot_tabs(
         _correlated_name_mapping,
-        settings.paths.images / "bivariate_analysis" / "correlated",
+        settings.paths.plots / "bivariate_analysis" / "correlated",
     )
     return
 
@@ -846,7 +846,7 @@ def _(result):
     result.plot_bivariate_analysis("best_features")
     mo_utils.build_plot_tabs(
         result.name_mapping,
-        settings.paths.images / "bivariate_analysis" / "best_features",
+        settings.paths.plots / "bivariate_analysis" / "best_features",
     )
     return
 
@@ -871,7 +871,7 @@ def _(result):
     mo.ui.tabs(
         {
             "Best Features Importances": mo.image(
-                src=settings.paths.images / "plot_top_features" / "best_features.svg"
+                src=settings.paths.plots / "plot_top_features" / "best_features.svg"
             ),
             "Best Features Cross Validation Results": mo_utils.build_trainer_cv_view(
                 result.trainer, include_logs=True
@@ -891,8 +891,8 @@ def _(result):
 def _():
     mo.md(rf"""
     ## 6.1 Performance Metrics
-    {mo.image(src=settings.paths.images / "plot_evaluation_metrics" / "roc_curve.svg")}
-    {mo.image(src=settings.paths.images / "plot_evaluation_metrics" / "deciles.svg")}
+    {mo.image(src=settings.paths.plots / "plot_evaluation_metrics" / "roc_curve.svg")}
+    {mo.image(src=settings.paths.plots / "plot_evaluation_metrics" / "deciles.svg")}
 
     Los valores siguientes corresponden a la ejecución del notebook con
     `data/example_data.parquet`; son ilustrativos y pueden variar si cambia el

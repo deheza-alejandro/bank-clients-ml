@@ -91,7 +91,7 @@ class FeaturesSelection:
 
         ## Args:
             analysis_name: Nombre del análisis. Define el subdirectorio de salida
-                de las imágenes.
+                de los gráficos.
             max_bins_quantity: Cantidad máxima de bines por variable.
         """
         visualization.plot_bivariate_charts(
@@ -221,7 +221,7 @@ class BivariateAnalyzer:
         ## Args:
             name_mapping: Mapeo entre nombres originales y finales.
             analysis_name: Nombre del análisis. Define el subdirectorio de salida
-                de las imágenes.
+                de los gráficos.
             max_bins_quantity: Cantidad máxima de bines por variable.
         """
         visualization.plot_bivariate_charts(

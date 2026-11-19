@@ -14,8 +14,8 @@ sincroniza si hace falta; al detener el contenedor se descartan los cambios.
 host; Python no tiene esa restricción. Si se reconstruye la imagen,
 `node_modules` se actualiza en el siguiente arranque.
 
-`data/` y `notebooks/images/` forman parte del bind mount. Ninguna operación de
-volúmenes borra su contenido.
+`data/` y `docs/assets/plots/` forman parte del bind mount. Ninguna operación
+de volúmenes borra su contenido.
 
 ## Actualizar el entorno
 

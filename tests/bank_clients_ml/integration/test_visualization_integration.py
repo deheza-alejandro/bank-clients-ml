@@ -38,7 +38,7 @@ def test_should_write_top_features_bivariate_roc_and_deciles_svgs(
     visualization.plot_bivariate_charts se ejecuta de forma secuencial.
 
     ## Args:
-        integration_settings: Configuración con un directorio de imágenes temporal.
+        integration_settings: Configuración con un directorio de gráficos temporal.
     """
     top_features = pl.DataFrame(
         {
@@ -102,17 +102,17 @@ def test_should_write_top_features_bivariate_roc_and_deciles_svgs(
     visualization.plot_deciles(metrics, "deciles", integration_settings)
 
     svg_paths = (
-        integration_settings.paths.images / "plot_top_features" / "top_features.svg",
-        integration_settings.paths.images
+        integration_settings.paths.plots / "plot_top_features" / "top_features.svg",
+        integration_settings.paths.plots
         / "bivariate_analysis"
         / "integration_analysis"
         / "age.svg",
-        integration_settings.paths.images
+        integration_settings.paths.plots
         / "bivariate_analysis"
         / "integration_analysis"
         / "income.svg",
-        integration_settings.paths.images / "plot_evaluation_metrics" / "roc_curve.svg",
-        integration_settings.paths.images / "plot_evaluation_metrics" / "deciles.svg",
+        integration_settings.paths.plots / "plot_evaluation_metrics" / "roc_curve.svg",
+        integration_settings.paths.plots / "plot_evaluation_metrics" / "deciles.svg",
     )
     for svg_path in svg_paths:
         assert svg_path.is_file()
@@ -129,7 +129,7 @@ def test_should_write_bivariate_top_features_and_evaluation_svgs(
 
     ## Args:
         synthetic_train: Conjunto sintético con variables y target.
-        integration_settings: Configuración con un directorio de imágenes temporal.
+        integration_settings: Configuración con un directorio de gráficos temporal.
     """
     feature_columns = [
         column for column in synthetic_train.columns if column.startswith("Feature_")
@@ -172,7 +172,7 @@ def test_should_write_bivariate_top_features_and_evaluation_svgs(
     )
 
     expected_bivariate_paths = [
-        integration_settings.paths.images
+        integration_settings.paths.plots
         / "bivariate_analysis"
         / analysis_name
         / f"{column}.svg"
@@ -182,17 +182,17 @@ def test_should_write_bivariate_top_features_and_evaluation_svgs(
     expected_svg_paths = [
         *expected_bivariate_paths,
         (
-            integration_settings.paths.images
+            integration_settings.paths.plots
             / "plot_top_features"
             / "integration_selection_top_features.svg"
         ),
         (
-            integration_settings.paths.images
+            integration_settings.paths.plots
             / "plot_evaluation_metrics"
             / "integration_selection_roc.svg"
         ),
         (
-            integration_settings.paths.images
+            integration_settings.paths.plots
             / "plot_evaluation_metrics"
             / "integration_selection_deciles.svg"
         ),

@@ -12,14 +12,14 @@ from bank_clients_ml import config
     [pathlib.Path("repo"), pathlib.Path("repo/nested")],
     ids=["simple", "nested"],
 )
-def test_should_derive_data_and_images_paths_from_project(
+def test_should_derive_data_and_plots_paths_from_project(
     project: pathlib.Path,
 ) -> None:
-    """Verifica que las rutas de datos e imágenes se deriven correctamente a partir del proyecto."""
+    """Verifica que las rutas de datos y gráficos se deriven correctamente a partir del proyecto."""
     paths = config.DirectoryPaths(project=project)
 
     assert paths.raw_data == project / "data" / "example_data.parquet"
-    assert paths.images == project / "notebooks" / "images"
+    assert paths.plots == project / "docs" / "assets" / "plots"
 
 
 def test_should_resolve_paths_from_project_and_not_from_working_directory(

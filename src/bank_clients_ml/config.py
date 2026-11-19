@@ -29,7 +29,7 @@ class DirectoryPaths(pydantic.BaseModel):
         project: Directorio raíz del proyecto.
         raw_data_file_name: Nombre del archivo parquet de entrada.
         raw_data: Ruta completa del parquet, calculada dinámicamente a partir de project.
-        images: Directorio de imágenes, calculado dinámicamente a partir de project.
+        plots: Directorio de gráficos SVG, calculado dinámicamente a partir de project.
     """
 
     model_config = pydantic.ConfigDict(frozen=True, extra="forbid")
@@ -48,9 +48,9 @@ class DirectoryPaths(pydantic.BaseModel):
 
     @pydantic.computed_field
     @property
-    def images(self) -> pathlib.Path:
-        """Directorio de imágenes calculado dinámicamente a partir de project."""
-        return self.project / "notebooks" / "images"
+    def plots(self) -> pathlib.Path:
+        """Directorio de gráficos SVG calculado dinámicamente a partir de project."""
+        return self.project / "docs" / "assets" / "plots"
 
 
 class DatasetColumns(pydantic.BaseModel):

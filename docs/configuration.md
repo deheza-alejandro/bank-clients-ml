@@ -33,9 +33,8 @@ En el uso normal no es necesario definir `ML_PATHS__PROJECT`: el sistema lo
 calcula desde la ubicación de `config.py` y en el contenedor de desarrollo
 corresponde a `/app`.
 
-`Settings` deriva `raw_data` e `images` de `paths.project`; `raw_data` es
-`paths.project / "data" / paths.raw_data_file_name`. No admiten configuración
-independiente.
+`Settings` deriva `raw_data` y `plots` de `paths.project`. No admiten
+configuración independiente.
 
 Al reemplazar el conjunto de datos, conservar el nombre
 `example_data.parquet` o definir `ML_PATHS__RAW_DATA_FILE_NAME`. Después de

@@ -20,19 +20,19 @@ def build_plot_tabs(
     directory: pathlib.Path,
     orientation: Literal["horizontal", "vertical"] = "vertical",
 ) -> mo.Html:
-    """Presenta imágenes SVG como pestañas en Marimo.
+    """Presenta gráficos SVG como pestañas en Marimo.
 
-    Construye una pestaña por cada entrada del mapeo, cargando la imagen SVG
+    Construye una pestaña por cada entrada del mapeo, cargando el gráfico SVG
     correspondiente desde el directorio indicado.
 
     ## Args:
         name_mapping: Mapeo de nombres de archivo en snake_case a títulos
             legibles para las pestañas.
-        directory: Directorio donde se encuentran las imágenes.
+        directory: Directorio donde se encuentran los gráficos.
         orientation: Orientación de las pestañas.
 
     ## Returns:
-        Componente interactivo de Marimo con las imágenes renderizadas.
+        Componente interactivo de Marimo con los gráficos renderizados.
     """
     return mo.ui.tabs(
         {

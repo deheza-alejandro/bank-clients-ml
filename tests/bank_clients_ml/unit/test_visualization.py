@@ -18,7 +18,7 @@ from bank_clients_ml import bivariate_table, config, visualization
 
 @pytest.fixture
 def plot_settings(tmp_path: pathlib.Path) -> config.Settings:
-    """Devuelve una configuración con las imágenes en un directorio temporal.
+    """Devuelve una configuración con los gráficos en un directorio temporal.
 
     ## Args:
         tmp_path: Directorio temporal proporcionado por pytest.
@@ -39,7 +39,7 @@ def test_should_close_figure_after_plotting_top_features(
 
     ## Args:
         mocker: Utilidad para evitar la ejecución de SVGO.
-        plot_settings: Configuración con un directorio de imágenes temporal.
+        plot_settings: Configuración con un directorio de gráficos temporal.
     """
     top_features_table = tests.builders.unit.visualization.build_top_features_table()
     mocker.patch.object(visualization.subprocess, "run")
@@ -62,7 +62,7 @@ def test_should_raise_runtime_error_and_close_figure_when_bun_is_missing(
 
     ## Args:
         mocker: Utilidad para simular la ausencia del ejecutable.
-        plot_settings: Configuración con un directorio de imágenes temporal.
+        plot_settings: Configuración con un directorio de gráficos temporal.
     """
     top_features_table = tests.builders.unit.visualization.build_top_features_table()
     mocker.patch.object(
@@ -119,9 +119,7 @@ def test_should_build_top_features_figure_with_requested_limit_and_expected_titl
 
     assert len(saved) == 1
     fig, svg_path = saved[0]
-    assert svg_path == (
-        plot_settings.paths.images / "plot_top_features" / "model_a.svg"
-    )
+    assert svg_path == (plot_settings.paths.plots / "plot_top_features" / "model_a.svg")
     assert plt.get_fignums() == []
 
     ax = fig.axes[0]
@@ -167,7 +165,7 @@ def test_should_use_configured_column_names_in_top_features_figure(
     assert len(saved) == 1
     fig, svg_path = saved[0]
     assert svg_path == (
-        custom_settings.paths.images / "plot_top_features" / "custom.svg"
+        custom_settings.paths.plots / "plot_top_features" / "custom.svg"
     )
 
     ax = fig.axes[0]
@@ -198,7 +196,7 @@ def test_should_build_bivariate_figure_with_table_bars_and_target_percentage_lin
     assert len(saved) == 1
     fig, svg_path = saved[0]
     assert svg_path == (
-        plot_settings.paths.images / "bivariate_analysis" / "test_analysis" / "age.svg"
+        plot_settings.paths.plots / "bivariate_analysis" / "test_analysis" / "age.svg"
     )
 
     ax_table, ax_graph, ax_target_pct = fig.axes
@@ -271,7 +269,7 @@ def test_should_use_configured_columns_in_bivariate_figure(
     assert len(saved) == 1
     fig, svg_path = saved[0]
     assert svg_path == (
-        custom_settings.paths.images
+        custom_settings.paths.plots
         / "bivariate_analysis"
         / "custom_analysis"
         / "income.svg"
@@ -303,7 +301,7 @@ def test_should_build_roc_curve_figure_with_metrics_annotation(
     """Verifica la curva ROC, la diagonal y la anotación de métricas.
 
     ## Args:
-        plot_settings: Configuración con un directorio de imágenes temporal.
+        plot_settings: Configuración con un directorio de gráficos temporal.
     """
     evaluation_metrics = tests.builders.unit.visualization.build_evaluation_metrics()
     saved, saver = tests.builders.unit.visualization.build_capture_saver()
@@ -318,7 +316,7 @@ def test_should_build_roc_curve_figure_with_metrics_annotation(
     assert len(saved) == 1
     fig, svg_path = saved[0]
     assert svg_path == (
-        plot_settings.paths.images / "plot_evaluation_metrics" / "test_model.svg"
+        plot_settings.paths.plots / "plot_evaluation_metrics" / "test_model.svg"
     )
 
     ax = fig.axes[0]
@@ -342,7 +340,7 @@ def test_should_build_train_and_test_deciles_in_single_figure(
     """Verifica títulos, ejes, cabeceras y redondeo de las tablas de deciles.
 
     ## Args:
-        plot_settings: Configuración con un directorio de imágenes temporal.
+        plot_settings: Configuración con un directorio de gráficos temporal.
     """
     evaluation_metrics = tests.builders.unit.visualization.build_evaluation_metrics()
     saved, saver = tests.builders.unit.visualization.build_capture_saver()
@@ -357,7 +355,7 @@ def test_should_build_train_and_test_deciles_in_single_figure(
     assert len(saved) == 1
     fig, svg_path = saved[0]
     assert svg_path == (
-        plot_settings.paths.images / "plot_evaluation_metrics" / "deciles.svg"
+        plot_settings.paths.plots / "plot_evaluation_metrics" / "deciles.svg"
     )
 
     assert len(fig.axes) == 2
