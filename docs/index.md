@@ -22,7 +22,6 @@ Instalación y puesta en marcha con Docker o en local.
   entorno y locks.
 - [Hooks de Git](development/hooks.md): validaciones opcionales antes de
   commit y push.
-- [Convenciones visuales](development/visuals.md): diagramas, gráficos, imágenes.
 
 ## [Configuración](configuration.md)
 

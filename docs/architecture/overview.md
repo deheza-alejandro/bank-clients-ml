@@ -80,8 +80,11 @@ importación.*
 | `marimo_utils.py` | Helpers para mostrar resultados en cuadernos Marimo. |
 | `config.py` | Configuración central del proyecto; el detalle está en [Configuración](../configuration.md). |
 
-La generación de gráficos y diagramas se rige por
-[Convenciones visuales](../development/visuals.md).
+## Generación de gráficos
+
+Los gráficos del notebook se regeneran al ejecutarlo; `visualization.py` aplica
+SVGO cuando está disponible. Los pasos para ejecutar el notebook están en
+[Primeros pasos](../getting-started.md).
 
 ## Estrategia de pruebas
 

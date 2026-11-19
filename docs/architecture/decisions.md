@@ -181,8 +181,7 @@ las consecuencias los trade-offs.
   archivos más pesados.
 - **Decisión:** adoptar SVGO para optimizar los SVG generados.
 - **Consecuencias:** agrega una dependencia JavaScript ejecutada con Bun y los
-  tests que escriben SVG requieren SVGO. La ubicación de los gráficos y el
-  procedimiento se describen en [Convenciones visuales](../development/visuals.md).
+  tests que escriben SVG requieren SVGO.
 
 ## Herramientas del entorno
 
