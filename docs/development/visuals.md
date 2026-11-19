@@ -11,10 +11,12 @@ visual y se puedan reutilizar desde el README y la documentación.
 | `docs/assets/plots/` | Gráficos SVG generados por el notebook | No |
 | `docs/assets/images/` | Capturas e imágenes manuales | Sí |
 
-Los diagramas Mermaid se ubican en la página que los explica. Si otro documento
-los necesita, se enlaza a esa sección en lugar de duplicarlos.
+Los diagramas Mermaid se ubican en la página que los explica. Cada recurso se
+mantiene en un solo lugar; los demás documentos que necesiten un mismo recurso
+enlazan a esa sección.
 
-No usar `docs_dir = "."` y no duplicar assets fuera de `docs/`.
+No usar `docs_dir = "."`: el sitio debe limitarse a `docs/` para no publicar
+archivos ajenos a la documentación. No duplicar assets fuera de `docs/`.
 
 ## Regenerar los gráficos
 
