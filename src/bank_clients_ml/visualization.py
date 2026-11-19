@@ -377,10 +377,7 @@ def plot_bivariate_charts(
                 future.result()
 
 
-def _build_roc_curve_figure(
-    evaluation_metrics: evaluation.EvaluationMetrics,
-    plot_name: str,
-) -> Figure:
+def _build_roc_curve_figure(evaluation_metrics: evaluation.EvaluationMetrics) -> Figure:
     """Construye una curva ROC con las métricas resumidas de evaluación.
 
     Dibuja la tasa de verdaderos positivos frente a la tasa de falsos positivos,
@@ -389,7 +386,6 @@ def _build_roc_curve_figure(
 
     ## Args:
         evaluation_metrics: Métricas del modelo.
-        plot_name: Nombre del gráfico que se muestra en el título.
 
     ## Returns:
         Figura construida, sin guardar en disco.
@@ -399,7 +395,7 @@ def _build_roc_curve_figure(
     ax.plot([0, 1], [0, 1], color="gray", linestyle="--", alpha=0.7)
     ax.set_xlabel("False Positive Rate (FPR)")
     ax.set_ylabel("True Positive Rate (TPR)")
-    ax.set_title(f"ROC Curve - {plot_name}")
+    ax.set_title("ROC Curve")
 
     ax.annotate(
         f"Accuracy: {evaluation_metrics.accuracy:.6f}\nROC AUC: {evaluation_metrics.roc_auc:.6f}",
@@ -437,7 +433,7 @@ def plot_roc_curve(
     """
     figure_saver = figure_saver or _save_fig_with_svgo
 
-    fig = _build_roc_curve_figure(evaluation_metrics, plot_name)
+    fig = _build_roc_curve_figure(evaluation_metrics)
     _save_fig_as_svg(
         fig,
         plot_name,

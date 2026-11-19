@@ -328,7 +328,7 @@ def test_should_build_roc_curve_figure_with_metrics_annotation(
     np.testing.assert_allclose(ydata_1, [0.0, 1.0])
     assert ax.get_xlabel() == "False Positive Rate (FPR)"
     assert ax.get_ylabel() == "True Positive Rate (TPR)"
-    assert ax.get_title() == "ROC Curve - test_model"
+    assert ax.get_title() == "ROC Curve"
     assert ax.texts[0].get_text() == "Accuracy: 0.765432\nROC AUC: 0.876543"
     assert ax.get_xlim() == (0.0, 1.0)
     assert ax.get_ylim() == (0.0, 1.0)
