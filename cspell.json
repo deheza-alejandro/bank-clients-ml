@@ -15,12 +15,14 @@
         "data-science-tools"
     ],
     "useGitignore": true,
+    "enableGlobDot": true,
     "ignorePaths": [
         "data/**",
         "**/*.svg",
         ".vscode/**",
         "cspell.json",
-        "**/LICENSE"
+        "**/LICENSE",
+        ".git/**"
     ],
     "files": [
         "src/**",
@@ -47,6 +49,8 @@
         "bivariados",
         "bivariate",
         "boxstyle",
+        "buildx",
+        "Buildx",
         "bunx",
         "cardinalidad",
         "codespell",
