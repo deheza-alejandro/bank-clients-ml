@@ -97,12 +97,11 @@ validación están en [Comandos de desarrollo](../development/commands.md).
 ## Limitaciones y próximos pasos
 
 El repositorio cubre el proceso analítico y de experimentación. No incluye un
-servicio de inferencia, CI, monitoreo de drift ni registro de modelos.
+servicio de inferencia, monitoreo de drift ni registro de modelos.
 
 Los próximos pasos posibles son:
 
 - Batch scoring programado.
 - Empaquetado y despliegue del modelo.
-- CI para ejecutar las validaciones en cada cambio.
 - Monitoreo de drift y alertas sobre la distribución de entradas y resultados.
 - Registro de modelos y versionado de artefactos.

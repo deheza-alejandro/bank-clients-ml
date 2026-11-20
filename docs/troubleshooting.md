@@ -153,3 +153,21 @@ son:
 En un checkout de solo lectura, sin intención de crear un commit,
 `uv sync --frozen` instala desde el lockfile sin comprobar si está
 actualizado. Es una salida temporal; no corrige la inconsistencia.
+
+## GitHub Actions
+
+### El check `CI success` falla
+
+Abrir el job que falló en la pestaña Actions. Las causas frecuentes son:
+
+| Causa | Acción |
+| --- | --- |
+| Lockfile desactualizado | Actualizar el lock correspondiente; ver [Docker: actualizar locks](development/docker.md#comandos-para-actualizar-locks). |
+| Fallo del healthcheck de Docker | Revisar los logs del job y reproducir el arranque con `docker compose up --build`; ver [Docker](development/docker.md). |
+
+### El job Docker falla al escribir en el bind mount
+
+CI construye la imagen con el UID y el GID del runner. Si se cambia el entorno
+de ejecución, alinear esos valores con los del usuario que ejecuta el
+contenedor. El detalle de los permisos está en
+[esta misma página](#aparece-permission-denied-al-escribir-archivos).

@@ -20,6 +20,7 @@ Instalación y puesta en marcha con Docker o en local.
   estática de tipos y calidad.
 - [Docker](development/docker.md): imagen, entrypoint, actualización del
   entorno y locks.
+- [Integración continua](development/ci.md): workflow, jobs, cache.
 - [Hooks de Git](development/hooks.md): validaciones opcionales antes de
   commit y push.
 

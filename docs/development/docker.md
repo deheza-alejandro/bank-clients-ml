@@ -141,9 +141,10 @@ esta etapa porque el entrypoint ejecuta `uv sync --locked` en cada arranque e
 instala el paquete desde el código montado en aproximadamente un segundo. Como
 los cambios en `src/` no modifican las dependencias, la capa se reutiliza. El
 trade-off es que los errores de empaquetado aparecen al iniciar el contenedor y
-no durante el build; por eso CI debe instalar el proyecto y ejecutar los tests
-contra la imagen. El primer `uv sync` monta `.python-version` para fallar rápido
-si la versión no coincide con la imagen.
+no durante el build; por eso CI construye la imagen y ejecuta un smoke test del
+entrypoint, que instala el proyecto y arranca el servicio. Ver [CI](ci.md#docker).
+El primer `uv sync` monta `.python-version` para fallar rápido si la versión no
+coincide con la imagen.
 
 `js-deps` instala las herramientas JavaScript que usan SVGO y cspell. Esta etapa
 toma Python solo para el helper del marker; no espera a `apt` ni al usuario de

@@ -28,6 +28,7 @@ __marimo__/
 
 # Tests
 .coverage
+coverage.xml
 htmlcov/
 .pytest_cache/
 

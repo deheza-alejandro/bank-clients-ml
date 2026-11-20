@@ -1,5 +1,9 @@
 # bank-clients-ml
 
+[![CI][ci-badge]][ci-link]
+[![Python][python-badge]](.python-version)
+[![License][license-badge]](LICENSE)
+
 Pipeline de Machine Learning reproducible para priorizar clientes con mayor
 propensión a comprar un paquete financiero.
 
@@ -17,7 +21,8 @@ El repositorio contiene:
 - Tests unitarios y de integración con una cobertura mínima del 80 %.
 - Un entorno de desarrollo reproducible con Docker, o con uv y Bun en local.
 - Configuración centralizada con Pydantic Settings.
-- Calidad verificada con Ruff, Pyrefly, rumdl, cspell y hooks opcionales.
+- Calidad verificada con Ruff, Pyrefly, rumdl, cspell y GitHub Actions; hooks
+  opcionales.
 - Decisiones de arquitectura documentadas como ADRs.
 
 ## Pipeline
@@ -66,6 +71,7 @@ La documentación completa está en [docs/index.md](docs/index.md).
 | Diagramas | Mermaid, SVG |
 | Configuración | Pydantic Settings |
 | Calidad | pytest, Ruff, Pyrefly, rumdl, cspell, SVGO |
+| CI | GitHub Actions |
 | Entorno | Python 3.13, uv, Bun, Docker Compose, Lefthook, Commitizen |
 
 ## Contribución
@@ -80,3 +86,8 @@ archivo [LICENSE](LICENSE) para más detalles. Las dependencias externas
 utilizadas mantienen sus respectivas licencias, tales como Apache 2.0.
 
 [deciles]: docs/assets/plots/plot_evaluation_metrics/deciles.svg
+
+[ci-badge]: https://github.com/deheza-alejandro/bank-clients-ml/actions/workflows/ci.yml/badge.svg
+[ci-link]: https://github.com/deheza-alejandro/bank-clients-ml/actions/workflows/ci.yml
+[python-badge]: https://img.shields.io/badge/dynamic/regex?url=https://raw.githubusercontent.com/deheza-alejandro/bank-clients-ml/main/.python-version&search=(.*)&replace=$1&label=Python&color=3776AB&logo=python&logoColor=white
+[license-badge]: https://img.shields.io/github/license/deheza-alejandro/bank-clients-ml

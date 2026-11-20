@@ -42,3 +42,9 @@ Para desactivarlos:
 ```bash
 uv run lefthook uninstall
 ```
+
+## Relación con CI
+
+Los hooks son opcionales y buscan anticipar las mismas validaciones antes de un
+commit o un push. No reemplazan al workflow de CI: la referencia completa de los jobs
+y del check requerido está en [Integración continua](ci.md).

@@ -6,6 +6,9 @@ data/
 # Version control metadata
 .git
 
+# CI configuration
+.github
+
 # Editor and operating system files
 .vscode
 .idea
@@ -23,6 +26,7 @@ __pycache__/
 .pyrefly_cache/
 .coverage
 .coverage.*
+coverage.xml
 htmlcov/
 build/
 dist/
