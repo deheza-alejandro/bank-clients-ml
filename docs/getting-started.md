@@ -6,7 +6,7 @@ requiere clonar el repositorio.
 ## Clonar el repositorio
 
 ```bash
-git clone <URL-del-repositorio>
+git clone https://github.com/deheza-alejandro/bank-clients-ml.git
 ```
 
 Ir al directorio del proyecto.
