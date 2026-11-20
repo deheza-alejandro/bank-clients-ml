@@ -177,8 +177,8 @@ respect-gitignore = true
 # [tool.rumdl.MD007]
 # indent = 4  # Unordered list indentation
 
-# [tool.rumdl.MD013]
-# line-length = 100  # Line length
+[tool.rumdl.MD013]
+line-length = 90
 # code-blocks = false  # Exclude code blocks from line length check
 # tables = false  # Exclude tables from line length check
 # headings = true  # Include headings in line length check
