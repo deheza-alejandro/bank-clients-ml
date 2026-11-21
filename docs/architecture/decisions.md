@@ -120,8 +120,9 @@ las consecuencias los trade-offs.
   evaluaron pre-commit, con más dependencias y enfoque Python, y husky, que
   depende del ecosistema Node.
 - **Decisión:** adoptar Lefthook como orquestador de los hooks de Git.
-- **Consecuencias:** los trabajos se ejecutan en paralelo y la instalación se
-  limita a un binario. Los hooks son opt-in y su configuración debe mantenerse
+- **Consecuencias:** los jobs se ejecutan en paralelo cuando son
+  independientes y en orden cuando comparten recursos o estado; la instalación
+  se limita a un binario. Los hooks son opt-in y su configuración debe mantenerse
   alineada con [Comandos de desarrollo](../development/commands.md); los
   detalles de activación están en [Hooks de Git](../development/hooks.md).
 

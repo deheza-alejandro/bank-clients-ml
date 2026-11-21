@@ -110,38 +110,33 @@ puede generar las visualizaciones.
 Sincronizar el entorno virtual con `uv sync --locked`; ver
 [Primeros pasos](getting-started.md#inicio-rápido-en-local).
 
-### Sincronización fallida tras checkout, merge o rewrite
+### Sincronización fallida del entorno
 
-El hook `uv-sync-locked` falla cuando `uv sync --locked` no puede sincronizar
-el entorno después de una operación de checkout, merge o rewrite. Para
-determinar la causa, ejecutar:
+Los hooks que sincronizan dependencias fallan cuando
+`uv sync --locked` o `bun install --frozen-lockfile` no pueden dejar el
+entorno en el estado de los lockfiles. Ocurre después de checkout, merge o
+rewrite, y también antes del push. Estos comandos
+no corrigen los lockfiles: fallan si están desactualizados.
 
-```bash
-uv lock --check
-```
+| Entorno | Comprobación sin escritura | Sincronización modificando lockfile | Sincronización sin modificar lockfile |
+| --- | --- | --- | --- |
+| Python | `uv lock --check` | `uv lock` | `uv sync --locked` |
+| JavaScript | `bun install --frozen-lockfile --dry-run` | `bun install` | `bun install --frozen-lockfile` |
 
-Si el comando falla, el lockfile está desactualizado, falta o no se puede
-resolver. En ese caso:
+Para corregir una inconsistencia:
 
 1. Revisar `git status` y guardar temporalmente o descartar los cambios
-   locales en `pyproject.toml` que no se vayan a incluir en el commit, ya que
-   `uv lock` los incorporaría al lockfile.
-2. Verificar la versión de uv si el error menciona un lockfile no soportado;
-   una versión incompatible puede reescribir el lockfile con un formato
-   distinto.
-3. Ejecutar `uv lock`.
-4. Revisar el diff de `uv.lock` y confirmar que solo cambió lo esperado para
-   no mezclar el arreglo con otras dependencias.
-5. Ejecutar `uv sync --locked`.
-6. Agregar `uv.lock` al commit.
+   locales en `pyproject.toml` o `package.json` que no se vayan a incluir en el
+   commit, ya que una "Sincronización modificando lockfile" los incorporaría al lockfile.
+2. Ejecutar la "Comprobación sin escritura" del entorno afectado.
+3. Si falla, ejecutar la "Sincronización modificando lockfile".
+4. Revisar el diff del lockfile y confirmar que solo cambió lo esperado para no
+   mezclar el arreglo con otras dependencias.
+5. Ejecutar "Sincronización sin modificar lockfile".
+6. Agregar el lockfile al commit correspondiente y reintentar la operación.
 
-Si `uv.lock` tiene marcadores de conflicto o no se puede leer, restaurarlo
-desde Git o resolver el conflicto antes de ejecutar `uv lock`. Si `uv lock`
-falla por red, credenciales o un conflicto de versiones, corregir esa causa
-antes de reintentar.
-
-Si `uv lock --check` pasa, el problema no es el lockfile. Las causas posibles
-son:
+Si la "Comprobación sin escritura" pasa, el problema no es el lockfile. En Python, las causas
+posibles son:
 
 | Causa | Acción |
 | --- | --- |
@@ -149,6 +144,17 @@ son:
 | Red, índice o credenciales | Revisar la conexión y la configuración del índice; reintentar. |
 | Falla la compilación de una dependencia | Revisar el error; instalar las dependencias del sistema o usar Docker. |
 | Permisos, disco o caché | Corregir permisos y espacio; si se sospecha corrupción, ejecutar `uv cache clean` y, si el problema persiste, eliminar `.venv`. |
+
+En JavaScript, comprobar la versión de Bun contra el requisito de
+[Primeros pasos](getting-started.md#opción-2-local), la conexión de red y los
+permisos de `node_modules`. Si el error aparece al escribir en `node_modules`
+dentro de Docker, ver
+[errores de permisos](#aparece-permission-denied-al-escribir-archivos).
+
+Si el lockfile tiene marcadores de conflicto o no se puede leer, restaurarlo
+desde Git o resolver el conflicto antes de actualizarlo. Si la actualización
+falla por red, credenciales, versión de la herramienta o un conflicto de
+versiones, corregir esa causa antes de reintentar.
 
 En un checkout de solo lectura, sin intención de crear un commit,
 `uv sync --frozen` instala desde el lockfile sin comprobar si está
