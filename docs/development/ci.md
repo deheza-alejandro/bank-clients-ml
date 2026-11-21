@@ -25,7 +25,7 @@ también ejecuta el workflow para que el check requerido no quede pendiente.
 | `python-quality` | Lockfile y sincronización, formato, lint, tipos, versiones de herramientas y configuración de Lefthook. |
 | `markdown` | Lint y formato de Markdown con rumdl. |
 | `spelling` | Ortografía con cspell. |
-| `tests` | Suite completa de pytest y cobertura mínima del 80 %. |
+| `tests` | Suite completa de pytest, cobertura mínima del 80 % y publicación del reporte en el job summary. |
 | `docker` | Configuración de Compose, build del target `dev` y healthcheck del servicio. |
 | `ci-success` | Agrega los resultados; es el check que debe exigirse en la protección de rama. |
 
