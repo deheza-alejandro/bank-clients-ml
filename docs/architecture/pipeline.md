@@ -1,7 +1,7 @@
 # Pipeline
 
-Recorrido visual del pipeline de bank-clients-ml: qué entra, qué se transforma
-y cómo se evalúa.
+Recorrido visual del pipeline de bank-clients-ml: qué entra,
+qué se transforma y cómo se evalúa.
 
 ## Etapas del pipeline
 
@@ -16,8 +16,7 @@ y cómo se evalúa.
 
 ## Interacción entre notebook y paquete
 
-La secuencia muestra el orden temporal de una ejecución, no las funciones
-internas.
+La secuencia muestra el orden temporal de una ejecución, no las funciones internas.
 
 ```mermaid
 sequenceDiagram
@@ -39,41 +38,45 @@ sequenceDiagram
   Note over N,F: Si falta Bun/SVGO, los SVG no se generan.
 ```
 
-*Figura 1. La secuencia cubre el flujo esperado. La separación de
-responsabilidades está en [Arquitectura](overview.md).*
+*Figura 1.
+La secuencia cubre el flujo esperado.
+La separación de responsabilidades está en [Arquitectura](overview.md).*
 
 ## Selección de features
 
 ![Ranking de importancia de las features finales][importancias]
 
-*Figura 2. Las cuatro features finales concentran la información usada por el
-modelo. El [ranking por grupos][top_grouped] está disponible como SVG.*
+*Figura 2.
+Las cuatro features finales concentran la información usada por el modelo.
+El [ranking por grupos][top_grouped] está disponible como SVG.*
 
 ## Resultados
 
-Los gráficos corresponden a `data/example_data.parquet`. Los valores son
-ilustrativos y pueden variar si cambia el conjunto de datos.
+Los gráficos corresponden a `data/example_data.parquet`.
+Los valores son ilustrativos y pueden variar si cambia el conjunto de datos.
 
 ### Curva ROC
 
 ![Curva ROC del modelo final][roc]
 
-*Figura 3. La curva ROC resume la capacidad de discriminación del modelo sobre
-el conjunto de prueba. El cálculo está en `evaluation.py`.*
+*Figura 3.
+La curva ROC resume la capacidad de discriminación del modelo sobre el conjunto de
+prueba.
+El cálculo está en `evaluation.py`.*
 
 ### Lift por deciles
 
 ![Lift por deciles en entrenamiento y prueba][deciles]
 
-*Figura 4. La diferencia de lift entre entrenamiento y prueba es mínima.*
+*Figura 4.
+La diferencia de lift entre entrenamiento y prueba es mínima.*
 
 | Métrica | Entrenamiento | Prueba |
 | --- | --- | --- |
 | Lift del decil superior | 2,4 | 2,39 |
 | KS | 47,03 | 48,19 |
 
-El análisis bivariado completo está en
-`docs/assets/plots/bivariate_analysis/`.
+El análisis bivariado completo está en `docs/assets/plots/bivariate_analysis/`.
 
 ## Reproducir
 

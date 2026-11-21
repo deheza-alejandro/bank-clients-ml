@@ -1,8 +1,8 @@
 # Arquitectura
 
-El notebook orquesta y documenta el análisis; el paquete `bank_clients_ml`
-implementa la lógica reutilizable del pipeline. Las decisiones de diseño se
-registran en [Decisiones de arquitectura](decisions.md).
+El notebook orquesta y documenta el análisis;
+el paquete `bank_clients_ml` implementa la lógica reutilizable del pipeline.
+Las decisiones de diseño se registran en [Decisiones de arquitectura](decisions.md).
 
 ## Mapa de componentes
 
@@ -18,8 +18,8 @@ flowchart LR
   class D,F,T data;
 ```
 
-*Figura 1. El recorrido
-visual está en [Pipeline](pipeline.md).*
+*Figura 1.
+El recorrido visual está en [Pipeline](pipeline.md).*
 
 ## Módulos
 
@@ -59,9 +59,9 @@ flowchart TB
   class ED,MU,CF neutral;
 ```
 
-*Figura 2. Los módulos se agrupan por etapa y por soporte transversal; las
-flechas representan el avance del pipeline, no las dependencias de
-importación.*
+*Figura 2.
+Los módulos se agrupan por etapa y por soporte transversal;
+las flechas representan el avance del pipeline, no las dependencias de importación.*
 
 | Módulo | Responsabilidad |
 | --- | --- |
@@ -82,22 +82,23 @@ importación.*
 
 ## Generación de gráficos
 
-Los gráficos del notebook se regeneran al ejecutarlo; `visualization.py` aplica
-SVGO cuando está disponible. Los pasos para ejecutar el notebook están en
-[Primeros pasos](../getting-started.md).
+Los gráficos del notebook se regeneran al ejecutarlo;
+`visualization.py` aplica SVGO cuando está disponible.
+Los pasos para ejecutar el notebook están en [Primeros pasos](../getting-started.md).
 
 ## Estrategia de pruebas
 
-Las pruebas unitarias cubren los módulos del paquete; las de integración
-validan la carga de datos, la preparación y el pipeline completo. Los marcadores
-`slow`, `requires_svg` y `requires_real_env` identifican requisitos específicos
-y se definen en `pyproject.toml`. La política de cobertura y los comandos de
-validación están en [Comandos de desarrollo](../development/commands.md).
+Las pruebas unitarias cubren los módulos del paquete;
+las de integración validan la carga de datos, la preparación y el pipeline completo.
+Los marcadores `slow`, `requires_svg` y `requires_real_env` identifican requisitos
+específicos y se definen en `pyproject.toml`.
+La política de cobertura y los comandos de validación están en
+[Comandos de desarrollo](../development/commands.md).
 
 ## Limitaciones y próximos pasos
 
-El repositorio cubre el proceso analítico y de experimentación. No incluye un
-servicio de inferencia, monitoreo de drift ni registro de modelos.
+El repositorio cubre el proceso analítico y de experimentación.
+No incluye un servicio de inferencia, monitoreo de drift ni registro de modelos.
 
 Los próximos pasos posibles son:
 

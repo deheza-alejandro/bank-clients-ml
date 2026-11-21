@@ -1,7 +1,7 @@
 # Primeros pasos
 
-Guía para ejecutar bank-clients-ml con Docker o en local. En ambos casos se
-requiere clonar el repositorio.
+Guía para ejecutar bank-clients-ml con Docker o en local.
+En ambos casos se requiere clonar el repositorio.
 
 ## Clonar el repositorio
 
@@ -30,12 +30,14 @@ Después, elegir una de las dos opciones.
 docker compose up
 ```
 
-Abrir <http://localhost:2718> en el navegador. La primera vez construye la
-imagen y descarga Python, uv, Bun y las dependencias; las ejecuciones siguientes
-arrancan en segundos. Marimo se publica únicamente en `127.0.0.1` (así que no es
-accesible desde otra máquina de la red) para poder ejecutarlo sin token de
-acceso. El contenedor arranca Marimo con `--watch` y recarga el notebook cuando
-el archivo se guarda desde el host.
+Abrir <http://localhost:2718> en el navegador.
+La primera vez construye la imagen y descarga Python, uv, Bun y las dependencias;
+las ejecuciones siguientes arrancan en segundos.
+Marimo se publica únicamente en `127.0.0.1`
+(así que no es accesible desde otra máquina de la red)
+para poder ejecutarlo sin token de acceso.
+El contenedor arranca Marimo con `--watch` y recarga el notebook cuando el archivo se
+guarda desde el host.
 
 ### Detener y eliminar el contenedor
 
@@ -56,8 +58,8 @@ Si se usa Windows y el montaje es lento, ver
 
 ### Requisitos
 
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) 0.12.1, o una
-  versión superior que sea menor a 0.13.0.
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) 0.12.1, o una versión
+  superior que sea menor a 0.13.0.
 - [Bun](https://bun.sh/docs/installation) 1.4 o superior.
 - No es necesario instalar Python 3.13; uv puede instalarlo automáticamente.
 
@@ -79,9 +81,10 @@ bun install --frozen-lockfile
 uv run marimo edit notebooks/notebook.py
 ```
 
-`uv sync --locked` instala las dependencias de Python, incluido el grupo de
-desarrollo. `bun install --frozen-lockfile` instala SVGO, cspell y el resto de
-las herramientas de JavaScript. Marimo abre el notebook en el navegador.
+`uv sync --locked` instala las dependencias de Python, incluido el grupo de desarrollo.
+`bun install --frozen-lockfile` instala SVGO,
+cspell y el resto de las herramientas de JavaScript.
+Marimo abre el notebook en el navegador.
 
 ### Notebook en modo de solo lectura
 
@@ -95,8 +98,8 @@ uv run marimo run notebooks/notebook.py
 uv run marimo edit notebooks/notebook.py --headless --watch
 ```
 
-`--headless` deja la URL en la terminal para abrirla manualmente y `--watch`
-aplica los cambios guardados fuera de Marimo.
+`--headless` deja la URL en la terminal para abrirla manualmente y `--watch` aplica los
+cambios guardados fuera de Marimo.
 
 En Docker y en local, si se usa `--watch` al ejecutar el notebook de Marimo,
 evitar editar la misma celda en dos lugares al mismo tiempo.
