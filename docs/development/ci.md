@@ -22,7 +22,7 @@ también ejecuta el workflow para que el check requerido no quede pendiente.
 
 | Job | Validación |
 | --- | --- |
-| `python-quality` | Lockfile, formato, lint, tipos, versiones de herramientas y configuración de Lefthook. |
+| `python-quality` | Lockfile y sincronización, formato, lint, tipos, versiones de herramientas y configuración de Lefthook. |
 | `markdown` | Lint y formato de Markdown con rumdl. |
 | `spelling` | Ortografía con cspell. |
 | `tests` | Suite completa de pytest y cobertura mínima del 80 %. |
@@ -59,12 +59,19 @@ ejecuciones manuales de otras ramas reutilizan la caché existente.
   `ARG UV_VERSION` del `Dockerfile`.
 - Bun se instala con la versión fijada en el workflow, alineada con
   `ARG BUN_VERSION` del `Dockerfile`.
-- Los lockfiles se validan con `--locked` y `--frozen-lockfile`.
+- En CI no se ejecuta `uv lock --check` por separado: `uv sync --locked` ya
+  falla si el lockfile no está actualizado.
+- El lockfile de Bun se valida con `--frozen-lockfile`.
+- Las validaciones que ejecutan herramientas instaladas en el runner consumen
+  el entorno que CI acaba de sincronizar: `uv run --no-sync` y
+  `bun --no-install` no vuelven a resolver ni instalar dependencias.
 - Las actions se fijan a un SHA completo con un comentario de versión.
 
-La actualización de uv o Bun requiere modificar el `Dockerfile` y el workflow;
-`scripts/check_python_versions.py` valida la coherencia del `Dockerfile` con el
-proyecto.
+La actualización de uv requiere modificar el `Dockerfile` y el workflow; si la
+nueva versión queda fuera del rango de `uv_build`, también `pyproject.toml`.
+`scripts/check_python_versions.py` valida Python y uv. La versión de Bun se
+mantiene alineada entre el `Dockerfile` y el workflow, y
+[Primeros pasos](../getting-started.md#opción-2-local) declara el mínimo.
 
 ## Diagnóstico
 
