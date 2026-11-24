@@ -1,6 +1,5 @@
 {
   "name": "bank-clients-ml",
-  "module": "index.ts",
   "type": "module",
   "private": true,
   "license": "MIT",
