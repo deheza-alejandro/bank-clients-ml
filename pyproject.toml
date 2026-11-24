@@ -186,7 +186,7 @@ reflow-mode = "semantic-line-breaks"
 # headings = true  # Include headings in line length check
 
 [tool.rumdl.MD033]
-allowed-elements = ["details", "summary", "b", "br"]
+allowed-elements = ["details", "summary", "b", "br", "div"]
 
 # [tool.rumdl.MD044]
 # names = ["rumdl", "Markdown", "GitHub"]  # Proper names that should be capitalized correctly
