@@ -84,7 +84,7 @@ uv run marimo edit notebooks/notebook.py
 `uv sync --locked` instala las dependencias de Python, incluido el grupo de desarrollo.
 `bun install --frozen-lockfile` instala SVGO,
 cspell y el resto de las herramientas de JavaScript.
-Marimo abre el notebook en el navegador.
+Marimo abre el notebook en el navegador predeterminado de forma automática.
 
 ### Notebook en modo de solo lectura
 

@@ -1,8 +1,13 @@
 # Comandos de desarrollo
 
 Ejecutar los comandos desde la raíz del proyecto.
-En local, usar el comando tal cual; con Docker, anteponer `docker compose run --rm dev`,
-que crea un contenedor temporal y reutiliza la imagen y el volumen de `node_modules`.
+En local, usar el comando tal cual; con Docker, anteponer:
+
+```bash
+docker compose run --rm dev
+```
+
+Esto crea un contenedor temporal y reutiliza la imagen y el volumen de `node_modules`.
 Por ejemplo:
 
 ```bash
