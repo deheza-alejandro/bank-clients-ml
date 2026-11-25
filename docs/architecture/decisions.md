@@ -2,8 +2,7 @@
 
 Registro de las decisiones que condicionan el pipeline,
 las dependencias de desarrollo y el entorno de trabajo.
-Cada entrada indica el contexto, la decisión y sus consecuencias;
-el contexto recoge las alternativas evaluadas y las consecuencias los trade-offs.
+Cada entrada indica el contexto, la decisión y sus consecuencias.
 
 ## Decisiones del pipeline
 
@@ -17,8 +16,8 @@ el contexto recoge las alternativas evaluadas y las consecuencias los trade-offs
 
 ### ADR-002: Configuración centralizada con Pydantic Settings
 
-- **Contexto:** las rutas, los nombres de columna y los parámetros varían entre entornos
-  y deben ser reproducibles.
+- **Contexto:** las rutas, los nombres de columna y los parámetros pueden variar entre
+  entornos y deben ser reproducibles.
 - **Decisión:** centralizar la configuración en `Settings` con el prefijo `ML_` y un
   archivo `.env` opcional.
 - **Consecuencias:** una sola fuente de verdad; los entornos se ajustan sin modificar
@@ -48,7 +47,7 @@ el contexto recoge las alternativas evaluadas y las consecuencias los trade-offs
   por la recencia entre el último producto y el mes siguiente al último mes de
   entrenamiento.
 - **Consecuencias:** se expresa la misma información en una escala relativa y estable en
-  el tiempo; el modelo no depende del calendario.
+  el tiempo.
 
 ### ADR-006: Reducción de dimensionalidad en tres etapas
 
@@ -76,7 +75,7 @@ el contexto recoge las alternativas evaluadas y las consecuencias los trade-offs
 - **Decisión:** agrupar las features relevantes en bines y codificar cada bin con su
   porcentaje de target; las categóricas ya codificadas solo se agrupan en bines.
 - **Consecuencias:** se captura la no linealidad sin ampliar dimensiones; los bines
-  fusionados simplifican la lectura.
+  fusionados simplifican la lectura y la interpretación.
 
 ### ADR-009: LightGBM sin estandarizar ni balancear
 
@@ -112,7 +111,7 @@ el contexto recoge las alternativas evaluadas y las consecuencias los trade-offs
 ### ADR-012: Lefthook como orquestador de hooks
 
 - **Contexto:** se necesitan hooks rápidos y paralelos para validaciones de Python y
-  JavaScript sin incorporar un framework de hooks basado en Node.
+  JavaScript.
   Se evaluaron pre-commit, con más dependencias y enfoque Python, y husky,
   que depende del ecosistema Node.
 - **Decisión:** adoptar Lefthook como orquestador de los hooks de Git.
@@ -133,7 +132,7 @@ el contexto recoge las alternativas evaluadas y las consecuencias los trade-offs
 
 ### ADR-014: Pyrefly para comprobación de tipos
 
-- **Contexto:** el código usa anotaciones de Python 3.13 y necesita una comprobación de
+- **Contexto:** el código usa anotaciones de Python y necesita una comprobación de
   tipos.
   Se evaluaron mypy y pyright.
 - **Decisión:** adoptar Pyrefly, escrito en rust, para comprobación de tipos.
@@ -146,9 +145,9 @@ el contexto recoge las alternativas evaluadas y las consecuencias los trade-offs
   Se evaluaron Black con  
   Flake8 e isort, que multiplican herramientas y configuraciones, y pylint,
   más lento y con un enfoque distinto.
-- **Decisión:** adoptar Ruff para lint y formato.
-- **Consecuencias:** una sola herramienta cubre ambas tareas y la selección de reglas
-  vive en `pyproject.toml`.
+- **Decisión:** adoptar Ruff, escrito en rust, para lint y formato.
+- **Consecuencias:** una sola herramienta cubre ambas tareas,
+  el chequeo es rápido y la selección de reglas vive en `pyproject.toml`.
   Los comandos de validación están en
   [Comandos de desarrollo](../development/commands.md).
 
@@ -157,9 +156,10 @@ el contexto recoge las alternativas evaluadas y las consecuencias los trade-offs
 - **Contexto:** la documentación necesita lint y formato.
   Se evaluaron markdownlint-cli2, que agrega otra herramienta Node; Prettier,
   con un estilo distinto y enfoque JavaScript; y la revisión manual, que no escala.
-- **Decisión:** adoptar rumdl para lint y formato de Markdown.
-- **Consecuencias:** el binario se instala con uv y los bloques Python dentro de los
-  archivos markdown se validan con Ruff.
+- **Decisión:** adoptar rumdl, escrito en rust, para lint y formato de Markdown.
+- **Consecuencias:** el chequeo es rápido,
+  el binario se instala con uv y los bloques Python dentro de los archivos markdown se
+  validan con Ruff.
   La configuración vive en `pyproject.toml` y los comandos en
   [Comandos de desarrollo](../development/commands.md).
 
@@ -180,8 +180,8 @@ el contexto recoge las alternativas evaluadas y las consecuencias los trade-offs
 
 ### ADR-018: SVGO para optimización de SVG
 
-- **Contexto:** el notebook genera gráficos SVG que deben ocupar menos espacio,
-  sin metadata ni comentarios, y evitar colisiones de IDs.
+- **Contexto:** el notebook genera gráficos SVG que deben ser versionados en Git,
+  ocupar menos espacio, sin metadata ni comentarios, y evitar colisiones de IDs.
   Se evaluaron la limpieza manual, propensa a errores; y prescindir de la optimización,
   con archivos más pesados.
 - **Decisión:** adoptar SVGO para optimizar los SVG generados.
