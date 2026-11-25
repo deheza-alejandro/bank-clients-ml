@@ -1,6 +1,7 @@
 # Configuración
 
-La configuración central está en `src/bank_clients_ml/config.py`.
+La configuración central está en
+[`src/bank_clients_ml/config.py`](/src/bank_clients_ml/config.py).
 La clase `Settings` agrupa las rutas,
 los nombres de las columnas y los parámetros globales, como `random_state` y `n_jobs`.
 Las variables de entorno redefinen los valores por defecto definidos en ese archivo.
@@ -19,7 +20,7 @@ ML_DATASET__TARGET=Target
 
 El listado completo de variables y sus valores por defecto está en `Settings`,
 `DirectoryPaths`, `DatasetColumns` y `AnalysisColumns`,
-en `src/bank_clients_ml/config.py`.
+en [`src/bank_clients_ml/config.py`](/src/bank_clients_ml/config.py).
 
 El archivo `.env` de la raíz del proyecto es opcional y está ignorado por Git.
 El sistema solo lee del archivo las variables con prefijo `ML_`,

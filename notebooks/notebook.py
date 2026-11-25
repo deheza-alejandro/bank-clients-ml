@@ -895,8 +895,7 @@ def _():
     {mo.image(src=settings.paths.plots / "plot_evaluation_metrics" / "deciles.svg")}
 
     Los valores siguientes corresponden a la ejecución del notebook con
-    `data/example_data.parquet`; son ilustrativos y pueden variar si cambia el
-    conjunto de datos.
+    `data/example_data.parquet`; pueden variar si cambia el conjunto de datos.
 
     ### Training
 

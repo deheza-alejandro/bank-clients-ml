@@ -21,8 +21,8 @@ Después, elegir una de las dos opciones.
 
 ### Requisitos
 
-- Docker Engine o Docker Desktop con Docker Compose v2.
-- No es necesario instalar Python, uv ni Bun en la máquina host.
+- [Docker Engine](https://docs.docker.com/engine/install/) o
+  [Docker Desktop](https://docs.docker.com/desktop/) con Docker Compose v2.
 
 ### Inicio rápido con Docker
 

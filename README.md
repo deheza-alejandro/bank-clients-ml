@@ -1,10 +1,19 @@
+<div align="center"> <!-- rumdl-disable-line first-line-heading -->
+
 # bank-clients-ml
+
+Pipeline de Machine Learning reproducible para priorizar clientes con mayor propensión a
+comprar un paquete financiero.
 
 [![CI][ci-badge]][ci-link] [![Python][python-badge]](.python-version)
 [![License][license-badge]](LICENSE)
 
-Pipeline de Machine Learning reproducible para priorizar clientes con mayor propensión a
-comprar un paquete financiero.
+[Cómo probar el proyecto con docker o en local](docs/getting-started.md) •
+[Documentación completa](docs/index.md)
+
+![Banner](docs/assets/screenshots/marimo.png)
+
+</div>
 
 ## Resumen
 
@@ -14,9 +23,10 @@ optimizar las campañas del banco.
 
 El repositorio contiene:
 
-- Un notebook de Marimo que documenta el pipeline completo.
-- Un paquete de Python con la lógica reutilizable en `src/bank_clients_ml`, separada del
-  notebook.
+- Un notebook de Marimo que documenta el pipeline completo,
+  desde el EDA hasta la evaluación final.
+- Un paquete de Python con la lógica reutilizable en
+  [`src/bank_clients_ml`](/src/bank_clients_ml/), separada del notebook.
 - Tests unitarios y de integración con una cobertura mínima del 80 %.
 - Un entorno de desarrollo reproducible con Docker, o con uv y Bun en local.
 - Configuración centralizada con Pydantic Settings.
@@ -24,28 +34,28 @@ El repositorio contiene:
   opcionales.
 - Decisiones de arquitectura documentadas como ADRs.
 
-## Pipeline
-
-El pipeline cubre seis etapas,
-desde el EDA y la limpieza hasta la evaluación por deciles.
-La tabla de etapas y los diagramas están en
-[Pipeline](docs/architecture/pipeline.md#etapas-del-pipeline).
-
 ## Resultados
 
-El detalle de lift, KS y deciles está en
-[Resultados del pipeline](docs/architecture/pipeline.md#resultados).
+Según el set de test, del dataset de referencia,
+contactar el 9,2 % de clientes con mayor score captura 22,1 % de los compradores.
+Bajo costo por contacto constante y sin costos fijos,
+el costo por comprador es 0,42 veces el baseline, o sea, un 58,2 % menos.
 
 ![Deciles en entrenamiento y prueba][deciles]
 
-*Figura.
-El decil superior mantiene el mayor lift en entrenamiento y prueba.*
+*Figura 1.
+El detalle de ROC, lift, KS y deciles está en
+[Resultados del pipeline](docs/architecture/pipeline.md#resultados).*
 
 ## Cómo probarlo
 
 El proyecto se ejecuta con Docker, o con uv y Bun en local.
 Los requisitos y los pasos de instalación y puesta en marcha están en
 [Primeros pasos](docs/getting-started.md).
+
+## Documentación
+
+La documentación completa está en [`docs/index.md`](docs/index.md).
 
 ## Estructura del repositorio
 
@@ -58,10 +68,6 @@ data/                   Conjunto de datos de ejemplo
 docs/                   Documentación del proyecto
 docs/assets/            Diagramas, gráficos y capturas
 ```
-
-## Documentación
-
-La documentación completa está en [docs/index.md](docs/index.md).
 
 ## Stack tecnológico
 

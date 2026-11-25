@@ -1,8 +1,10 @@
 # Arquitectura
 
 El notebook orquesta y documenta el análisis;
-el paquete `bank_clients_ml` implementa la lógica reutilizable del pipeline.
-Las decisiones de diseño se registran en [Decisiones de arquitectura](decisions.md).
+el paquete [`bank_clients_ml`](/src/bank_clients_ml/) implementa la lógica reutilizable
+del pipeline.
+Las decisiones de arquitectura se registran en
+[Decisiones de arquitectura](decisions.md).
 
 ## Mapa de componentes
 
@@ -102,7 +104,9 @@ No incluye un servicio de inferencia, monitoreo de drift ni registro de modelos.
 
 Los próximos pasos posibles son:
 
-- Batch scoring programado.
-- Empaquetado y despliegue del modelo.
-- Monitoreo de drift y alertas sobre la distribución de entradas y resultados.
-- Registro de modelos y versionado de artefactos.
+- Incorporar una CLI que ejecute el pipeline completo, con una prueba de integración
+  sobre el dataset de ejemplo y un job de GitHub Actions que replique esa ejecución.
+- Validar los datasets de entrada con Pandera o una herramienta equivalente, para
+  detectar cambios de esquema y valores fuera de rango antes del procesamiento.
+- Definir un entorno de producción con Docker, separado del entorno de desarrollo.
+- Empaquetar y desplegar el modelo.
