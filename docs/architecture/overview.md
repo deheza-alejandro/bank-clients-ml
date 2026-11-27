@@ -92,8 +92,8 @@ Los pasos para ejecutar el notebook están en [Primeros pasos](../getting-starte
 
 Las pruebas unitarias cubren los módulos del paquete;
 las de integración validan la carga de datos, la preparación y el pipeline completo.
-Los marcadores `slow`, `requires_svg` y `requires_real_env` identifican requisitos
-específicos y se definen en `pyproject.toml`.
+Los marcadores de pytest identifican requisitos específicos y se definen en
+[`pyproject.toml`](/pyproject.toml).
 La política de cobertura y los comandos de validación están en
 [Comandos de desarrollo](../development/commands.md).
 

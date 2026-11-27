@@ -14,8 +14,7 @@ Por ejemplo:
 docker compose run --rm dev uv run pytest -m "not slow"
 ```
 
-La cobertura mínima exigida es del 80 %;
-el comando de todos los tests la aplica con `--cov-fail-under=80`.
+La cobertura mínima exigida esta especificada en [ci.yaml](/.github/workflows/ci.yml).
 
 | Tarea | Comando |
 | --- | --- |
